@@ -1,0 +1,13 @@
+{
+  "name": "watch-party",
+  "version": "1.0.0",
+  "description": "Watch Party - Plataforma para ver videos en sincronía en tiempo real",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build"
+  },
+  "keywords": ["watchparty", "video", "sync", "socketio", "webrtc"],
+  "author": "",
+  "license": "MIT"
+}
