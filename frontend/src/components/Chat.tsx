@@ -36,9 +36,18 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage }) => {
         ) : (
           messages.map((m) => {
             const isSystem = m.user === 'Sistema';
+            if (isSystem) {
+              return (
+                <div key={m.id} className="drawer-chat__system-row">
+                  <div className="drawer-chat__system-pill">
+                    <span>{m.text}</span>
+                  </div>
+                </div>
+              );
+            }
             return (
-              <div key={m.id} className={`drawer-chat__msg ${isSystem ? 'drawer-chat__msg--system' : ''}`}>
-                {!isSystem && <span className="drawer-chat__author">{m.user}</span>}
+              <div key={m.id} className="drawer-chat__msg">
+                <span className="drawer-chat__author">{m.user}</span>
                 <span className="drawer-chat__text">{m.text}</span>
                 <span className="drawer-chat__time">{m.timestamp}</span>
               </div>

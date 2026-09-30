@@ -125,6 +125,29 @@ export class RoomController {
   }
 
   /**
+   * Delete room and cleanup all associated files on disk
+   */
+  public static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { roomId } = req.params;
+      if (!roomId) {
+        res.status(400).json({ error: 'roomId is required' });
+        return;
+      }
+
+      const deleted = await RoomService.deleteRoom(roomId);
+      if (!deleted) {
+        res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      res.json({ message: 'Sala y archivos de video eliminados exitosamente', roomId });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Ultra-fast HTTP 206 Partial Content Video Streaming with chunk caching and zero delay
    */
   public static async streamVideo(req: Request, res: Response, next: NextFunction): Promise<void> {

@@ -103,13 +103,31 @@ body {
   top: 0;
   z-index: 100;
   gap: 0.5rem;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
 }
 
-.header--hidden {
-  transform: translateY(-100%);
-  opacity: 0;
-  pointer-events: none;
+/* En PC (pantallas > 900px) el navbar y la barra se quedan fijos al 100% */
+@media (min-width: 901px) {
+  .header--hidden {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  .meet-bottom-bar--hidden {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
+/* En teléfonos / móviles (≤ 900px) se atenúa suavemente la opacidad */
+@media (max-width: 900px) {
+  .header--hidden {
+    opacity: 0.32;
+    pointer-events: auto;
+  }
+  .meet-bottom-bar--hidden {
+    opacity: 0.32;
+    pointer-events: auto;
+  }
 }
 
 .header__brand {
@@ -1172,353 +1190,18 @@ body {
   background: transparent;
   flex-shrink: 0;
   z-index: 50;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
-}
-
-.meet-bottom-bar--hidden {
-  transform: translateY(100%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* On mobile: compact Teams/Meet style toolbar with cozy button spacing */
-@media (max-width: 900px) {
-  .meet-bottom-bar {
-    background: rgba(10, 15, 26, 0.94);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    gap: 0.85rem;
-    padding: 0.55rem 1rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
-    justify-content: center;
-  }
-}
-
-.meet-circle-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-}
-
-.meet-circle-btn--on {
-  background: #3c4043;
-  color: #ffffff;
-}
-.meet-circle-btn--on:hover {
-  background: #474c50;
-}
-
-/* Mic active — green like Google Meet */
-.meet-circle-btn--mic-on {
-  background: #1e8e3e;
-  color: #ffffff;
-}
-.meet-circle-btn--mic-on:hover {
-  background: #137333;
-}
-
-.meet-circle-btn--off {
-  background: #ea4335;
-  color: #ffffff;
-}
-.meet-circle-btn--off:hover {
-  background: #d93025;
-}
-
-.meet-circle-btn--active {
-  background: #8ab4f8;
-  color: #202124;
-}
-
-.meet-circle-btn--leave {
-  background: #ea4335;
-  color: #ffffff;
-  width: 56px;
-  border-radius: 28px;
-}
-.meet-circle-btn--leave:hover {
-  background: #d93025;
-}
-
-.meet-circle-btn:not(.meet-circle-btn--on):not(.meet-circle-btn--mic-on):not(.meet-circle-btn--off):not(.meet-circle-btn--leave):not(.meet-circle-btn--active) {
-  background: #3c4043;
-  color: #ffffff;
-}
-.meet-circle-btn:not(.meet-circle-btn--on):not(.meet-circle-btn--mic-on):not(.meet-circle-btn--off):not(.meet-circle-btn--leave):not(.meet-circle-btn--active):hover {
-  background: #474c50;
-}
-
-/* ── Show/hide classes for desktop vs mobile toolbar items ── */
-.meet-btn--hide-mobile { display: inline-flex; } /* visible on desktop */
-.meet-btn--mobile-only { display: none; }        /* hidden on desktop */
-
-@media (max-width: 900px) {
-  .meet-btn--hide-mobile { display: none !important; }
-  .meet-btn--mobile-only { display: inline-flex !important; }
-}
-
-/* ── More menu wrapper and dropdown ── */
-.meet-more-wrap {
-  position: relative;
-}
-
-.meet-more-dropdown {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  /* Open to the LEFT: align right edge of dropdown with right edge of button */
-  right: 0;
-  left: auto;
-  transform: none;
-  background: rgba(32, 33, 36, 0.98);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  padding: 0.4rem 0;
-  min-width: 210px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.8);
-  z-index: 200;
-  animation: moreMenuIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes moreMenuIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.meet-more-item {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.72rem 1rem;
-  background: transparent;
-  border: none;
-  color: #e8eaed;
-  font-family: inherit;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  transition: background 0.12s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-.meet-more-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-.meet-more-item--active {
-  color: #8ab4f8;
-}
-.meet-more-item--danger {
-  color: #f28b82;
-}
-.meet-more-item--danger:hover {
-  background: rgba(239, 68, 68, 0.12);
-}
-
-.meet-more-separator {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  margin: 0.25rem 0;
-}
-
-.meet-more-badge {
-  margin-left: auto;
-  background: #ea4335;
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.1rem 0.4rem;
-  border-radius: 9999px;
-  min-width: 18px;
-  text-align: center;
-}
-
-.meet-badge-dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 9px;
-  height: 9px;
-  background: #38bdf8;
-  border-radius: 50%;
-  border: 2px solid #080c14;
-}
-
-.meet-emoji-popup {
-  position: absolute;
-  bottom: 64px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 9999px;
-  padding: 0.35rem 0.65rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
-  z-index: 120;
-}
-
-.meet-error-banner {
-  position: absolute;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(239, 68, 68, 0.9);
-  color: #fff;
-  padding: 0.4rem 1rem;
-  border-radius: 9999px;
-  font-size: 0.8rem;
-  z-index: 100;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================================================
-   Block: Video Player
-   ========================================================================== */
-.player-container {
-  background: #000;
-  position: relative;
-  /* On desktop fill the main column */
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Aspect ratio box on mobile — fills width, height auto from ratio */
-@media (max-width: 900px) {
-  .player-container {
-    flex: none;
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    min-height: unset;
-  }
-}
-
-/* Fullscreen states */
-.player-container:fullscreen,
-.player-container--fullscreen {
-  width: 100vw !important;
-  height: 100dvh !important;
-  border-radius: 0 !important;
-  border: none !important;
-  aspect-ratio: auto !important;
-}
-
-.player-container__video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-/* ── Top overlay: filename left + controls right ── */
-.player-container__topbar-wrapper {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  z-index: 30;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 0.65rem 0.85rem;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, transparent 100%);
-  transition: opacity 0.35s ease;
-  pointer-events: none;
-}
-
-.player-container__filename {
-  background: rgba(0,0,0,0.52);
-  backdrop-filter: blur(6px);
-  padding: 0.28rem 0.65rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  border: 1px solid rgba(255,255,255,0.1);
-  max-width: 48%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: auto;
-}
-
-.player-container__topbar {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  background: transparent;
-  padding: 0;
-  border: none;
-  pointer-events: auto;
-}
-
-/* Volume duck badge — clean pill without nested box look */
-.player-volume-duck {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #fbbf24;
-  padding: 0.3rem 0.6rem;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 9999px;
-  white-space: nowrap;
-}
-
-/* Ghost "Cambiar" button — transparent pill matching player overlay */
-.player-change-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f1f5f9;
-  font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0.3rem 0.65rem;
-  border-radius: 9999px;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-.player-change-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-.player-container__placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  color: var(--color-text-muted);
-  text-align: center;
-  padding: 2rem 1.5rem;
-  width: 100%;
-  max-width: 460px;
-}
-
-/* ==========================================================================
-   Block: Floating Reactions — always visible, even in fullscreen
+   Block: Floating Reactions — higher and shifted to the right, smooth physics
    ========================================================================== */
 .reactions-overlay {
   position: absolute;
-  bottom: calc(0.35rem + 3px);
-  right: calc(0.5rem + 3px);
-  width: 70px;
-  height: 160px;
+  bottom: 2.2rem;
+  right: 0.75rem;
+  width: 90px;
+  height: 240px;
   pointer-events: none;
   z-index: 2147483646;
   display: flex;
@@ -1530,34 +1213,54 @@ body {
 
 .floating-reaction {
   position: absolute;
-  bottom: 0; right: 0;
-  font-size: 1.3rem;
+  bottom: 0;
+  right: 4px;
+  font-size: 1.6rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  animation: floatUpAndFade 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: floatUpAndFade 2.6s cubic-bezier(0.12, 0.82, 0.22, 1) forwards;
   will-change: transform, opacity;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.85));
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.85));
   transform: translateX(var(--x-offset, 0px));
 }
 
 .floating-reaction__user {
-  font-size: 0.55rem;
-  background: rgba(0,0,0,0.88);
+  font-size: 0.6rem;
+  background: rgba(13, 19, 33, 0.92);
   color: #fff;
-  padding: 0.05rem 0.25rem;
-  border-radius: 3px;
+  padding: 0.08rem 0.35rem;
+  border-radius: 4px;
   white-space: nowrap;
   margin-top: -0.1rem;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.16);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
 }
 
 @keyframes floatUpAndFade {
-  0%   { opacity: 0; transform: translateX(var(--x-offset,0px)) translateY(6px)     scale(0.5); }
-  12%  { opacity: 1; transform: translateX(var(--x-offset,0px)) translateY(0px)     scale(1.1); }
-  35%  {             transform: translateX(var(--x-offset,0px)) translateY(-35px)   scale(1); }
-  70%  { opacity: 0.8; transform: translateX(var(--x-offset,0px)) translateY(-95px) scale(0.85); }
-  100% { opacity: 0; transform: translateX(var(--x-offset,0px)) translateY(-150px) scale(0.7); }
+  0% {
+    opacity: 0;
+    transform: translateX(var(--x-offset, 0px)) translateY(12px) scale(0.4);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(var(--x-offset, 0px)) translateY(0px) scale(1.15);
+  }
+  25% {
+    transform: translateX(calc(var(--x-offset, 0px) * 0.9)) translateY(-45px) scale(1.05);
+  }
+  60% {
+    opacity: 0.92;
+    transform: translateX(calc(var(--x-offset, 0px) * 1.1)) translateY(-120px) scale(0.95);
+  }
+  85% {
+    opacity: 0.5;
+    transform: translateX(calc(var(--x-offset, 0px) * 1.2)) translateY(-185px) scale(0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(calc(var(--x-offset, 0px) * 1.3)) translateY(-230px) scale(0.75);
+  }
 }
 
 /* ==========================================================================
@@ -1971,12 +1674,33 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.drawer-chat__msg--system {
-  background: rgba(99, 102, 241, 0.08);
-  border-left: 3px solid rgba(99, 102, 241, 0.6);
-  color: #a5b4fc;
-  font-size: 0.85rem;
-  padding: 0.5rem 0.8rem;
+.drawer-chat__system-row {
+  display: flex;
+  justify-content: center;
+  margin: 0.5rem 0;
+  width: 100%;
+}
+
+.drawer-chat__system-pill {
+  background: #202124;
+  color: #9aa0a6;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  text-align: center;
+  max-width: 90%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  line-height: 1.4;
+}
+
+.meet-toast--chat {
+  border-left: 3px solid #818cf8;
+}
+
+.meet-toast--chat:hover {
+  background: rgba(30, 41, 59, 0.98);
 }
 
 .drawer-chat__author {

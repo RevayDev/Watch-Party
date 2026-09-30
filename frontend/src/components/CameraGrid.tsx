@@ -73,20 +73,43 @@ const CameraTile: React.FC<{
   isCameraOn?: boolean;
 }> = ({ stream = null, userName, isHost = false, isLocal = false, isMicOn = true, isCameraOn = true }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const isSpeaking = useIsSpeaking(stream, isLocal, isMicOn);
 
   useEffect(() => {
     const vid = videoRef.current;
-    if (!vid || !stream) return;
-    if (vid.srcObject !== stream) vid.srcObject = stream;
-    vid.play().catch(() => {});
-  }, [stream]);
+    if (vid && stream) {
+      if (vid.srcObject !== stream) vid.srcObject = stream;
+      vid.play().catch(() => {});
+    }
 
-  const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled && isCameraOn;
+    // Explicit audio playback for remote peers to guarantee sound is heard even if video tile is avatar
+    const aud = audioRef.current;
+    if (aud && stream && !isLocal) {
+      if (aud.srcObject !== stream) aud.srcObject = stream;
+      aud.play().catch(() => {});
+    }
+  }, [stream, isLocal]);
+
+  const hasVideo = Boolean(
+    stream &&
+    stream.getVideoTracks().length > 0 &&
+    stream.getVideoTracks()[0].enabled &&
+    isCameraOn
+  );
   const initial = userName.charAt(0).toUpperCase();
 
   return (
     <div className={`cam-tile ${isSpeaking ? 'cam-tile--speaking' : ''}`}>
+      {/* Hidden audio element for remote stream to guarantee audio output */}
+      {!isLocal && (
+        <audio
+          ref={audioRef}
+          autoPlay
+          playsInline
+        />
+      )}
+
       {/* Video */}
       {hasVideo ? (
         <video

@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Uploads directory contents
+uploads/*
+!uploads/.gitkeep

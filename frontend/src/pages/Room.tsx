@@ -15,8 +15,9 @@ import { Loader2, Mic, MicOff, Video, VideoOff, MessageSquare, Users, PhoneOff, 
 // ── Toast Notification Types ───────────────────────────────────────────────
 interface ToastNotification {
   id: string;
-  type: 'join' | 'leave';
+  type: 'join' | 'leave' | 'chat';
   userName: string;
+  text?: string;
 }
 
 // ── Audio helpers (Web Audio API) ─────────────────────────────────────────
@@ -53,6 +54,25 @@ function playLeaveSound() {
     o1.start();
     o1.stop(ctx.currentTime + 0.55);
     setTimeout(() => ctx.close(), 700);
+  } catch (_) {}
+}
+
+function playChatSound() {
+  try {
+    const ctx = new AudioContext();
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.16, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    g.connect(ctx.destination);
+    const o1 = ctx.createOscillator();
+    o1.type = 'triangle';
+    o1.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+    o1.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08); // E5
+    o1.frequency.setValueAtTime(783.99, ctx.currentTime + 0.16); // G5
+    o1.connect(g);
+    o1.start();
+    o1.stop(ctx.currentTime + 0.35);
+    setTimeout(() => ctx.close(), 500);
   } catch (_) {}
 }
 
@@ -165,15 +185,18 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     if (timer) { clearTimeout(timer); toastTimersRef.current.delete(id); }
   }, []);
 
-  const addToast = useCallback((type: 'join' | 'leave', toastUserName: string) => {
+  const addToast = useCallback((type: 'join' | 'leave' | 'chat', toastUserName: string, toastText?: string) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, type, userName: toastUserName }]);
+    setToasts((prev) => [...prev.slice(-3), { id, type, userName: toastUserName, text: toastText }]);
     if (type === 'join') playJoinSound();
-    else playLeaveSound();
+    else if (type === 'leave') playLeaveSound();
+    else if (type === 'chat') playChatSound();
+
+    const duration = type === 'chat' ? 4500 : 4000;
     const timer = setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
       toastTimersRef.current.delete(id);
-    }, 4000);
+    }, duration);
     toastTimersRef.current.set(id, timer);
   }, []);
 
@@ -213,35 +236,29 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     loadRoom();
 
     // ── Socket Listeners ──────────────────────────────────────────────────────
+    const handleRoomState = (state: {
+      video: any;
+      participants: any[];
+      hostName?: string;
+      isHost?: boolean;
+      playback?: { currentTime: number; isPlaying: boolean } | null;
+    }) => {
+      setRoomData((prev) =>
+        prev ? { ...prev, video: state.video, participants: state.participants } : null
+      );
+      if (state.isHost !== undefined) setIsHost(state.isHost);
 
-    // room-state: initial state when joining. Includes playback position.
-    socket.on(
-      'room-state',
-      (state: {
-        video: any;
-        participants: any[];
-        hostName?: string;
-        isHost?: boolean;
-        playback?: { currentTime: number; isPlaying: boolean } | null;
-      }) => {
-        setRoomData((prev) =>
-          prev ? { ...prev, video: state.video, participants: state.participants } : null
-        );
-        if (state.isHost !== undefined) setIsHost(state.isHost);
-
-        // ── KEY: apply playback position so joiner syncs immediately ──
-        if (state.playback && state.video) {
-          setRemoteAction({
-            action: state.playback.isPlaying ? 'play' : 'seek',
-            currentTime: state.playback.currentTime,
-            sentAt: Date.now(), // already compensated by server
-            timestamp: Date.now(),
-          });
-        }
+      if (state.playback && state.video) {
+        setRemoteAction({
+          action: state.playback.isPlaying ? 'play' : 'seek',
+          currentTime: state.playback.currentTime,
+          sentAt: Date.now(),
+          timestamp: Date.now(),
+        });
       }
-    );
+    };
 
-    socket.on('host-changed', (data: { newHostName: string; participants: any[] }) => {
+    const handleHostChanged = (data: { newHostName: string; participants: any[] }) => {
       setRoomData((prev) =>
         prev ? { ...prev, participants: data.participants, hostName: data.newHostName } : null
       );
@@ -256,27 +273,27 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       setMessages((prev) => [
         ...prev,
         {
-          id: Math.random().toString(36).substring(2, 9),
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           user: 'Sistema',
           text: `👑 ${data.newHostName} es ahora el nuevo Anfitrión (Host) de la sala`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
-    });
+    };
 
-    socket.on('room-closed', (data: { message: string }) => {
+    const handleRoomClosed = (data: { message: string }) => {
       alert(data.message || 'La sala ha sido cerrada por el anfitrión.');
       localStorage.removeItem('watchparty_host_session');
       disconnectSocket();
       onLeave();
-    });
+    };
 
-    socket.on('user-joined', (data: { userName: string; participants: any[] }) => {
+    const handleUserJoined = (data: { socketId?: string; userName: string; participants: any[] }) => {
       setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
       setMessages((prev) => [
         ...prev,
         {
-          id: Math.random().toString(36).substring(2, 9),
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           user: 'Sistema',
           text: `👋 ${data.userName} se ha unido a la sala`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -285,76 +302,88 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       if (data.userName.toLowerCase() !== userName.toLowerCase()) {
         addToast('join', data.userName);
       }
-    });
+    };
 
-    socket.on('user-left', (data: { userName: string; participants: any[] }) => {
+    const handleUserLeft = (data: { userName: string; participants: any[] }) => {
       setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
       setMessages((prev) => [
         ...prev,
         {
-          id: Math.random().toString(36).substring(2, 9),
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           user: 'Sistema',
           text: `🚪 ${data.userName} ha salido de la sala`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
-      addToast('leave', data.userName);
-    });
+      if (data.userName && data.userName.toLowerCase() !== userName.toLowerCase()) {
+        addToast('leave', data.userName);
+      }
+    };
 
-    socket.on('video-changed', (data: { video: any }) => {
+    const handleVideoChanged = (data: { video: any }) => {
       setRoomData((prev) => (prev ? { ...prev, video: data.video, status: 'active' } : null));
-      // Reset remote action so the video starts fresh at 0
       setRemoteAction(null);
       setMessages((prev) => [
         ...prev,
         {
-          id: Math.random().toString(36).substring(2, 9),
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           user: 'Sistema',
           text: `🎬 Nuevo video disponible: ${data.video.originalName}`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
-    });
+    };
 
-    socket.on(
-      'sync-video',
-      (data: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number }) => {
-        setRemoteAction({
-          action: data.action,
-          currentTime: data.currentTime,
-          sentAt: data.sentAt,
-          timestamp: Date.now(),
-        });
-      }
-    );
+    const handleSyncVideo = (data: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number }) => {
+      setRemoteAction({
+        action: data.action,
+        currentTime: data.currentTime,
+        sentAt: data.sentAt,
+        timestamp: Date.now(),
+      });
+    };
 
-    socket.on('chat-message', (msg: ChatMessage) => {
+    const handleChatMessage = (msg: ChatMessage) => {
       setMessages((prev) => [...prev, msg]);
-      // Increment unread only when chat panel is not currently open
       setActiveSideTab((tab) => {
-        if (tab !== 'chat') setUnreadCount((n) => n + 1);
+        if (tab !== 'chat') {
+          setUnreadCount((n) => n + 1);
+          if (msg.user.toLowerCase() !== userName.toLowerCase()) {
+            addToast('chat', msg.user, msg.text);
+          }
+        }
         return tab;
       });
-    });
+    };
 
-    socket.on('reaction', (reaction: ReactionItem) => {
+    const handleReactionEvent = (reaction: ReactionItem) => {
       setReactions((prev) => [...prev, reaction]);
       setTimeout(() => {
         setReactions((prev) => prev.filter((r) => r.id !== reaction.id));
       }, 2600);
-    });
+    };
+
+    socket.on('room-state', handleRoomState);
+    socket.on('host-changed', handleHostChanged);
+    socket.on('room-closed', handleRoomClosed);
+    socket.on('user-joined', handleUserJoined);
+    socket.on('user-left', handleUserLeft);
+    socket.on('video-changed', handleVideoChanged);
+    socket.on('sync-video', handleSyncVideo);
+    socket.on('chat-message', handleChatMessage);
+    socket.on('reaction', handleReactionEvent);
 
     return () => {
       isMounted = false;
-      socket.off('room-state');
-      socket.off('host-changed');
-      socket.off('room-closed');
-      socket.off('user-joined');
-      socket.off('user-left');
-      socket.off('video-changed');
-      socket.off('sync-video');
-      socket.off('chat-message');
-      socket.off('reaction');
+      socket.off('room-state', handleRoomState);
+      socket.off('host-changed', handleHostChanged);
+      socket.off('room-closed', handleRoomClosed);
+      socket.off('user-joined', handleUserJoined);
+      socket.off('user-left', handleUserLeft);
+      socket.off('video-changed', handleVideoChanged);
+      socket.off('sync-video', handleSyncVideo);
+      socket.off('chat-message', handleChatMessage);
+      socket.off('reaction', handleReactionEvent);
     };
   }, [roomId, userName, initialIsHost, socket, onLeave]);
 
@@ -636,19 +665,36 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       {/* ── Google Meet-style Toast Notifications ── */}
       <div className="meet-toasts">
         {toasts.map((toast) => (
-          <div key={toast.id} className={`meet-toast meet-toast--${toast.type}`}>
+          <div 
+            key={toast.id} 
+            className={`meet-toast meet-toast--${toast.type}`}
+            onClick={() => {
+              if (toast.type === 'chat') {
+                setActiveSideTab('chat');
+                dismissToast(toast.id);
+              }
+            }}
+            style={{ cursor: toast.type === 'chat' ? 'pointer' : 'default' }}
+          >
             <span className="meet-toast__avatar">
               {toast.userName.charAt(0).toUpperCase()}
             </span>
             <div className="meet-toast__body">
               <span className="meet-toast__name">{toast.userName}</span>
               <span className="meet-toast__action">
-                {toast.type === 'join' ? 'se unió a la sala' : 'salió de la sala'}
+                {toast.type === 'join' 
+                  ? 'se unió a la sala' 
+                  : toast.type === 'leave' 
+                  ? 'salió de la sala' 
+                  : toast.text || 'envió un mensaje'}
               </span>
             </div>
             <button
               className="meet-toast__close"
-              onClick={() => dismissToast(toast.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                dismissToast(toast.id);
+              }}
               title="Cerrar"
             >
               <X size={14} />
