@@ -121,21 +121,40 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconne
 
           {/* Reconnect notice if host */}
           {savedHostSession && (
-            <div className="reconnect-banner" style={{ margin: '0 0 1.25rem', width: '100%' }}>
-              <div className="reconnect-banner__info">
-                <span style={{ fontSize: '1.2rem' }}>👑</span>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Tu sala activa: {savedHostSession.roomId}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Anfitrión: {savedHostSession.hostName}</div>
+            <div className="home-reconnect-card">
+              <div className="home-reconnect-card__left">
+                <div className="home-reconnect-card__icon-wrap">
+                  <span>👑</span>
+                </div>
+                <div className="home-reconnect-card__text">
+                  <div className="home-reconnect-card__title">
+                    Tu sala activa: <span className="home-reconnect-card__code">{savedHostSession.roomId}</span>
+                  </div>
+                  <div className="home-reconnect-card__subtitle">
+                    Anfitrión: <strong>{savedHostSession.hostName}</strong>
+                  </div>
                 </div>
               </div>
-              <button
-                onClick={() => onReconnectHost(savedHostSession.roomId, savedHostSession.hostName)}
-                className="btn btn--primary"
-                style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
-              >
-                Reingresar
-              </button>
+              <div className="home-reconnect-card__actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('watchparty_host_session');
+                    setSavedHostSession(null);
+                  }}
+                  className="home-reconnect-card__dismiss-btn"
+                  title="Descartar sala"
+                >
+                  <X size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReconnectHost(savedHostSession.roomId, savedHostSession.hostName)}
+                  className="home-reconnect-card__enter-btn"
+                >
+                  Reingresar
+                </button>
+              </div>
             </div>
           )}
 

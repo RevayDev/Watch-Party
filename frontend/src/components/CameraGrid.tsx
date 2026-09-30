@@ -75,6 +75,32 @@ const CameraTile: React.FC<{
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSpeaking = useIsSpeaking(stream, isLocal, isMicOn);
+  // Track version counter to force re-renders when remote tracks change
+  const [, setTrackVersion] = useState(0);
+
+  // Listen to track add/remove/mute/unmute events on the stream
+  useEffect(() => {
+    if (!stream) return;
+    const bump = () => setTrackVersion((v) => v + 1);
+    stream.addEventListener('addtrack', bump);
+    stream.addEventListener('removetrack', bump);
+    // Also listen for individual track mute/unmute
+    const tracks = stream.getTracks();
+    tracks.forEach((t) => {
+      t.addEventListener('mute', bump);
+      t.addEventListener('unmute', bump);
+      t.addEventListener('ended', bump);
+    });
+    return () => {
+      stream.removeEventListener('addtrack', bump);
+      stream.removeEventListener('removetrack', bump);
+      tracks.forEach((t) => {
+        t.removeEventListener('mute', bump);
+        t.removeEventListener('unmute', bump);
+        t.removeEventListener('ended', bump);
+      });
+    };
+  }, [stream]);
 
   useEffect(() => {
     const vid = videoRef.current;
@@ -83,7 +109,7 @@ const CameraTile: React.FC<{
       vid.play().catch(() => {});
     }
 
-    // Explicit audio playback for remote peers to guarantee sound is heard even if video tile is avatar
+    // Explicit audio playback for remote peers to guarantee sound is heard
     const aud = audioRef.current;
     if (aud && stream && !isLocal) {
       if (aud.srcObject !== stream) aud.srcObject = stream;
@@ -91,13 +117,18 @@ const CameraTile: React.FC<{
     }
   }, [stream, isLocal]);
 
-  const hasVideo = Boolean(
-    stream &&
-    stream.getVideoTracks().length > 0 &&
-    stream.getVideoTracks()[0].enabled &&
-    isCameraOn
-  );
+  // Derive actual video/audio state from the stream tracks (works for remote peers too)
+  const videoTracks = stream?.getVideoTracks() || [];
+  const audioTracks = stream?.getAudioTracks() || [];
+  const hasVideo = isLocal
+    ? Boolean(videoTracks.length > 0 && videoTracks[0].enabled && isCameraOn)
+    : Boolean(videoTracks.length > 0 && videoTracks[0].readyState === 'live' && !videoTracks[0].muted);
+  const hasAudio = isLocal
+    ? isMicOn
+    : Boolean(audioTracks.length > 0 && audioTracks[0].readyState === 'live');
+
   const initial = userName.charAt(0).toUpperCase();
+  const effectiveMicOn = isLocal ? isMicOn : hasAudio;
 
   return (
     <div className={`cam-tile ${isSpeaking ? 'cam-tile--speaking' : ''}`}>
@@ -128,8 +159,8 @@ const CameraTile: React.FC<{
       )}
 
       {/* Mic badge — top right */}
-      <div className={`cam-tile__mic-badge ${isMicOn ? '' : 'cam-tile__mic-badge--off'}`}>
-        {isMicOn
+      <div className={`cam-tile__mic-badge ${effectiveMicOn ? '' : 'cam-tile__mic-badge--off'}`}>
+        {effectiveMicOn
           ? <Mic size={12} color={isSpeaking ? '#10b981' : '#ffffff'} />
           : <MicOff size={12} color="#ffffff" />}
       </div>
