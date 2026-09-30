@@ -12,13 +12,16 @@ export class ApiService {
   /**
    * Request backend to create a new room.
    */
-  static async createRoom(hostName: string): Promise<{ roomId: string; hostSecret: string; hostName: string }> {
+  static async createRoom(
+    hostName: string,
+    isTemporary: boolean = true
+  ): Promise<{ roomId: string; hostSecret: string; hostName: string; isTemporary?: boolean }> {
     const response = await fetch(`${API_BASE_URL}/rooms`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ hostName }),
+      body: JSON.stringify({ hostName, isTemporary }),
     });
 
     if (!response.ok) {

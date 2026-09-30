@@ -62,6 +62,7 @@ export const App: React.FC = () => {
     <div className="app">
       {view === 'home' && (
         <Home
+          initialRoomCode={currentRoomId}
           onJoinRoom={handleJoinRoom}
           onRoomCreated={handleRoomCreated}
           onReconnectHost={handleReconnectHost}

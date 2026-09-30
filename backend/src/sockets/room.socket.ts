@@ -99,6 +99,8 @@ export function setupSocketHandlers(io: Server): void {
         roomId: cleanRoomId,
         hostName: room?.hostName,
         isHost: socketUser.isHost,
+        isTemporary: room?.isTemporary !== false,
+        settings: room?.settings,
         video: room?.video || null,
         status: room?.status || 'waiting',
         participants: room?.participants || [],
@@ -270,6 +272,115 @@ export function setupSocketHandlers(io: Server): void {
       };
 
       io.to(cleanRoomId).emit('chat-message', messagePayload);
+    });
+
+    // ── MODERATION & ROLE EVENTS ─────────────────────────────────────────────
+
+    // Mute a specific user remotely (Host or Co-host)
+    socket.on('moderate-mute-user', (data: { roomId: string; targetSocketId?: string; targetUserName: string }) => {
+      const { roomId, targetSocketId, targetUserName } = data;
+      if (!roomId) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      console.log(`🔇 Moderación: Silenciando a ${targetUserName} en sala [${cleanRoomId}]`);
+      io.to(cleanRoomId).emit('force-mute-user', {
+        targetSocketId,
+        targetUserName,
+      });
+    });
+
+    // Disable camera of a specific user remotely (Host or Co-host)
+    socket.on('moderate-disable-camera', (data: { roomId: string; targetSocketId?: string; targetUserName: string }) => {
+      const { roomId, targetSocketId, targetUserName } = data;
+      if (!roomId) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      console.log(`📷 Moderación: Apagando cámara a ${targetUserName} en sala [${cleanRoomId}]`);
+      io.to(cleanRoomId).emit('force-disable-camera', {
+        targetSocketId,
+        targetUserName,
+      });
+    });
+
+    // Mute all participants (Host or Co-host)
+    socket.on('moderate-mute-all', (data: { roomId: string }) => {
+      const { roomId } = data;
+      if (!roomId) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      console.log(`🔇 Moderación: Silenciando a TODOS en sala [${cleanRoomId}]`);
+      io.to(cleanRoomId).emit('force-mute-all');
+    });
+
+    // Disable all cameras (Host or Co-host)
+    socket.on('moderate-disable-all-cameras', (data: { roomId: string }) => {
+      const { roomId } = data;
+      if (!roomId) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      console.log(`📷 Moderación: Apagando cámaras de TODOS en sala [${cleanRoomId}]`);
+      io.to(cleanRoomId).emit('force-disable-all-cameras');
+    });
+
+    // Kick participant
+    socket.on('kick-user', async (data: { roomId: string; targetUserName: string; kickedBy: string }) => {
+      const { roomId, targetUserName, kickedBy } = data;
+      if (!roomId || !targetUserName) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      console.log(`🚫 ${targetUserName} expulsado por ${kickedBy} en sala [${cleanRoomId}]`);
+      const updatedRoom = await RoomService.kickParticipant(cleanRoomId, targetUserName, kickedBy);
+
+      io.to(cleanRoomId).emit('user-kicked', {
+        targetUserName,
+        kickedBy,
+        participants: updatedRoom?.participants || [],
+        kickedUsers: updatedRoom?.kickedUsers || [],
+      });
+    });
+
+    // Toggle Co-host Role
+    socket.on('set-role', async (data: { roomId: string; targetUserName: string; role: 'cohost' | 'member' }) => {
+      const { roomId, targetUserName, role } = data;
+      if (!roomId || !targetUserName) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      const updatedRoom = await RoomService.setParticipantRole(cleanRoomId, targetUserName, role);
+      console.log(`🎖️ Rol de ${targetUserName} cambiado a [${role}] en [${cleanRoomId}]`);
+
+      io.to(cleanRoomId).emit('participant-role-updated', {
+        targetUserName,
+        role,
+        participants: updatedRoom?.participants || [],
+      });
+    });
+
+    // Rename Participant
+    socket.on('rename-participant', async (data: { roomId: string; oldName: string; newName: string }) => {
+      const { roomId, oldName, newName } = data;
+      if (!roomId || !oldName || !newName.trim()) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      const updatedRoom = await RoomService.renameParticipant(cleanRoomId, oldName, newName.trim());
+      console.log(`✏️ Usuario ${oldName} renombrado a: ${newName.trim()}`);
+
+      io.to(cleanRoomId).emit('participant-renamed', {
+        oldName,
+        newName: newName.trim(),
+        participants: updatedRoom?.participants || [],
+      });
+    });
+
+    // Update Room Settings (Mute on entry, etc.)
+    socket.on('update-room-settings', async (data: { roomId: string; settings: any }) => {
+      const { roomId, settings } = data;
+      if (!roomId) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      const updatedRoom = await RoomService.updateSettings(cleanRoomId, settings);
+      io.to(cleanRoomId).emit('room-settings-updated', {
+        settings: updatedRoom?.settings || settings,
+      });
     });
 
     // 8. Reaction (Emoji float animation)

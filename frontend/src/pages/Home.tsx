@@ -7,26 +7,36 @@ import exampleImg from '../Example.png';
 import { ApiService } from '../services/api';
 
 interface HomeProps {
+  initialRoomCode?: string | null;
   onJoinRoom: (code: string, name: string) => void;
   onRoomCreated: (roomId: string, hostName: string, hostSecret: string) => void;
   onReconnectHost: (roomId: string, hostName: string) => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconnectHost }) => {
+export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomCreated, onReconnectHost }) => {
   // Join Room Form state
-  const [roomCode, setRoomCode] = useState('');
+  const [roomCode, setRoomCode] = useState(initialRoomCode || '');
   const [userName, setUserName] = useState('');
   const [error, setError] = useState('');
   const [savedHostSession, setSavedHostSession] = useState<{ roomId: string; hostName: string } | null>(null);
 
   // Popups state
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(Boolean(initialRoomCode));
 
   // Create room modal form state
   const [createHostName, setCreateHostName] = useState('');
+  const [isTemporary, setIsTemporary] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
+
+  // Update roomCode and show modal if initialRoomCode changes
+  useEffect(() => {
+    if (initialRoomCode) {
+      setRoomCode(initialRoomCode);
+      setShowJoinModal(true);
+    }
+  }, [initialRoomCode]);
 
   // FAQ accordion state
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -66,7 +76,7 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconne
     try {
       setCreateLoading(true);
       setCreateError('');
-      const data = await ApiService.createRoom(createHostName.trim());
+      const data = await ApiService.createRoom(createHostName.trim(), isTemporary);
       setShowCreateModal(false);
       onRoomCreated(data.roomId, data.hostName, data.hostSecret);
     } catch (err: any) {
@@ -406,7 +416,7 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconne
             )}
 
             <form onSubmit={handleCreateSubmit}>
-              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-group__label" style={{ color: '#cbd5e1', fontWeight: 600 }}>Tu nombre como Anfitrión</label>
                 <input
                   type="text"
@@ -418,6 +428,28 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconne
                   autoFocus
                   required
                 />
+              </div>
+
+              {/* Modo de sala: Temporal vs Guardar Video */}
+              <div className="form-group" style={{ marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.04)', padding: '0.85rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#f3f4f6' }}>
+                    {isTemporary ? '⚡ Sala Temporal' : '💾 Sala Persistente'}
+                  </span>
+                  <label className="part-switch" style={{ margin: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={isTemporary}
+                      onChange={(e) => setIsTemporary(e.target.checked)}
+                    />
+                    <span className="part-slider" />
+                  </label>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#9ca3af', margin: 0, lineHeight: 1.4 }}>
+                  {isTemporary
+                    ? 'Al cerrar la sala se borra el video y la sala automáticamente (ideal para videos pesados o funciones rápidas).'
+                    : 'El video se conserva subido en el servidor para futuras sesiones.'}
+                </p>
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -462,7 +494,9 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconne
                 <div className="host-exit-modal__icon-badge" style={{ background: 'rgba(99, 102, 241, 0.15)', borderColor: 'rgba(99, 102, 241, 0.35)' }}>
                   <Link2 size={18} color="#818cf8" />
                 </div>
-                <h3 className="host-exit-modal__title">Unirse a una sala</h3>
+                <h3 className="host-exit-modal__title">
+                  {initialRoomCode ? `Unirse a la sala ${roomCode}` : 'Unirse a una sala'}
+                </h3>
               </div>
               <button onClick={() => setShowJoinModal(false)} className="meet-drawer__close-btn" title="Cerrar">
                 <X size={18} />
@@ -470,7 +504,9 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconne
             </div>
 
             <p className="host-exit-modal__desc">
-              Ingresa tu nombre y el código de 6 u 8 caracteres que te compartió el anfitrión.
+              {initialRoomCode
+                ? `Ingresa tu nombre de usuario para unirte de inmediato a la sala ${roomCode}.`
+                : 'Ingresa tu nombre y el código de sala que te compartió el anfitrión.'}
             </p>
 
             {error && (
@@ -480,8 +516,8 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconne
             )}
 
             <form onSubmit={handleJoinSubmit}>
-              <div className="form-group" style={{ marginBottom: '0.85rem' }}>
-                <label className="form-group__label" style={{ color: '#cbd5e1', fontWeight: 600 }}>Tu nombre</label>
+              <div className="form-group" style={{ marginBottom: initialRoomCode ? '1.25rem' : '0.85rem' }}>
+                <label className="form-group__label" style={{ color: '#cbd5e1', fontWeight: 600 }}>Tu nombre de usuario</label>
                 <input
                   type="text"
                   className="form-group__input"
@@ -493,19 +529,21 @@ export const Home: React.FC<HomeProps> = ({ onJoinRoom, onRoomCreated, onReconne
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label className="form-group__label" style={{ color: '#cbd5e1', fontWeight: 600 }}>Código de sala</label>
-                <input
-                  type="text"
-                  className="form-group__input"
-                  placeholder="Ej. 8FK29X"
-                  value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value)}
-                  maxLength={8}
-                  style={{ textTransform: 'uppercase' }}
-                  required
-                />
-              </div>
+              {!initialRoomCode && (
+                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label className="form-group__label" style={{ color: '#cbd5e1', fontWeight: 600 }}>Código de sala</label>
+                  <input
+                    type="text"
+                    className="form-group__input"
+                    placeholder="Ej. 8FK29X"
+                    value={roomCode}
+                    onChange={(e) => setRoomCode(e.target.value)}
+                    maxLength={8}
+                    style={{ textTransform: 'uppercase' }}
+                    required
+                  />
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button

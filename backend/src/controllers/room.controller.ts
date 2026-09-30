@@ -12,19 +12,23 @@ const uploadsDir = path.join(__dirname, '../../uploads');
 export class RoomController {
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { hostName } = req.body;
+      const { hostName, isTemporary } = req.body;
       if (!hostName || typeof hostName !== 'string' || hostName.trim().length === 0) {
         res.status(400).json({ error: 'hostName is required' });
         return;
       }
 
-      const { room, hostSecret } = await RoomService.createRoom({ hostName });
+      const { room, hostSecret } = await RoomService.createRoom({
+        hostName,
+        isTemporary: isTemporary !== undefined ? Boolean(isTemporary) : true,
+      });
 
       res.status(201).json({
         roomId: room.roomId,
         hostName: room.hostName,
         hostSecret,
         status: room.status,
+        isTemporary: room.isTemporary !== false,
         createdAt: room.createdAt,
       });
     } catch (error) {
@@ -50,6 +54,8 @@ export class RoomController {
         roomId: room.roomId,
         hostName: room.hostName,
         status: room.status,
+        isTemporary: room.isTemporary !== false,
+        settings: room.settings,
         video: room.video || null,
         participants: room.participants,
         createdAt: room.createdAt,

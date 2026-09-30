@@ -8,7 +8,28 @@ const ParticipantSchema = new Schema<IParticipant>(
     socketId: { type: String },
     name: { type: String, required: true },
     isHost: { type: Boolean, default: false },
+    role: { type: String, enum: ['host', 'cohost', 'member'], default: 'member' },
     joinedAt: { type: Date, default: Date.now },
+    device: { type: String, default: 'Web Browser' },
+  },
+  { _id: false }
+);
+
+const JoinRequestSchema = new Schema<IJoinRequest>(
+  {
+    socketId: { type: String, required: true },
+    name: { type: String, required: true },
+    requestedAt: { type: Date, default: Date.now },
+    device: { type: String, default: 'Web Browser' },
+  },
+  { _id: false }
+);
+
+const KickedUserSchema = new Schema<IKickedParticipant>(
+  {
+    name: { type: String, required: true },
+    kickedAt: { type: Date, default: Date.now },
+    kickedBy: { type: String, default: 'Afitrión' },
   },
   { _id: false }
 );
@@ -48,6 +69,10 @@ const RoomSchema = new Schema<RoomDocument>(
       enum: ['waiting', 'active', 'closed'],
       default: 'waiting',
     },
+    isTemporary: {
+      type: Boolean,
+      default: true,
+    },
     video: {
       type: VideoMetadataSchema,
       default: null,
@@ -55,6 +80,23 @@ const RoomSchema = new Schema<RoomDocument>(
     participants: {
       type: [ParticipantSchema],
       default: [],
+    },
+    joinRequests: {
+      type: [JoinRequestSchema],
+      default: [],
+    },
+    kickedUsers: {
+      type: [KickedUserSchema],
+      default: [],
+    },
+    settings: {
+      type: Object,
+      default: {
+        muteOnEntry: false,
+        cameraOffOnEntry: false,
+        allowMicReactivation: true,
+        allowCamReactivation: true,
+      },
     },
   },
   {

@@ -217,6 +217,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     mediaError,
     toggleMic,
     toggleCamera,
+    enableMedia,
   } = useWebRTC(socket, roomId, userName, isHost);
 
   // 1. Initial Room Fetch + Socket.IO connection
@@ -261,10 +262,20 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       participants: any[];
       hostName?: string;
       isHost?: boolean;
+      isTemporary?: boolean;
+      settings?: any;
       playback?: { currentTime: number; isPlaying: boolean } | null;
     }) => {
       setRoomData((prev) =>
-        prev ? { ...prev, video: state.video, participants: state.participants } : null
+        prev
+          ? {
+              ...prev,
+              video: state.video,
+              participants: state.participants,
+              isTemporary: state.isTemporary !== undefined ? state.isTemporary : prev.isTemporary,
+              settings: state.settings || prev.settings,
+            }
+          : null
       );
       if (state.isHost !== undefined) setIsHost(state.isHost);
 
@@ -395,6 +406,100 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       }, 2600);
     };
 
+    // Moderation remote actions
+    const handleForceMuteUser = (data: { targetSocketId?: string; targetUserName: string }) => {
+      if (data.targetUserName.toLowerCase() === userName.toLowerCase() || data.targetSocketId === socket.id) {
+        enableMedia(false, isCameraOn);
+        alert('🔇 El anfitrión o co-anfitrión ha silenciado tu micrófono.');
+      }
+    };
+
+    const handleForceDisableCamera = (data: { targetSocketId?: string; targetUserName: string }) => {
+      if (data.targetUserName.toLowerCase() === userName.toLowerCase() || data.targetSocketId === socket.id) {
+        enableMedia(isMicOn, false);
+        alert('📷 El anfitrión o co-anfitrión ha apagado tu cámara.');
+      }
+    };
+
+    const handleForceMuteAll = () => {
+      if (!isHost) {
+        enableMedia(false, isCameraOn);
+      }
+    };
+
+    const handleForceDisableAllCameras = () => {
+      if (!isHost) {
+        enableMedia(isMicOn, false);
+      }
+    };
+
+    const handleUserKicked = (data: { targetUserName: string; kickedBy: string; participants: any[]; kickedUsers: any[] }) => {
+      setRoomData((prev) =>
+        prev
+          ? { ...prev, participants: data.participants, kickedUsers: data.kickedUsers }
+          : null
+      );
+      if (data.targetUserName.toLowerCase() === userName.toLowerCase()) {
+        alert(`🚫 Has sido expulsado de la sala por ${data.kickedBy}.`);
+        localStorage.removeItem('watchparty_host_session');
+        disconnectSocket();
+        onLeave();
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            user: 'Sistema',
+            text: `🚫 ${data.targetUserName} fue expulsado de la sala por ${data.kickedBy}`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+      }
+    };
+
+    const handleParticipantRoleUpdated = (data: { targetUserName: string; role: string; participants: any[] }) => {
+      setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
+      if (data.targetUserName.toLowerCase() === userName.toLowerCase()) {
+        if (data.role === 'cohost') {
+          alert('🛡️ ¡Ahora eres Co-Afitrión de la sala!');
+        }
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          user: 'Sistema',
+          text: `🎖️ ${data.targetUserName} ahora tiene el rol: ${data.role === 'cohost' ? 'Co-Afitrión' : 'Miembro'}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    };
+
+    const handleParticipantRenamed = (data: { oldName: string; newName: string; participants: any[] }) => {
+      setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          user: 'Sistema',
+          text: `✏️ ${data.oldName} ahora se llama ${data.newName}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    };
+
+    const handleRoomSettingsUpdated = (data: { settings: any }) => {
+      setRoomData((prev) =>
+        prev
+          ? {
+              ...prev,
+              settings: data.settings,
+              isTemporary: data.settings.isTemporary !== undefined ? data.settings.isTemporary : prev.isTemporary,
+            }
+          : null
+      );
+    };
+
     socket.on('room-state', handleRoomState);
     socket.on('host-changed', handleHostChanged);
     socket.on('room-closed', handleRoomClosed);
@@ -404,6 +509,14 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     socket.on('sync-video', handleSyncVideo);
     socket.on('chat-message', handleChatMessage);
     socket.on('reaction', handleReactionEvent);
+    socket.on('force-mute-user', handleForceMuteUser);
+    socket.on('force-disable-camera', handleForceDisableCamera);
+    socket.on('force-mute-all', handleForceMuteAll);
+    socket.on('force-disable-all-cameras', handleForceDisableAllCameras);
+    socket.on('user-kicked', handleUserKicked);
+    socket.on('participant-role-updated', handleParticipantRoleUpdated);
+    socket.on('participant-renamed', handleParticipantRenamed);
+    socket.on('room-settings-updated', handleRoomSettingsUpdated);
 
     return () => {
       isMounted = false;
@@ -416,10 +529,40 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       socket.off('sync-video', handleSyncVideo);
       socket.off('chat-message', handleChatMessage);
       socket.off('reaction', handleReactionEvent);
+      socket.off('force-mute-user', handleForceMuteUser);
+      socket.off('force-disable-camera', handleForceDisableCamera);
+      socket.off('force-mute-all', handleForceMuteAll);
+      socket.off('force-disable-all-cameras', handleForceDisableAllCameras);
+      socket.off('user-kicked', handleUserKicked);
+      socket.off('participant-role-updated', handleParticipantRoleUpdated);
+      socket.off('participant-renamed', handleParticipantRenamed);
+      socket.off('room-settings-updated', handleRoomSettingsUpdated);
     };
-  }, [roomId, userName, initialIsHost, socket, onLeave]);
+  }, [roomId, userName, initialIsHost, socket, onLeave, enableMedia]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
+
+  const handleToggleTemporaryMode = () => {
+    if (!isHost || !roomData) return;
+    const currentIsTemp = roomData.isTemporary !== false;
+    const nextIsTemp = !currentIsTemp;
+    socket.emit('update-room-settings', {
+      roomId,
+      settings: { ...roomData.settings, isTemporary: nextIsTemp },
+    });
+    setRoomData((prev) => (prev ? { ...prev, isTemporary: nextIsTemp } : null));
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        user: 'Sistema',
+        text: `⚙️ Modo de sala cambiado a: ${
+          nextIsTemp ? '⚡ Sala Temporal (se borra al salir)' : '💾 Sala Persistente (video queda guardado)'
+        }`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+  };
 
   const handleLeaveClick = () => {
     if (isHost) setShowHostExitModal(true);
@@ -506,6 +649,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         roomId={roomData.roomId}
         participantCount={roomData.participants.length}
         isHost={isHost}
+        isTemporary={roomData.isTemporary !== false}
+        onToggleTemporary={handleToggleTemporaryMode}
         onLeaveClick={handleLeaveClick}
         className={!isBarVisible ? 'header--hidden' : ''}
       />
@@ -545,19 +690,67 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
 
         {/* ── Slide-over Right Drawer for Chat or Participants ── */}
         {activeSideTab && (
-          <aside className="meet-drawer">
-            <div className="meet-drawer__header">
-              <h3>{activeSideTab === 'chat' ? 'Mensajes del chat' : `Participantes (${roomData.participants.length})`}</h3>
-              <button onClick={() => setActiveSideTab(null)} className="meet-drawer__close-btn">
-                <X size={18} />
-              </button>
-            </div>
+          <aside className={`meet-drawer ${activeSideTab === 'participants' ? 'meet-drawer--wide' : ''}`}>
             <div className="meet-drawer__body">
               {activeSideTab === 'chat' && (
-                <Chat messages={messages} onSendMessage={handleSendMessage} />
+                <>
+                  <div className="meet-drawer__header">
+                    <h3>Mensajes del chat</h3>
+                    <button onClick={() => setActiveSideTab(null)} className="meet-drawer__close-btn">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <Chat messages={messages} onSendMessage={handleSendMessage} />
+                </>
               )}
               {activeSideTab === 'participants' && (
-                <Participants participants={roomData.participants} currentUserName={userName} />
+                <Participants
+                  participants={roomData.participants}
+                  currentUserName={userName}
+                  isHost={isHost}
+                  isCoHost={
+                    roomData.participants.some(
+                      (p) =>
+                        p.name.toLowerCase() === userName.toLowerCase() &&
+                        p.role === 'cohost'
+                    )
+                  }
+                  kickedUsers={roomData.kickedUsers}
+                  peerMediaStates={peerMediaStates}
+                  isMicOn={isMicOn}
+                  isCameraOn={isCameraOn}
+                  onToggleMyMic={toggleMic}
+                  onToggleMyCamera={toggleCamera}
+                  onMuteUser={(targetUserName, targetSocketId) => {
+                    socket.emit('moderate-mute-user', { roomId, targetUserName, targetSocketId });
+                  }}
+                  onDisableCamUser={(targetUserName, targetSocketId) => {
+                    socket.emit('moderate-disable-camera', { roomId, targetUserName, targetSocketId });
+                  }}
+                  onMuteAll={() => {
+                    socket.emit('moderate-mute-all', { roomId });
+                  }}
+                  onDisableAllCameras={() => {
+                    socket.emit('moderate-disable-all-cameras', { roomId });
+                  }}
+                  onKickUser={(targetUserName) => {
+                    socket.emit('kick-user', { roomId, targetUserName, kickedBy: userName });
+                  }}
+                  onToggleCoHost={(targetUserName, makeCoHost) => {
+                    socket.emit('set-role', {
+                      roomId,
+                      targetUserName,
+                      role: makeCoHost ? 'cohost' : 'member',
+                    });
+                  }}
+                  onRenameUser={(oldName, newName) => {
+                    socket.emit('rename-participant', { roomId, oldName, newName });
+                  }}
+                  onUpdateSettings={(settings) => {
+                    socket.emit('update-room-settings', { roomId, settings });
+                  }}
+                  onClose={() => setActiveSideTab(null)}
+                />
               )}
             </div>
           </aside>
