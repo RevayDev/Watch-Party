@@ -106,27 +106,30 @@ body {
   transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
 }
 
-/* En PC (pantallas > 900px) el navbar y la barra se quedan fijos al 100% */
-@media (min-width: 901px) {
-  .header--hidden {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-  }
-  .meet-bottom-bar--hidden {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-  }
+/* Navbar y Barra inferior: Fijos y siempre visibles en PC y teléfonos verticales */
+.header--hidden {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
 }
 
-/* En teléfonos / móviles (≤ 900px) se atenúa suavemente la opacidad */
-@media (max-width: 900px) {
+.meet-bottom-bar--hidden {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+}
+
+/* Solo en teléfonos en modo horizontal (Landscape / cine) se ocultan suavemente para maximizar la pantalla */
+@media (max-height: 520px) and (orientation: landscape) {
   .header--hidden {
-    opacity: 0.32;
-    pointer-events: auto;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(-100%) !important;
   }
   .meet-bottom-bar--hidden {
-    opacity: 0.32;
-    pointer-events: auto;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(100%) !important;
   }
 }
 

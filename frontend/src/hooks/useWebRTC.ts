@@ -150,27 +150,25 @@ export function useWebRTC(socket: Socket | null, userName: string, isHost: boole
 
   // Toggle Microphone
   const toggleMic = useCallback(async () => {
-    const nextState = !isMicOn;
-    if (!localStreamRef.current || localStreamRef.current.getAudioTracks().length === 0) {
-      await enableMedia(nextState, isCameraOn);
-    } else {
-      localStreamRef.current.getAudioTracks().forEach((t) => {
-        t.enabled = nextState;
-      });
+    const audioTrack = localStreamRef.current?.getAudioTracks()[0];
+    if (audioTrack) {
+      const nextState = !audioTrack.enabled;
+      audioTrack.enabled = nextState;
       setIsMicOn(nextState);
+    } else {
+      await enableMedia(!isMicOn, isCameraOn);
     }
   }, [isMicOn, isCameraOn, enableMedia]);
 
   // Toggle Camera
   const toggleCamera = useCallback(async () => {
-    const nextState = !isCameraOn;
-    if (!localStreamRef.current || localStreamRef.current.getVideoTracks().length === 0) {
-      await enableMedia(isMicOn, nextState);
-    } else {
-      localStreamRef.current.getVideoTracks().forEach((t) => {
-        t.enabled = nextState;
-      });
+    const videoTrack = localStreamRef.current?.getVideoTracks()[0];
+    if (videoTrack) {
+      const nextState = !videoTrack.enabled;
+      videoTrack.enabled = nextState;
       setIsCameraOn(nextState);
+    } else {
+      await enableMedia(isMicOn, !isCameraOn);
     }
   }, [isCameraOn, isMicOn, enableMedia]);
 
