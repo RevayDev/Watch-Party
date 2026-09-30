@@ -239,8 +239,8 @@ body {
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  border: none;
-  transition: all var(--trans-fast);
+  border: 1px solid transparent;
+  transition: background-color var(--trans-fast), border-color var(--trans-fast), box-shadow var(--trans-fast), color var(--trans-fast);
   text-decoration: none;
   white-space: nowrap;
   user-select: none;
@@ -250,12 +250,12 @@ body {
 .btn--primary {
   background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: white;
+  border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 14px var(--color-primary-glow);
 }
 .btn--primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 22px var(--color-primary-glow);
-  filter: brightness(1.08);
+  filter: brightness(1.1);
+  box-shadow: 0 4px 18px var(--color-primary-glow);
 }
 
 .btn--secondary {
@@ -263,23 +263,32 @@ body {
   color: var(--color-text-main);
   border: 1px solid var(--color-border);
 }
-.btn--secondary:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
+.btn--secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+}
 
 .btn--danger {
-  background: rgba(239,68,68,0.12);
-  color: var(--color-danger);
-  border: 1px solid rgba(239,68,68,0.28);
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
-.btn--danger:hover:not(:disabled) { background: var(--color-danger); color: white; }
+.btn--danger:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: white;
+}
 
 .btn--full { width: 100%; }
 
 .btn--accent {
   background: linear-gradient(135deg, var(--color-accent), #db2777);
   color: white;
+  border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 14px var(--color-accent-glow);
 }
-.btn--accent:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+.btn--accent:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -427,6 +436,130 @@ body {
   margin-bottom: 2rem;
   line-height: 1.6;
   max-width: 540px;
+}
+
+/* ── Reconnect Host Card (Active Room banner on Home) ── */
+.home-reconnect-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 520px;
+  background: rgba(22, 18, 48, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1.15rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 25px rgba(99, 102, 241, 0.12);
+  gap: 1rem;
+}
+
+.home-reconnect-card__left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.home-reconnect-card__icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.2);
+}
+
+.home-reconnect-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.home-reconnect-card__title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.home-reconnect-card__code {
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  padding: 0.12rem 0.5rem;
+  border-radius: 6px;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+}
+
+.home-reconnect-card__subtitle {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.home-reconnect-card__subtitle strong {
+  color: #a78bfa;
+  font-weight: 600;
+}
+
+.home-reconnect-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.home-reconnect-card__dismiss-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.home-reconnect-card__dismiss-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
+}
+
+.home-reconnect-card__enter-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.5rem 1.15rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-reconnect-card__enter-btn:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 4px 18px rgba(139, 92, 246, 0.55);
 }
 
 /* ── Hero Buttons (Left primary pill, Right secondary pill) ── */
@@ -1207,7 +1340,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   background: rgba(255, 255, 255, 0.08);
   color: #e8eaed;
   position: relative;
@@ -1217,11 +1350,10 @@ body {
 }
 .meet-circle-btn:hover {
   background: rgba(255, 255, 255, 0.16);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 .meet-circle-btn:active {
-  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* ON state — subtle green tint (camera) */
@@ -1232,6 +1364,7 @@ body {
 }
 .meet-circle-btn--on:hover {
   background: rgba(16, 185, 129, 0.28);
+  border-color: rgba(16, 185, 129, 0.65);
 }
 
 /* Mic ON — blue-ish tint */
@@ -1242,6 +1375,7 @@ body {
 }
 .meet-circle-btn--mic-on:hover {
   background: rgba(99, 102, 241, 0.28);
+  border-color: rgba(99, 102, 241, 0.65);
 }
 
 /* OFF state — muted red */
@@ -1252,6 +1386,7 @@ body {
 }
 .meet-circle-btn--off:hover {
   background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.55);
 }
 
 /* Active/selected state — accent highlight */
@@ -1271,7 +1406,6 @@ body {
 }
 .meet-circle-btn--leave:hover {
   background: #d93025;
-  transform: translateY(-2px);
 }
 
 /* ── Unread badge dot ── */
@@ -1285,11 +1419,6 @@ body {
   background: #ea4335;
   border: 2px solid rgba(32, 33, 36, 0.95);
   pointer-events: none;
-  animation: badgePulse 2s ease-in-out infinite;
-}
-@keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.25); }
 }
 
 /* ── Emoji Popup ── */

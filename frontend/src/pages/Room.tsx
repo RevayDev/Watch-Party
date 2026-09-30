@@ -119,13 +119,19 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
   const hideBarTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetBarTimer = useCallback(() => {
+    // Only auto-hide in landscape mode or full desktop when inactive; NEVER hide in portrait mobile
+    const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
+    if (isMobilePortrait) {
+      setIsBarVisible(true);
+      return;
+    }
+
     setIsBarVisible(true);
     if (hideBarTimeoutRef.current) {
       clearTimeout(hideBarTimeoutRef.current);
     }
-    // Auto hide after 4 seconds of inactivity
+    // Auto hide after 4.5 seconds of inactivity
     hideBarTimeoutRef.current = setTimeout(() => {
-      // Do not hide if moreMenu, emojiPicker or active drawer are open
       setShowMoreMenu((currentMenu) => {
         setShowEmojiPicker((currentEmoji) => {
           if (!currentMenu && !currentEmoji) {
@@ -135,7 +141,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         });
         return currentMenu;
       });
-    }, 4000);
+    }, 4500);
   }, []);
 
   useEffect(() => {
@@ -202,8 +208,16 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
 
   // WebRTC hook for Voice and Camera
   const socket = getSocket();
-  const { localStream, remotePeers, isMicOn, isCameraOn, mediaError, toggleMic, toggleCamera } =
-    useWebRTC(socket, userName, isHost);
+  const {
+    localStream,
+    remotePeers,
+    peerMediaStates,
+    isMicOn,
+    isCameraOn,
+    mediaError,
+    toggleMic,
+    toggleCamera,
+  } = useWebRTC(socket, roomId, userName, isHost);
 
   // 1. Initial Room Fetch + Socket.IO connection
   useEffect(() => {
@@ -225,7 +239,13 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         }
 
         // Join room via Socket.IO
-        socket.emit('join-room', { roomId, userName, isHost: initialIsHost });
+        const emitJoin = () => {
+          socket.emit('join-room', { roomId, userName, isHost: initialIsHost });
+        };
+        if (socket.connected) {
+          emitJoin();
+        }
+        socket.on('connect', emitJoin);
       } catch (err: any) {
         if (isMounted) setError(err.message || 'No se pudo cargar la sala.');
       } finally {
@@ -290,15 +310,21 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
 
     const handleUserJoined = (data: { socketId?: string; userName: string; participants: any[] }) => {
       setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          user: 'Sistema',
-          text: `👋 ${data.userName} se ha unido a la sala`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && last.user === 'Sistema' && last.text.includes(data.userName) && last.text.includes('se ha unido')) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            user: 'Sistema',
+            text: `👋 ${data.userName} se ha unido a la sala`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ];
+      });
       if (data.userName.toLowerCase() !== userName.toLowerCase()) {
         addToast('join', data.userName);
       }
@@ -306,15 +332,21 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
 
     const handleUserLeft = (data: { userName: string; participants: any[] }) => {
       setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          user: 'Sistema',
-          text: `🚪 ${data.userName} ha salido de la sala`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && last.user === 'Sistema' && last.text.includes(data.userName) && last.text.includes('ha salido')) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            user: 'Sistema',
+            text: `🚪 ${data.userName} ha salido de la sala`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ];
+      });
       if (data.userName && data.userName.toLowerCase() !== userName.toLowerCase()) {
         addToast('leave', data.userName);
       }
@@ -506,6 +538,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
               isHost={isHost}
               isMicOn={isMicOn}
               isCameraOn={isCameraOn}
+              peerMediaStates={peerMediaStates}
             />
           </aside>
         )}

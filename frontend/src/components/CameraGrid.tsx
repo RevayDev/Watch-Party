@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { RemotePeer } from '../hooks/useWebRTC';
+import { RemotePeer, PeerMediaState } from '../hooks/useWebRTC';
 import { IParticipant } from '../types/room';
 import { Crown, Mic, MicOff } from 'lucide-react';
 
@@ -11,40 +11,46 @@ interface CameraGridProps {
   isHost: boolean;
   isMicOn: boolean;
   isCameraOn: boolean;
+  peerMediaStates?: Record<string, PeerMediaState>;
 }
 
-// ─── Audio Level Hook ──────────────────────────────────────────────────────────
+// ─── Audio Level Speaking Hook ────────────────────────────────────────────────
 function useIsSpeaking(stream: MediaStream | null, isLocal: boolean, isMicOn: boolean): boolean {
   const [speaking, setSpeaking] = useState(false);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const ctxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!stream || (isLocal && !isMicOn)) { setSpeaking(false); return; }
+    if (!stream || !isMicOn) {
+      setSpeaking(false);
+      return;
+    }
     const audioTracks = stream.getAudioTracks();
-    if (audioTracks.length === 0) { setSpeaking(false); return; }
+    if (audioTracks.length === 0) {
+      setSpeaking(false);
+      return;
+    }
 
     let cancelled = false;
+    let ctx: AudioContext | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let analyser: AnalyserNode | null = null;
+
     try {
-      const ctx = new AudioContext();
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.6;
-      const source = ctx.createMediaStreamSource(stream);
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.5;
+      source = ctx.createMediaStreamSource(stream);
       source.connect(analyser);
-      ctxRef.current = ctx;
-      analyserRef.current = analyser;
-      sourceRef.current = source;
+
       const data = new Uint8Array(analyser.frequencyBinCount);
       const tick = () => {
         if (cancelled) return;
-        analyser.getByteFrequencyData(data);
+        analyser?.getByteFrequencyData(data);
         let sum = 0;
-        for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
-        const rms = Math.sqrt(sum / data.length);
-        setSpeaking(rms > 12);
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length;
+        setSpeaking(avg > 15);
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
@@ -53,12 +59,11 @@ function useIsSpeaking(stream: MediaStream | null, isLocal: boolean, isMicOn: bo
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
-      sourceRef.current?.disconnect();
-      ctxRef.current?.close().catch(() => {});
-      analyserRef.current = null; sourceRef.current = null; ctxRef.current = null;
+      source?.disconnect();
+      ctx?.close().catch(() => {});
       setSpeaking(false);
     };
-  }, [stream, isMicOn]);
+  }, [stream, isMicOn, isLocal]);
 
   return speaking;
 }
@@ -71,80 +76,35 @@ const CameraTile: React.FC<{
   isLocal?: boolean;
   isMicOn?: boolean;
   isCameraOn?: boolean;
-}> = ({ stream = null, userName, isHost = false, isLocal = false, isMicOn = true, isCameraOn = true }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
+}> = ({ stream = null, userName, isHost = false, isLocal = false, isMicOn = false, isCameraOn = false }) => {
   const isSpeaking = useIsSpeaking(stream, isLocal, isMicOn);
-  // Track version counter to force re-renders when remote tracks change
-  const [, setTrackVersion] = useState(0);
-
-  // Listen to track add/remove/mute/unmute events on the stream
-  useEffect(() => {
-    if (!stream) return;
-    const bump = () => setTrackVersion((v) => v + 1);
-    stream.addEventListener('addtrack', bump);
-    stream.addEventListener('removetrack', bump);
-    // Also listen for individual track mute/unmute
-    const tracks = stream.getTracks();
-    tracks.forEach((t) => {
-      t.addEventListener('mute', bump);
-      t.addEventListener('unmute', bump);
-      t.addEventListener('ended', bump);
-    });
-    return () => {
-      stream.removeEventListener('addtrack', bump);
-      stream.removeEventListener('removetrack', bump);
-      tracks.forEach((t) => {
-        t.removeEventListener('mute', bump);
-        t.removeEventListener('unmute', bump);
-        t.removeEventListener('ended', bump);
-      });
-    };
-  }, [stream]);
-
-  useEffect(() => {
-    const vid = videoRef.current;
-    if (vid && stream) {
-      if (vid.srcObject !== stream) vid.srcObject = stream;
-      vid.play().catch(() => {});
-    }
-
-    // Explicit audio playback for remote peers to guarantee sound is heard
-    const aud = audioRef.current;
-    if (aud && stream && !isLocal) {
-      if (aud.srcObject !== stream) aud.srcObject = stream;
-      aud.play().catch(() => {});
-    }
-  }, [stream, isLocal]);
-
-  // Derive actual video/audio state from the stream tracks (works for remote peers too)
-  const videoTracks = stream?.getVideoTracks() || [];
-  const audioTracks = stream?.getAudioTracks() || [];
-  const hasVideo = isLocal
-    ? Boolean(videoTracks.length > 0 && videoTracks[0].enabled && isCameraOn)
-    : Boolean(videoTracks.length > 0 && videoTracks[0].readyState === 'live' && !videoTracks[0].muted);
-  const hasAudio = isLocal
-    ? isMicOn
-    : Boolean(audioTracks.length > 0 && audioTracks[0].readyState === 'live');
-
-  const initial = userName.charAt(0).toUpperCase();
-  const effectiveMicOn = isLocal ? isMicOn : hasAudio;
+  const initial = (userName || '?').charAt(0).toUpperCase();
 
   return (
     <div className={`cam-tile ${isSpeaking ? 'cam-tile--speaking' : ''}`}>
-      {/* Hidden audio element for remote stream to guarantee audio output */}
-      {!isLocal && (
+      {/* Remote Audio Track Player (Always active to ensure clear sound output) */}
+      {!isLocal && stream && (
         <audio
-          ref={audioRef}
+          ref={(el) => {
+            if (el && el.srcObject !== stream) {
+              el.srcObject = stream;
+              el.play().catch(() => {});
+            }
+          }}
           autoPlay
           playsInline
         />
       )}
 
-      {/* Video */}
-      {hasVideo ? (
+      {/* Video Element when Camera is ON */}
+      {isCameraOn && (isLocal || stream) ? (
         <video
-          ref={videoRef}
+          ref={(el) => {
+            if (el && stream && el.srcObject !== stream) {
+              el.srcObject = stream;
+              el.play().catch(() => {});
+            }
+          }}
           autoPlay
           playsInline
           muted={isLocal}
@@ -158,14 +118,14 @@ const CameraTile: React.FC<{
         </div>
       )}
 
-      {/* Mic badge — top right */}
-      <div className={`cam-tile__mic-badge ${effectiveMicOn ? '' : 'cam-tile__mic-badge--off'}`}>
-        {effectiveMicOn
+      {/* Mic Badge */}
+      <div className={`cam-tile__mic-badge ${isMicOn ? '' : 'cam-tile__mic-badge--off'}`}>
+        {isMicOn
           ? <Mic size={12} color={isSpeaking ? '#10b981' : '#ffffff'} />
           : <MicOff size={12} color="#ffffff" />}
       </div>
 
-      {/* Name bar — bottom left */}
+      {/* Name plate */}
       <div className="cam-tile__nameplate">
         {isHost && <Crown size={10} color="#f59e0b" />}
         <span className="cam-tile__name">{isLocal ? 'Tú' : userName}</span>
@@ -174,7 +134,7 @@ const CameraTile: React.FC<{
   );
 };
 
-// ─── Camera Grid ──────────────────────────────────────────────────────────────
+// ─── Camera Grid Container ─────────────────────────────────────────────────────
 export const CameraGrid: React.FC<CameraGridProps> = ({
   localStream,
   remotePeers,
@@ -183,22 +143,33 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
   isHost,
   isMicOn,
   isCameraOn,
+  peerMediaStates = {},
 }) => {
-  // Map remote peers by socketId or lowercase userName
-  const remotePeersMap = new Map<string, RemotePeer>();
-  remotePeers.forEach((p) => {
-    if (p.socketId) remotePeersMap.set(p.socketId, p);
-    if (p.userName) remotePeersMap.set(p.userName.toLowerCase(), p);
+  const normCurrent = (currentUserName || '').trim().toLowerCase();
+
+  // Deduplicate participants excluding current user
+  const otherParticipantsMap = new Map<string, IParticipant>();
+  participants.forEach((p) => {
+    const norm = (p.name || '').trim().toLowerCase();
+    if (norm && norm !== normCurrent && !otherParticipantsMap.has(norm)) {
+      otherParticipantsMap.set(norm, p);
+    }
   });
 
-  // Filter other participants in the room
-  const otherParticipants = participants.filter(
-    (p) => p.name.toLowerCase() !== currentUserName.toLowerCase()
-  );
+  const otherList = Array.from(otherParticipantsMap.values());
+
+  // Map remote peers by lowercase username
+  const remotePeersByName = new Map<string, RemotePeer>();
+  remotePeers.forEach((p) => {
+    const norm = (p.userName || '').trim().toLowerCase();
+    if (norm && norm !== normCurrent) {
+      remotePeersByName.set(norm, p);
+    }
+  });
 
   return (
     <div className="cam-grid">
-      {/* Local tile */}
+      {/* 1. Local User Tile */}
       <CameraTile
         stream={localStream}
         userName={currentUserName}
@@ -208,12 +179,21 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
         isCameraOn={isCameraOn}
       />
 
-      {/* Other participants in the room: matched with their WebRTC stream if available */}
-      {otherParticipants.map((p) => {
-        const peer = remotePeersMap.get(p.name.toLowerCase());
+      {/* 2. Other Participants Tiles */}
+      {otherList.map((p, idx) => {
+        const norm = p.name.trim().toLowerCase();
+        const peer = remotePeersByName.get(norm) || (otherList.length === 1 && remotePeers.length === 1 ? remotePeers[0] : remotePeers[idx]);
         const stream = peer?.stream || null;
-        const hasAudio = Boolean(stream && stream.getAudioTracks().length > 0 && stream.getAudioTracks()[0].enabled);
-        const hasVideo = Boolean(stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled);
+        const mediaState = peerMediaStates[norm] || (peer?.socketId ? peerMediaStates[peer.socketId] : undefined);
+
+        // Strict media state check
+        const peerCameraOn = mediaState?.isCameraOn !== undefined
+          ? mediaState.isCameraOn
+          : Boolean(stream && stream.getVideoTracks().some((t) => t.readyState === 'live' && t.enabled && !t.muted));
+
+        const peerMicOn = mediaState?.isMicOn !== undefined
+          ? mediaState.isMicOn
+          : false;
 
         return (
           <CameraTile
@@ -222,26 +202,11 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
             userName={p.name}
             isHost={p.isHost}
             isLocal={false}
-            isMicOn={hasAudio}
-            isCameraOn={hasVideo}
+            isMicOn={peerMicOn}
+            isCameraOn={peerCameraOn}
           />
         );
       })}
-
-      {/* Any remote peers discovered via WebRTC that might not be in DB participants yet */}
-      {remotePeers
-        .filter((p) => !otherParticipants.some((op) => op.name.toLowerCase() === p.userName.toLowerCase()))
-        .map((peer) => (
-          <CameraTile
-            key={peer.socketId}
-            stream={peer.stream}
-            userName={peer.userName}
-            isHost={peer.isHost}
-            isLocal={false}
-            isMicOn={true}
-            isCameraOn={true}
-          />
-        ))}
     </div>
   );
 };

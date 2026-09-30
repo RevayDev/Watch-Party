@@ -9,8 +9,9 @@ interface SocketUser {
   isHost: boolean;
 }
 
-// In-memory socket user directory
+// In-memory socket user directory & media states
 const activeUsers = new Map<string, SocketUser>();
+const activeMediaStates = new Map<string, { isCameraOn: boolean; isMicOn: boolean }>();
 
 // In-memory playback state per room: { currentTime, isPlaying, updatedAt }
 interface PlaybackState {
@@ -52,8 +53,9 @@ export function setupSocketHandlers(io: Server): void {
 
       console.log(`👤 ${userName} se unió a la sala [${cleanRoomId}] (Host: ${socketUser.isHost})`);
 
-      // Build existing peers list for WebRTC mesh
+      // Build existing peers list and media states for WebRTC mesh
       const existingPeers: Array<{ socketId: string; userName: string; isHost: boolean }> = [];
+      const existingMediaStates: Record<string, { isCameraOn: boolean; isMicOn: boolean; userName: string }> = {};
       const roomSockets = io.sockets.adapter.rooms.get(cleanRoomId);
       if (roomSockets) {
         for (const sockId of roomSockets) {
@@ -65,6 +67,9 @@ export function setupSocketHandlers(io: Server): void {
                 userName: peer.userName,
                 isHost: peer.isHost,
               });
+              const media = activeMediaStates.get(sockId) || { isCameraOn: false, isMicOn: false };
+              existingMediaStates[sockId] = { ...media, userName: peer.userName };
+              existingMediaStates[peer.userName.toLowerCase()] = { ...media, userName: peer.userName };
             }
           }
         }
@@ -89,7 +94,7 @@ export function setupSocketHandlers(io: Server): void {
           : playback.currentTime;
       }
 
-      // Send initial room state + peer list for WebRTC + playback position
+      // Send initial room state + peer list for WebRTC + playback position + media states
       socket.emit('room-state', {
         roomId: cleanRoomId,
         hostName: room?.hostName,
@@ -98,7 +103,7 @@ export function setupSocketHandlers(io: Server): void {
         status: room?.status || 'waiting',
         participants: room?.participants || [],
         peers: existingPeers,
-        // New: send current playback position so joiner can seek immediately
+        mediaStates: existingMediaStates,
         playback: syncedCurrentTime !== null
           ? { currentTime: syncedCurrentTime, isPlaying: playback!.isPlaying }
           : null,
@@ -185,6 +190,27 @@ export function setupSocketHandlers(io: Server): void {
       io.to(data.targetSocketId).emit('webrtc-ice-candidate', {
         senderSocketId: socket.id,
         candidate: data.candidate,
+      });
+    });
+
+    // 4.1 Broadcast Peer Media State (Camera / Mic on/off)
+    socket.on('peer-media-state', (data: { roomId: string; userName?: string; isCameraOn: boolean; isMicOn: boolean }) => {
+      const { roomId, isCameraOn, isMicOn } = data;
+      if (!roomId) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+      const user = activeUsers.get(socket.id);
+      const effectiveUserName = data.userName?.trim() || user?.userName || '';
+
+      activeMediaStates.set(socket.id, { isCameraOn, isMicOn });
+      if (effectiveUserName) {
+        activeMediaStates.set(effectiveUserName.toLowerCase(), { isCameraOn, isMicOn });
+      }
+
+      socket.to(cleanRoomId).emit('peer-media-state', {
+        socketId: socket.id,
+        userName: effectiveUserName,
+        isCameraOn,
+        isMicOn,
       });
     });
 
