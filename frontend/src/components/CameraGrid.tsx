@@ -153,9 +153,16 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
   isMicOn,
   isCameraOn,
 }) => {
-  const remotePeersByName = new Map(remotePeers.map(p => [p.userName.toLowerCase(), p]));
-  const otherWithoutStream = participants.filter(
-    p => p.name.toLowerCase() !== currentUserName.toLowerCase() && !remotePeersByName.has(p.name.toLowerCase())
+  // Map remote peers by socketId or lowercase userName
+  const remotePeersMap = new Map<string, RemotePeer>();
+  remotePeers.forEach((p) => {
+    if (p.socketId) remotePeersMap.set(p.socketId, p);
+    if (p.userName) remotePeersMap.set(p.userName.toLowerCase(), p);
+  });
+
+  // Filter other participants in the room
+  const otherParticipants = participants.filter(
+    (p) => p.name.toLowerCase() !== currentUserName.toLowerCase()
   );
 
   return (
@@ -170,31 +177,40 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
         isCameraOn={isCameraOn}
       />
 
-      {/* Remote peers with active stream */}
-      {remotePeers.map((peer) => (
-        <CameraTile
-          key={peer.socketId}
-          stream={peer.stream}
-          userName={peer.userName}
-          isHost={peer.isHost}
-          isLocal={false}
-          isMicOn={true}
-          isCameraOn={true}
-        />
-      ))}
+      {/* Other participants in the room: matched with their WebRTC stream if available */}
+      {otherParticipants.map((p) => {
+        const peer = remotePeersMap.get(p.name.toLowerCase());
+        const stream = peer?.stream || null;
+        const hasAudio = Boolean(stream && stream.getAudioTracks().length > 0 && stream.getAudioTracks()[0].enabled);
+        const hasVideo = Boolean(stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled);
 
-      {/* Participants waiting (no stream yet) */}
-      {otherWithoutStream.map((p) => (
-        <CameraTile
-          key={p.name}
-          stream={null}
-          userName={p.name}
-          isHost={p.isHost}
-          isLocal={false}
-          isMicOn={false}
-          isCameraOn={false}
-        />
-      ))}
+        return (
+          <CameraTile
+            key={p.name}
+            stream={stream}
+            userName={p.name}
+            isHost={p.isHost}
+            isLocal={false}
+            isMicOn={hasAudio}
+            isCameraOn={hasVideo}
+          />
+        );
+      })}
+
+      {/* Any remote peers discovered via WebRTC that might not be in DB participants yet */}
+      {remotePeers
+        .filter((p) => !otherParticipants.some((op) => op.name.toLowerCase() === p.userName.toLowerCase()))
+        .map((peer) => (
+          <CameraTile
+            key={peer.socketId}
+            stream={peer.stream}
+            userName={peer.userName}
+            isHost={peer.isHost}
+            isLocal={false}
+            isMicOn={true}
+            isCameraOn={true}
+          />
+        ))}
     </div>
   );
 };
