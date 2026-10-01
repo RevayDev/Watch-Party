@@ -112,4 +112,28 @@ export class ApiService {
       xhr.send(formData);
     });
   }
+
+  /**
+   * Set video from direct URL, Google Drive or .m3u8 HLS playlist
+   */
+  static async setVideoUrl(
+    roomId: string,
+    url: string,
+    title?: string
+  ): Promise<{ message: string; video: IVideoMetadata; status: string }> {
+    const response = await fetch(`${API_BASE_URL}/rooms/${roomId}/video-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url, title }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al configurar el enlace de video');
+    }
+
+    return response.json();
+  }
 }

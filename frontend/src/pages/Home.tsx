@@ -20,6 +20,8 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
   const [error, setError] = useState('');
   const [savedHostSession, setSavedHostSession] = useState<{ roomId: string; hostName: string } | null>(null);
 
+  const [isUrlInvite, setIsUrlInvite] = useState(Boolean(initialRoomCode));
+
   // Popups state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(Boolean(initialRoomCode));
@@ -34,6 +36,7 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
   useEffect(() => {
     if (initialRoomCode) {
       setRoomCode(initialRoomCode);
+      setIsUrlInvite(true);
       setShowJoinModal(true);
     }
   }, [initialRoomCode]);
@@ -58,7 +61,7 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
   const handleJoinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomCode.trim() || !userName.trim()) {
-      setError('Ingresa tu nombre y código');
+      setError('Ingresa tu nombre y el código de la sala');
       return;
     }
     setError('');
@@ -181,7 +184,11 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
 
             <button
               type="button"
-              onClick={() => { setShowJoinModal(true); setError(''); }}
+              onClick={() => {
+                setShowJoinModal(true);
+                setIsUrlInvite(false);
+                setError('');
+              }}
               className="home-hero-btn home-hero-btn--secondary"
             >
               <Link2 size={18} />
@@ -495,7 +502,7 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
                   <Link2 size={18} color="#818cf8" />
                 </div>
                 <h3 className="host-exit-modal__title">
-                  {initialRoomCode ? `Unirse a la sala ${roomCode}` : 'Unirse a una sala'}
+                  {isUrlInvite && roomCode ? `Unirse a la sala ${roomCode}` : 'Unirse a una sala'}
                 </h3>
               </div>
               <button onClick={() => setShowJoinModal(false)} className="meet-drawer__close-btn" title="Cerrar">
@@ -504,9 +511,9 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
             </div>
 
             <p className="host-exit-modal__desc">
-              {initialRoomCode
+              {isUrlInvite && roomCode
                 ? `Ingresa tu nombre de usuario para unirte de inmediato a la sala ${roomCode}.`
-                : 'Ingresa tu nombre y el código de sala que te compartió el anfitrión.'}
+                : 'Ingresa tu nombre y el código de 6 u 8 caracteres que te compartió el anfitrión.'}
             </p>
 
             {error && (
@@ -516,7 +523,7 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
             )}
 
             <form onSubmit={handleJoinSubmit}>
-              <div className="form-group" style={{ marginBottom: initialRoomCode ? '1.25rem' : '0.85rem' }}>
+              <div className="form-group" style={{ marginBottom: isUrlInvite && roomCode ? '1.25rem' : '0.85rem' }}>
                 <label className="form-group__label" style={{ color: '#cbd5e1', fontWeight: 600 }}>Tu nombre de usuario</label>
                 <input
                   type="text"
@@ -529,7 +536,7 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
                 />
               </div>
 
-              {!initialRoomCode && (
+              {(!isUrlInvite || !roomCode) && (
                 <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                   <label className="form-group__label" style={{ color: '#cbd5e1', fontWeight: 600 }}>Código de sala</label>
                   <input
@@ -539,9 +546,21 @@ export const Home: React.FC<HomeProps> = ({ initialRoomCode, onJoinRoom, onRoomC
                     value={roomCode}
                     onChange={(e) => setRoomCode(e.target.value)}
                     maxLength={8}
-                    style={{ textTransform: 'uppercase' }}
+                    style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}
                     required
                   />
+                </div>
+              )}
+
+              {isUrlInvite && roomCode && (
+                <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setIsUrlInvite(false); setRoomCode(''); }}
+                    style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Usar otro código de sala
+                  </button>
                 </div>
               )}
 

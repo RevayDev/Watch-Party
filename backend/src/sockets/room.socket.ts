@@ -126,7 +126,7 @@ export function setupSocketHandlers(io: Server): void {
 
       io.in(cleanRoomId).socketsLeave(cleanRoomId);
       roomPlayback.delete(cleanRoomId);
-      await RoomService.deleteRoom(cleanRoomId);
+      await RoomService.deleteRoom(cleanRoomId, true);
     });
 
     // 3. User leaves voluntarily (with Host role transfer if host leaves)
@@ -256,6 +256,14 @@ export function setupSocketHandlers(io: Server): void {
 
       console.log(`🎬 Nuevo video cargado en sala [${cleanRoomId}]: ${video.originalName}`);
       io.to(cleanRoomId).emit('video-changed', { video });
+    });
+
+    // 6.1 Upload Progress broadcast (so all members see live upload status)
+    socket.on('upload-progress', (data: { roomId: string; progress: number | null; fileName?: string }) => {
+      const { roomId, progress, fileName } = data;
+      if (!roomId) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+      socket.to(cleanRoomId).emit('upload-progress', { progress, fileName });
     });
 
     // 7. Chat Message

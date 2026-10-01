@@ -354,8 +354,8 @@ export const Participants: React.FC<ParticipantsProps> = ({
           </div>
         )}
 
-        {/* Bottom Section: Entry Options & General Restrictions */}
-        {canModerate && (
+        {/* Bottom Section: Entry Options & General Restrictions (Pinned to bottom of room tab) */}
+        {canModerate && activeTab === 'room' && (
           <div className="part-footer-controls">
             {/* Left: Opciones al entrar */}
             <div className="part-footer-col">

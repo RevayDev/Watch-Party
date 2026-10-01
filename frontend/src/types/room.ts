@@ -36,6 +36,8 @@ export interface IVideoMetadata {
   mimeType: string;
   sizeBytes: number;
   durationSeconds?: number;
+  sourceType?: 'file' | 'url' | 'hls';
+  directUrl?: string;
 }
 
 export interface IRoomData {

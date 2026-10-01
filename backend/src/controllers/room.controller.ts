@@ -114,6 +114,7 @@ export class RoomController {
         mimeType: file.mimetype,
         sizeBytes: file.size,
         durationSeconds: 0,
+        sourceType: 'file',
       };
 
       const updatedRoom = await RoomService.updateRoomVideo(roomId, videoMetadata);
@@ -122,6 +123,59 @@ export class RoomController {
 
       res.json({
         message: 'Video subido correctamente',
+        video: updatedRoom?.video,
+        status: updatedRoom?.status,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Set a direct video URL (e.g., .m3u8 HLS, Google Drive direct stream, or web MP4)
+   */
+  public static async setVideoUrl(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { roomId } = req.params;
+      const { url, title } = req.body;
+
+      if (!url || typeof url !== 'string' || url.trim().length === 0) {
+        res.status(400).json({ error: 'url is required' });
+        return;
+      }
+
+      const room = await RoomService.getRoomById(roomId);
+      if (!room) {
+        res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      let cleanUrl = url.trim();
+      // Google Drive link conversion helper (e.g. drive.google.com/file/d/ID/view -> direct stream)
+      const driveMatch = cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (driveMatch && driveMatch[1]) {
+        cleanUrl = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+      }
+
+      const isHls = cleanUrl.includes('.m3u8') || cleanUrl.includes('/hls/');
+      const originalName = title?.trim() || (isHls ? 'Transmisión HLS en Vivo' : cleanUrl.split('/').pop()?.split('?')[0] || 'Video Enlace Web');
+
+      const videoMetadata: IVideoMetadata = {
+        originalName,
+        fileName: cleanUrl,
+        mimeType: isHls ? 'application/x-mpegURL' : 'video/mp4',
+        sizeBytes: 0,
+        durationSeconds: 0,
+        sourceType: isHls ? 'hls' : 'url',
+        directUrl: cleanUrl,
+      };
+
+      const updatedRoom = await RoomService.updateRoomVideo(roomId, videoMetadata);
+
+      console.log(`🔗 Video enlace configurado en sala [${roomId}]: ${originalName} (${videoMetadata.sourceType})`);
+
+      res.json({
+        message: 'Enlace de video configurado correctamente',
         video: updatedRoom?.video,
         status: updatedRoom?.status,
       });
@@ -141,7 +195,7 @@ export class RoomController {
         return;
       }
 
-      const deleted = await RoomService.deleteRoom(roomId);
+      const deleted = await RoomService.deleteRoom(roomId, true);
       if (!deleted) {
         res.status(404).json({ error: 'Room not found' });
         return;
@@ -163,6 +217,11 @@ export class RoomController {
 
       if (!room || !room.video) {
         res.status(404).json({ error: 'Video no encontrado en esta sala' });
+        return;
+      }
+
+      if (room.video.sourceType === 'hls' || room.video.sourceType === 'url' || room.video.directUrl) {
+        res.redirect(room.video.directUrl || room.video.fileName);
         return;
       }
 

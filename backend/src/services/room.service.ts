@@ -380,35 +380,44 @@ export class RoomService {
   }
 
   /**
-   * Delete room and cleanup its uploaded video file
+   * Delete room and cleanup its uploaded video file.
+   * @param forceDeleteVideo  When true the video file is always removed from disk
+   *   (used when the host deliberately closes/deletes the room vs auto-cleanup).
    */
-  public static async deleteRoom(roomId: string): Promise<boolean> {
+  public static async deleteRoom(roomId: string, forceDeleteVideo = false): Promise<boolean> {
     const cleanId = roomId.toUpperCase().trim();
     let videoFile: string | undefined;
     let isTemp = true;
+    let sourceType: string | undefined;
 
     if (isMongoConnected) {
       const room = await RoomModel.findOne({ roomId: cleanId });
       if (!room) return false;
       videoFile = room.video?.fileName;
+      sourceType = room.video?.sourceType;
       isTemp = room.isTemporary !== false;
       await RoomModel.deleteOne({ roomId: cleanId });
     } else {
       const room = inMemoryRooms.get(cleanId);
       if (!room) return false;
       videoFile = room.video?.fileName;
+      sourceType = room.video?.sourceType;
       isTemp = room.isTemporary !== false;
       inMemoryRooms.delete(cleanId);
     }
 
-    // Only delete video from disk if it was a temporary room (if not temporary, video remains saved)
-    if (videoFile && isTemp) {
+    // Delete the physical video file if:
+    //  1. forceDeleteVideo was requested (host explicitly destroyed the room), or
+    //  2. the room was temporary (auto-cleanup)
+    // For URL/HLS sources there is no physical file to remove.
+    const hasLocalFile = sourceType === 'file' || !sourceType;
+    if (videoFile && hasLocalFile && (forceDeleteVideo || isTemp)) {
       this.removeOldVideoFile(videoFile);
-    } else if (videoFile && !isTemp) {
+    } else if (videoFile && hasLocalFile && !isTemp) {
       console.log(`💾 Sala no temporal [${cleanId}]: Archivo de video conservado en servidor: ${videoFile}`);
     }
 
-    console.log(`❌ Sala [${cleanId}] eliminada permanentemente (temporal: ${isTemp})`);
+    console.log(`❌ Sala [${cleanId}] eliminada permanentemente (temporal: ${isTemp}, forceDelete: ${forceDeleteVideo})`);
     return true;
   }
 

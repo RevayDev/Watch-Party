@@ -41,6 +41,8 @@ const VideoMetadataSchema = new Schema<IVideoMetadata>(
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
     durationSeconds: { type: Number, default: 0 },
+    sourceType: { type: String, enum: ['file', 'url', 'hls'], default: 'file' },
+    directUrl: { type: String, default: null },
   },
   { _id: false }
 );

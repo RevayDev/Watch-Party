@@ -9,6 +9,7 @@ router.get('/:roomId', RoomController.getById);
 router.post('/:roomId/join', RoomController.join);
 router.delete('/:roomId', RoomController.delete);
 router.post('/:roomId/video', uploadVideoMiddleware.single('video'), RoomController.uploadVideo);
+router.post('/:roomId/video-url', RoomController.setVideoUrl);
 router.get('/:roomId/video/stream', RoomController.streamVideo);
 
 export default router;

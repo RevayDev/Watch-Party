@@ -500,6 +500,10 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       );
     };
 
+    const handleUploadProgressEvent = (data: { progress: number | null; fileName?: string }) => {
+      setUploadProgress(data.progress);
+    };
+
     socket.on('room-state', handleRoomState);
     socket.on('host-changed', handleHostChanged);
     socket.on('room-closed', handleRoomClosed);
@@ -507,6 +511,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     socket.on('user-left', handleUserLeft);
     socket.on('video-changed', handleVideoChanged);
     socket.on('sync-video', handleSyncVideo);
+    socket.on('upload-progress', handleUploadProgressEvent);
     socket.on('chat-message', handleChatMessage);
     socket.on('reaction', handleReactionEvent);
     socket.on('force-mute-user', handleForceMuteUser);
@@ -527,6 +532,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       socket.off('user-left', handleUserLeft);
       socket.off('video-changed', handleVideoChanged);
       socket.off('sync-video', handleSyncVideo);
+      socket.off('upload-progress', handleUploadProgressEvent);
       socket.off('chat-message', handleChatMessage);
       socket.off('reaction', handleReactionEvent);
       socket.off('force-mute-user', handleForceMuteUser);
@@ -588,15 +594,32 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
   const handleUploadVideo = async (file: File) => {
     try {
       setUploadProgress(0);
+      socket.emit('upload-progress', { roomId, progress: 0, fileName: file.name });
       const res = await ApiService.uploadVideo(roomId, file, (progress) => {
         setUploadProgress(progress);
+        socket.emit('upload-progress', { roomId, progress, fileName: file.name });
       });
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
       socket.emit('video-changed', { roomId, video: res.video });
+      socket.emit('upload-progress', { roomId, progress: null });
     } catch (err: any) {
+      socket.emit('upload-progress', { roomId, progress: null });
       alert(err.message || 'Error al subir el video');
     } finally {
       setUploadProgress(null);
+    }
+  };
+
+  const handleSetVideoUrl = async (url: string, title?: string) => {
+    try {
+      setLoading(true);
+      const res = await ApiService.setVideoUrl(roomId, url, title);
+      setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
+      socket.emit('video-changed', { roomId, video: res.video });
+    } catch (err: any) {
+      alert(err.message || 'Error al cargar el enlace de video');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -664,6 +687,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             video={roomData.video}
             isHost={isHost}
             onUploadVideo={handleUploadVideo}
+            onSetVideoUrl={handleSetVideoUrl}
             uploadProgress={uploadProgress}
             onSyncAction={handleSyncAction}
             remoteAction={remoteAction}
@@ -932,6 +956,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       <HostExitModal
         isOpen={showHostExitModal}
         participantCount={roomData.participants.length}
+        isTemporary={roomData.isTemporary !== false}
         onClose={() => setShowHostExitModal(false)}
         onLeaveOnlyMe={handleLeaveOnlyMe}
         onDeleteRoomForAll={handleDeleteRoomForAll}
