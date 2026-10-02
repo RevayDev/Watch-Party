@@ -786,6 +786,23 @@ export const Home: React.FC<HomeProps> = ({
               ))}
             </tbody>
           </table>
+
+          {/* Tarjetas automáticas para móvil */}
+          <div className="home-roadmap-cards">
+            {roadmapItems.map((item) => (
+              <div className="home-roadmap-card" key={item.title}>
+                <div className="home-roadmap-card__top">
+                  <h4 className="home-roadmap-card__title">{item.title}</h4>
+                  <span
+                    className={`home-status ${item.status === "En estudio" ? "home-status--wip" : ""}`}
+                  >
+                    {item.status}
+                  </span>
+                </div>
+                <p className="home-roadmap-card__desc">{item.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
