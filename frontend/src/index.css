@@ -96,10 +96,16 @@ body {
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  min-height: 60dvh;
+  height: 100dvh;
+  width: 100vw;
+  background: #000000;
   color: var(--color-text-muted);
   text-align: center;
   padding: 2rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
 }
 .room-loading__icon {
   color: var(--color-primary);
@@ -4508,9 +4514,24 @@ div[id] {
     margin: 0.55rem auto 0.1rem;
     flex-shrink: 0;
   }
+  /* Drawer header close button / X button visibility on mobile */
   .meet-drawer .meet-drawer__header .meet-drawer__close-btn,
   .meet-drawer .part-header__close {
-    display: none;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+  }
+  .meet-drawer .meet-drawer__header .meet-drawer__close-btn:hover,
+  .meet-drawer .part-header__close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
   }
   /* Beat the desktop `.meet-drawer--wide` !important rules that leave a 32px gap */
   .meet-drawer--wide {

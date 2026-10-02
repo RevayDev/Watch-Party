@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage } from '../types/room';
+import { X } from 'lucide-react';
 
 interface ChatProps {
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
+  onClose?: () => void;
 }
 
-export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage }) => {
+export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, onClose }) => {
   const [input, setInput] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -25,9 +27,22 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage }) => {
   };
 
   return (
-    <div className="drawer-chat">
+    <div className="drawer-chat" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Mobile Close Button Header */}
+      <div className="meet-drawer__header part-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Mensajes del chat</h3>
+        <button
+          className="part-icon-btn part-header__close"
+          onClick={onClose}
+          title="Cerrar"
+          style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.35rem 0.75rem', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <X size={16} />
+        </button>
+      </div>
+
       {/* Message list */}
-      <div ref={bodyRef} className="drawer-chat__messages">
+      <div ref={bodyRef} className="drawer-chat__messages" style={{ flex: 1, overflowY: 'auto' }}>
         {messages.length === 0 ? (
           <div className="drawer-chat__empty">
             Sin mensajes aún. ¡Di algo! 👋

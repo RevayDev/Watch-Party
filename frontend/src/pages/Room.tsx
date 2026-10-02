@@ -963,15 +963,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           >
             <div className="meet-drawer__body">
               {sideTabView === 'chat' && (
-                <>
-                  <div className="meet-drawer__header">
-                    <h3>Mensajes del chat</h3>
-                    <button onClick={() => setActiveSideTab(null)} className="meet-drawer__close-btn" title="Cerrar">
-                      Cerrar
-                    </button>
-                  </div>
-                  <Chat messages={messages} onSendMessage={handleSendMessage} />
-                </>
+                <Chat messages={messages} onSendMessage={handleSendMessage} onClose={() => setActiveSideTab(null)} />
               )}
               {sideTabView === 'participants' && (
                 <Participants

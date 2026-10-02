@@ -247,15 +247,13 @@ export const Participants: React.FC<ParticipantsProps> = ({
               <span className="part-count">({participants.length})</span>
             </h2>
           </div>
-          {onClose && (
-            <button
-              className="part-icon-btn part-header__close"
-              onClick={onClose}
-              title="Cerrar"
-            >
-              <X size={14} />
-            </button>
-          )}
+          <button
+            className="part-icon-btn part-header__close"
+            onClick={onClose}
+            title="Cerrar"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         {/* Top 3 Navigation Tabs */}
