@@ -4500,22 +4500,47 @@ div[id] {
     border-radius: 50%;
   }
 
-  /* Drawer covers full screen on phones (fixed: also covers the bottom bar) */
-  .meet-drawer {
-    position: fixed;
-    top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: 85dvh;
-    max-height: 85dvh;
-    border-radius: 20px 20px 0 0;
-    width: 100%;
-    max-width: 100%;
-    z-index: 120;
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    animation: slideUpBottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* Universal mobile drawers and modals: bottom sheet sliding up from bottom */
+  .meet-drawer,
+  .modal-card,
+  .modal-card--change {
+    position: fixed !important;
+    top: auto !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    height: 85dvh !important;
+    max-height: 85dvh !important;
+    border-radius: 20px 20px 0 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    z-index: 150 !important;
+    border: none !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+    animation: slideUpBottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
+  }
+  .meet-drawer--wide {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .modal-overlay {
+    padding: 0 !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    animation: sheetFadeIn 0.2s ease !important;
+  }
+  .modal-overlay--closing {
+    animation: overlayOut 0.2s ease forwards !important;
+  }
+  .meet-drawer--closing,
+  .modal-card--closing,
+  .modal-card--change.modal-card--closing {
+    animation: slideDownBottom 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+    pointer-events: none !important;
   }
   /* Phone sheet style: handle bar as a clickable close element */
   .meet-drawer::before {
