@@ -16,7 +16,7 @@ import { notify } from '../services/notifications';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useSwipeDown } from '../hooks/useSwipeDown';
 import { usePresence } from '../hooks/usePresence';
-import { Loader2, MessageSquare, Users, Phone, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile } from 'lucide-react';
+import { Loader2, MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile } from 'lucide-react';
 
 // ── Audio helpers (Web Audio API) ─────────────────────────────────────────
 function playJoinSound() {
@@ -1158,7 +1158,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
                 className="meet-more-item meet-more-item--danger"
                 onClick={() => { handleLeaveClick(); setShowMoreMenu(false); }}
               >
-                <Phone size={16} className="meet-hangup-icon" />
+                <PhoneOff size={16} />
                 <span>Salir de la sala</span>
               </button>
             </div>
@@ -1171,7 +1171,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           className="meet-circle-btn meet-circle-btn--leave meet-btn--hide-mobile"
           title="Salir de la reunión"
         >
-          <Phone size={20} className="meet-hangup-icon" />
+          <PhoneOff size={20} />
         </button>
       </footer>
 
