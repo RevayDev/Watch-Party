@@ -2,6 +2,7 @@ export type ParticipantRole = 'host' | 'cohost' | 'member';
 
 export interface IParticipant {
   socketId?: string;
+  userId?: string;
   name: string;
   isHost: boolean;
   role?: ParticipantRole;
@@ -11,6 +12,7 @@ export interface IParticipant {
 
 export interface IJoinRequest {
   socketId: string;
+  userId?: string;
   name: string;
   requestedAt: string;
   device?: string;
@@ -18,8 +20,10 @@ export interface IJoinRequest {
 
 export interface IKickedParticipant {
   name: string;
+  userId?: string;
   kickedAt: string;
   kickedBy: string;
+  banned?: boolean;
 }
 
 export interface IRoomSettings {
@@ -28,6 +32,11 @@ export interface IRoomSettings {
   allowMicReactivation: boolean;
   allowCamReactivation: boolean;
   isTemporary?: boolean;
+  requireApproval?: boolean;
+  name?: string;
+  description?: string;
+  timerMinutes?: number | null;
+  timerEndsAt?: string | null;
 }
 
 export interface IVideoMetadata {

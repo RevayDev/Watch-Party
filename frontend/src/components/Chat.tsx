@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send } from 'lucide-react';
 import { ChatMessage } from '../types/room';
 
 interface ChatProps {
@@ -67,7 +66,7 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage }) => {
           autoComplete="off"
         />
         <button type="submit" className="drawer-chat__send" disabled={!input.trim()}>
-          <Send size={16} />
+          Enviar
         </button>
       </form>
     </div>

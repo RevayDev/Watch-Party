@@ -3,6 +3,8 @@ import { Home } from './pages/Home';
 import { CreateRoom } from './pages/CreateRoom';
 import { Room } from './pages/Room';
 import { ApiService } from './services/api';
+import { saveRecentRoom, removeRecentRoom } from './services/recentRooms';
+import { NotificationProvider, notify } from './services/notifications';
 
 type ViewState = 'home' | 'create' | 'room';
 
@@ -30,6 +32,7 @@ export const App: React.FC = () => {
   const handleRoomCreated = (roomId: string, hostName: string, _hostSecret: string) => {
     // Persist host session
     localStorage.setItem('watchparty_host_session', JSON.stringify({ roomId, hostName }));
+    saveRecentRoom(roomId, hostName, 'host');
     setCurrentRoomId(roomId);
     setCurrentUserName(hostName);
     setIsHost(true);
@@ -37,7 +40,18 @@ export const App: React.FC = () => {
     window.history.pushState({}, '', `?room=${roomId}`);
   };
 
-  const handleReconnectHost = (roomId: string, hostName: string) => {
+  const handleReconnectHost = async (roomId: string, hostName: string) => {
+    // Verify the room still exists before entering (it may have been deleted)
+    try {
+      await ApiService.getRoom(roomId);
+    } catch {
+      localStorage.removeItem('watchparty_host_session');
+      removeRecentRoom(roomId);
+      notify('error', `La sala ${roomId} ya no existe o fue eliminada. Crea una nueva sala.`, 'Sala no disponible');
+      return;
+    }
+    localStorage.setItem('watchparty_host_session', JSON.stringify({ roomId, hostName }));
+    saveRecentRoom(roomId, hostName, 'host');
     setCurrentRoomId(roomId);
     setCurrentUserName(hostName);
     setIsHost(true);
@@ -48,18 +62,20 @@ export const App: React.FC = () => {
   const handleJoinRoom = async (roomId: string, userName: string) => {
     try {
       await ApiService.joinRoom(roomId, userName);
+      saveRecentRoom(roomId, userName, 'guest');
       setCurrentRoomId(roomId);
       setCurrentUserName(userName);
       setIsHost(false);
       setView('room');
       window.history.pushState({}, '', `?room=${roomId}`);
     } catch (err: any) {
-      alert(err.message || 'No se pudo unir a la sala');
+      notify('error', err.message || 'No se pudo unir a la sala', 'Error al unirse');
     }
   };
 
   return (
-    <div className="app">
+    <NotificationProvider>
+      <div className="app">
       {view === 'home' && (
         <Home
           initialRoomCode={currentRoomId}
@@ -84,7 +100,8 @@ export const App: React.FC = () => {
           onLeave={handleBackToHome}
         />
       )}
-    </div>
+      </div>
+    </NotificationProvider>
   );
 };
 export default App;

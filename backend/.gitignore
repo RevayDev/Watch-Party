@@ -11,3 +11,5 @@ npm-debug.log*
 # Uploads directory contents
 uploads/*
 !uploads/.gitkeep
+
+data/

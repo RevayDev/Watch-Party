@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { RoomHeader } from '../components/RoomHeader';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { Participants } from '../components/Participants';
@@ -6,19 +6,17 @@ import { Chat } from '../components/Chat';
 import { Reactions } from '../components/Reactions';
 import { CameraGrid } from '../components/CameraGrid';
 import { HostExitModal } from '../components/HostExitModal';
+import { RoomSettingsModal } from '../components/RoomSettingsModal';
+import { WaitingApproval } from '../components/WaitingApproval';
 import { IRoomData, ChatMessage, ReactionItem } from '../types/room';
 import { ApiService } from '../services/api';
 import { getSocket, disconnectSocket } from '../services/socket';
+import { removeRecentRoom } from '../services/recentRooms';
+import { notify } from '../services/notifications';
 import { useWebRTC } from '../hooks/useWebRTC';
-import { Loader2, Mic, MicOff, Video, VideoOff, MessageSquare, Users, PhoneOff, Smile, X, PanelRightClose, PanelRightOpen, MoreVertical } from 'lucide-react';
-
-// ── Toast Notification Types ───────────────────────────────────────────────
-interface ToastNotification {
-  id: string;
-  type: 'join' | 'leave' | 'chat';
-  userName: string;
-  text?: string;
-}
+import { useSwipeDown } from '../hooks/useSwipeDown';
+import { usePresence } from '../hooks/usePresence';
+import { Loader2, MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile } from 'lucide-react';
 
 // ── Audio helpers (Web Audio API) ─────────────────────────────────────────
 function playJoinSound() {
@@ -84,10 +82,43 @@ interface RoomProps {
 }
 
 export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsHost, onLeave }) => {
+  // Stable user identity for this browser (never changes on rename → no duplicates)
+  const userId = useMemo(() => {
+    try {
+      let id = localStorage.getItem('watchparty_user_id');
+      if (!id) {
+        id =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `u-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem('watchparty_user_id', id);
+      }
+      return id;
+    } catch {
+      return `u-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+  }, []);
+
+  // Current display name (updates when THIS user is renamed)
+  const [myName, setMyName] = useState(userName);
+  // Waiting-list state (manual approval rooms)
+  const [awaitingApproval, setAwaitingApproval] = useState(false);
+  // Media prefs chosen in the waiting lobby (mic/cam) — applied once admitted
+  // (camera defaults ON so the guest sees their preview before entering)
+  const pendingMediaPrefRef = useRef<{ micOn: boolean; camOn: boolean }>({ micOn: false, camOn: true });
+  const applyMediaOnJoinRef = useRef(false);
+
   const [roomData, setRoomData] = useState<IRoomData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // True once the server confirmed entry with 'room-state' (blocks UI flash)
+  const [joined, setJoined] = useState(false);
   const [isHost, setIsHost] = useState(initialIsHost);
+  // Ref mirror of isHost so socket handlers never read a stale value
+  const isHostRef = useRef(isHost);
+  isHostRef.current = isHost;
+  // Ref mirror of pending request count (for "new request" toasts)
+  const joinRequestsLenRef = useRef(0);
   const [showHostExitModal, setShowHostExitModal] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
@@ -105,14 +136,29 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   // Toggle collapse right cameras strip accordion
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
-  // Google Meet-style toast notifications
-  const [toasts, setToasts] = useState<ToastNotification[]>([]);
-  const toastTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // Unread messages counter (resets when chat tab opened)
   const [unreadCount, setUnreadCount] = useState(0);
   // Mobile “More” dropdown menu
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  // Room settings gear modal (name, info, save-mode, timer)
+  const [showRoomSettings, setShowRoomSettings] = useState(false);
+  // Swipe-down-to-dismiss for the phone drawer (chat / participants)
+  const drawerSheetRef = useSwipeDown<HTMLElement>(
+    () => setActiveSideTab(null),
+    !!activeSideTab
+  );
+  // Exit animations (drawer, ⋯ menu, emoji popup)
+  const drawerPresence = usePresence(!!activeSideTab);
+  const morePresence = usePresence(showMoreMenu, 160);
+  const emojiPresence = usePresence(showEmojiPicker, 160);
+  // Keep the last opened tab so the drawer still renders content while closing
+  const lastSideTabRef = useRef<'chat' | 'participants'>('chat');
+  if (activeSideTab) lastSideTabRef.current = activeSideTab;
+  const sideTabView = activeSideTab ?? lastSideTabRef.current;
+  // Ref mirror of the open side tab (socket handlers read it without stale closures)
+  const activeSideTabRef = useRef<'chat' | 'participants' | null>(null);
+  activeSideTabRef.current = activeSideTab;
 
   // Auto-hide toolbar and header on inactivity (like YouTube / Netflix / Google Meet)
   const [isBarVisible, setIsBarVisible] = useState(true);
@@ -185,27 +231,6 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     if (activeSideTab === 'chat') setUnreadCount(0);
   }, [activeSideTab]);
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-    const timer = toastTimersRef.current.get(id);
-    if (timer) { clearTimeout(timer); toastTimersRef.current.delete(id); }
-  }, []);
-
-  const addToast = useCallback((type: 'join' | 'leave' | 'chat', toastUserName: string, toastText?: string) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev.slice(-3), { id, type, userName: toastUserName, text: toastText }]);
-    if (type === 'join') playJoinSound();
-    else if (type === 'leave') playLeaveSound();
-    else if (type === 'chat') playChatSound();
-
-    const duration = type === 'chat' ? 4500 : 4000;
-    const timer = setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-      toastTimersRef.current.delete(id);
-    }, duration);
-    toastTimersRef.current.set(id, timer);
-  }, []);
-
   // WebRTC hook for Voice and Camera
   const socket = getSocket();
   const {
@@ -218,11 +243,16 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     toggleMic,
     toggleCamera,
     enableMedia,
-  } = useWebRTC(socket, roomId, userName, isHost);
+  } = useWebRTC(socket, roomId, myName, isHost);
 
   // 1. Initial Room Fetch + Socket.IO connection
   useEffect(() => {
     let isMounted = true;
+
+    // Join room via Socket.IO (hoisted so it can be unsubscribed on cleanup)
+    const emitJoin = () => {
+      socket.emit('join-room', { roomId, userName: myName, isHost: initialIsHost, userId });
+    };
 
     async function loadRoom() {
       try {
@@ -230,19 +260,15 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         const data = await ApiService.getRoom(roomId);
         if (isMounted) {
           setRoomData(data);
-          if (data.hostName.toLowerCase() === userName.toLowerCase()) {
+          if (data.hostName.toLowerCase() === myName.toLowerCase()) {
             setIsHost(true);
             localStorage.setItem(
               'watchparty_host_session',
-              JSON.stringify({ roomId, hostName: userName })
+              JSON.stringify({ roomId, hostName: myName })
             );
           }
         }
 
-        // Join room via Socket.IO
-        const emitJoin = () => {
-          socket.emit('join-room', { roomId, userName, isHost: initialIsHost });
-        };
         if (socket.connected) {
           emitJoin();
         }
@@ -264,6 +290,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       isHost?: boolean;
       isTemporary?: boolean;
       settings?: any;
+      joinRequests?: any[];
+      kickedUsers?: any[];
       playback?: { currentTime: number; isPlaying: boolean } | null;
     }) => {
       setRoomData((prev) =>
@@ -274,10 +302,24 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
               participants: state.participants,
               isTemporary: state.isTemporary !== undefined ? state.isTemporary : prev.isTemporary,
               settings: state.settings || prev.settings,
+              joinRequests: state.joinRequests || prev.joinRequests,
+              kickedUsers: state.kickedUsers || prev.kickedUsers,
             }
           : null
       );
+      setAwaitingApproval(false);
+      setJoined(true);
+      joinRequestsLenRef.current = state.joinRequests?.length || 0;
       if (state.isHost !== undefined) setIsHost(state.isHost);
+
+      // Admitted from the waiting lobby → apply the mic/cam prefs chosen there
+      if (applyMediaOnJoinRef.current) {
+        applyMediaOnJoinRef.current = false;
+        const { micOn, camOn } = pendingMediaPrefRef.current;
+        if (micOn || camOn) {
+          enableMedia(micOn, camOn);
+        }
+      }
 
       if (state.playback && state.video) {
         setRemoteAction({
@@ -293,12 +335,12 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       setRoomData((prev) =>
         prev ? { ...prev, participants: data.participants, hostName: data.newHostName } : null
       );
-      const amINewHost = data.newHostName.toLowerCase() === userName.toLowerCase();
+      const amINewHost = data.newHostName.toLowerCase() === myName.toLowerCase();
       if (amINewHost) {
         setIsHost(true);
         localStorage.setItem(
           'watchparty_host_session',
-          JSON.stringify({ roomId, hostName: userName })
+          JSON.stringify({ roomId, hostName: myName })
         );
       }
       setMessages((prev) => [
@@ -313,8 +355,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     };
 
     const handleRoomClosed = (data: { message: string }) => {
-      alert(data.message || 'La sala ha sido cerrada por el anfitrión.');
-      localStorage.removeItem('watchparty_host_session');
+      notify('error', data.message || 'La sala ha sido cerrada por el anfitrión.', 'Sala cerrada');
+      clearRoomLocalData();
       disconnectSocket();
       onLeave();
     };
@@ -336,8 +378,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           },
         ];
       });
-      if (data.userName.toLowerCase() !== userName.toLowerCase()) {
-        addToast('join', data.userName);
+      if (data.userName.toLowerCase() !== myName.toLowerCase()) {
+        playJoinSound();
+        notify('info', `${data.userName} se unió a la sala`, 'Participantes');
       }
     };
 
@@ -358,8 +401,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           },
         ];
       });
-      if (data.userName && data.userName.toLowerCase() !== userName.toLowerCase()) {
-        addToast('leave', data.userName);
+      if (data.userName && data.userName.toLowerCase() !== myName.toLowerCase()) {
+        playLeaveSound();
+        notify('info', `${data.userName} salió de la sala`, 'Participantes');
       }
     };
 
@@ -388,15 +432,15 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
 
     const handleChatMessage = (msg: ChatMessage) => {
       setMessages((prev) => [...prev, msg]);
-      setActiveSideTab((tab) => {
-        if (tab !== 'chat') {
-          setUnreadCount((n) => n + 1);
-          if (msg.user.toLowerCase() !== userName.toLowerCase()) {
-            addToast('chat', msg.user, msg.text);
-          }
+      if (activeSideTabRef.current !== 'chat') {
+        setUnreadCount((n) => n + 1);
+        if (msg.user.toLowerCase() !== myName.toLowerCase()) {
+          playChatSound();
+          notify('info', `${msg.user}: ${msg.text}`, 'Nuevo mensaje', () => {
+            setActiveSideTab('chat');
+          });
         }
-        return tab;
-      });
+      }
     };
 
     const handleReactionEvent = (reaction: ReactionItem) => {
@@ -408,16 +452,16 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
 
     // Moderation remote actions
     const handleForceMuteUser = (data: { targetSocketId?: string; targetUserName: string }) => {
-      if (data.targetUserName.toLowerCase() === userName.toLowerCase() || data.targetSocketId === socket.id) {
+      if (data.targetUserName.toLowerCase() === myName.toLowerCase() || data.targetSocketId === socket.id) {
         enableMedia(false, isCameraOn);
-        alert('🔇 El anfitrión o co-anfitrión ha silenciado tu micrófono.');
+        notify('warning', 'El anfitrión o co-anfitrión ha silenciado tu micrófono.', 'Micro silenciado');
       }
     };
 
     const handleForceDisableCamera = (data: { targetSocketId?: string; targetUserName: string }) => {
-      if (data.targetUserName.toLowerCase() === userName.toLowerCase() || data.targetSocketId === socket.id) {
+      if (data.targetUserName.toLowerCase() === myName.toLowerCase() || data.targetSocketId === socket.id) {
         enableMedia(isMicOn, false);
-        alert('📷 El anfitrión o co-anfitrión ha apagado tu cámara.');
+        notify('warning', 'El anfitrión o co-anfitrión ha apagado tu cámara.', 'Cámara apagada');
       }
     };
 
@@ -433,15 +477,31 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       }
     };
 
-    const handleUserKicked = (data: { targetUserName: string; kickedBy: string; participants: any[]; kickedUsers: any[] }) => {
+    const handleUserKicked = (data: {
+      targetUserName: string;
+      targetUserId?: string;
+      kickedBy: string;
+      banned?: boolean;
+      participants: any[];
+      kickedUsers: any[];
+    }) => {
       setRoomData((prev) =>
         prev
           ? { ...prev, participants: data.participants, kickedUsers: data.kickedUsers }
           : null
       );
-      if (data.targetUserName.toLowerCase() === userName.toLowerCase()) {
-        alert(`🚫 Has sido expulsado de la sala por ${data.kickedBy}.`);
-        localStorage.removeItem('watchparty_host_session');
+      const amITarget =
+        (data.targetUserId && data.targetUserId === userId) ||
+        data.targetUserName.toLowerCase() === myName.toLowerCase();
+      if (amITarget) {
+        notify(
+          'error',
+          data.banned
+            ? `Has sido baneado de la sala por ${data.kickedBy}.`
+            : `Has sido expulsado de la sala por ${data.kickedBy}.`,
+          data.banned ? 'Baneado' : 'Expulsado'
+        );
+        clearRoomLocalData();
         disconnectSocket();
         onLeave();
       } else {
@@ -450,18 +510,24 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           {
             id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             user: 'Sistema',
-            text: `🚫 ${data.targetUserName} fue expulsado de la sala por ${data.kickedBy}`,
+            text: data.banned
+              ? `⛔ ${data.targetUserName} fue baneado de la sala por ${data.kickedBy}`
+              : `🚫 ${data.targetUserName} fue expulsado de la sala por ${data.kickedBy}`,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           },
         ]);
       }
     };
 
+    const handleKickedUsersUpdated = (data: { kickedUsers: any[] }) => {
+      setRoomData((prev) => (prev ? { ...prev, kickedUsers: data.kickedUsers } : prev));
+    };
+
     const handleParticipantRoleUpdated = (data: { targetUserName: string; role: string; participants: any[] }) => {
       setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
-      if (data.targetUserName.toLowerCase() === userName.toLowerCase()) {
+      if (data.targetUserName.toLowerCase() === myName.toLowerCase()) {
         if (data.role === 'cohost') {
-          alert('🛡️ ¡Ahora eres Co-Afitrión de la sala!');
+          notify('success', '¡Ahora eres Co-Afitrión de la sala!', 'Nuevo rol');
         }
       }
       setMessages((prev) => [
@@ -475,8 +541,35 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       ]);
     };
 
-    const handleParticipantRenamed = (data: { oldName: string; newName: string; participants: any[] }) => {
+    const handleParticipantRenamed = (data: {
+      oldName: string;
+      newName: string;
+      userId?: string;
+      participants: any[];
+    }) => {
       setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
+
+      // If THIS user was renamed, adopt the new name everywhere (identity = userId)
+      const isMe =
+        (data.userId && data.userId === userId) ||
+        (!data.userId && data.oldName.toLowerCase() === myName.toLowerCase()) ||
+        data.oldName.toLowerCase() === myName.toLowerCase();
+      if (isMe && data.newName !== myName) {
+        setMyName(data.newName);
+        try {
+          const raw = localStorage.getItem('watchparty_host_session');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.roomId?.toUpperCase() === roomId.toUpperCase() && parsed.hostName === data.oldName) {
+              parsed.hostName = data.newName;
+              localStorage.setItem('watchparty_host_session', JSON.stringify(parsed));
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+
       setMessages((prev) => [
         ...prev,
         {
@@ -486,6 +579,49 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
+    };
+
+    // ── Waiting list (manual approval) ──────────────────────────────────────
+    const handleJoinPending = () => {
+      setJoined(false);
+      setAwaitingApproval(true);
+    };
+
+    const handleJoinApproved = () => {
+      // Apply the lobby media prefs once room-state arrives
+      applyMediaOnJoinRef.current = true;
+      setAwaitingApproval(false);
+      // Re-run the join flow now that we were accepted
+      socket.emit('join-room', { roomId, userName: myName, isHost: initialIsHost, userId });
+    };
+
+    const handleJoinRejected = (data: { reason?: string; message?: string }) => {
+      setAwaitingApproval(false);
+      setJoined(false);
+      notify(
+        data.reason === 'banned' ? 'error' : 'warning',
+        data.message || 'Tu solicitud para unirte fue rechazada.',
+        data.reason === 'banned' ? 'Baneado' : 'Solicitud rechazada'
+      );
+      clearRoomLocalData();
+      disconnectSocket();
+      onLeave();
+    };
+
+    const handleJoinRequestsUpdated = (data: { joinRequests: any[] }) => {
+      const nextList = data.joinRequests || [];
+      const prevLen = joinRequestsLenRef.current;
+      joinRequestsLenRef.current = nextList.length;
+      setRoomData((prev) => (prev ? { ...prev, joinRequests: nextList } : prev));
+      // Host/co-host: pop a toast when a NEW join request arrives
+      if (nextList.length > prevLen && isHostRef.current) {
+        const newest = nextList[nextList.length - 1];
+        notify(
+          'info',
+          `${newest?.name || 'Alguien'} quiere unirse a la sala. Revisa la pestaña Solicitudes.`,
+          'Nueva solicitud de entrada'
+        );
+      }
     };
 
     const handleRoomSettingsUpdated = (data: { settings: any }) => {
@@ -522,9 +658,15 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     socket.on('participant-role-updated', handleParticipantRoleUpdated);
     socket.on('participant-renamed', handleParticipantRenamed);
     socket.on('room-settings-updated', handleRoomSettingsUpdated);
+    socket.on('kicked-users-updated', handleKickedUsersUpdated);
+    socket.on('join-pending', handleJoinPending);
+    socket.on('join-approved', handleJoinApproved);
+    socket.on('join-rejected', handleJoinRejected);
+    socket.on('join-requests-updated', handleJoinRequestsUpdated);
 
     return () => {
       isMounted = false;
+      socket.off('connect', emitJoin);
       socket.off('room-state', handleRoomState);
       socket.off('host-changed', handleHostChanged);
       socket.off('room-closed', handleRoomClosed);
@@ -543,8 +685,14 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       socket.off('participant-role-updated', handleParticipantRoleUpdated);
       socket.off('participant-renamed', handleParticipantRenamed);
       socket.off('room-settings-updated', handleRoomSettingsUpdated);
+      socket.off('kicked-users-updated', handleKickedUsersUpdated);
+      socket.off('join-pending', handleJoinPending);
+      socket.off('join-approved', handleJoinApproved);
+      socket.off('join-rejected', handleJoinRejected);
+      socket.off('join-requests-updated', handleJoinRequestsUpdated);
     };
-  }, [roomId, userName, initialIsHost, socket, onLeave, enableMedia]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, myName, initialIsHost, socket, onLeave, enableMedia, userId]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -570,22 +718,80 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     ]);
   };
 
+  // ⚙ Configuración de sala: nombre + información
+  const handleSaveRoomDetails = (name: string, description: string) => {
+    if (!isHost || !roomData) return;
+    socket.emit('update-room-settings', {
+      roomId,
+      settings: { ...roomData.settings, name, description },
+    });
+    setRoomData((prev) =>
+      prev
+        ? {
+            ...prev,
+            settings: { ...prev.settings, name, description } as IRoomData['settings'],
+          }
+        : null
+    );
+  };
+
+  // ⚙ Configuración de sala: temporizador de cierre automático (minutes = null → eliminar)
+  const handleSetRoomTimer = (minutes: number | null) => {
+    if (!isHost || !roomData) return;
+    const timerEndsAt = minutes ? new Date(Date.now() + minutes * 60000).toISOString() : null;
+    socket.emit('update-room-settings', {
+      roomId,
+      settings: { ...roomData.settings, timerMinutes: minutes, timerEndsAt },
+    });
+    setRoomData((prev) =>
+      prev
+        ? {
+            ...prev,
+            settings: { ...prev.settings, timerMinutes: minutes, timerEndsAt } as IRoomData['settings'],
+          }
+        : null
+    );
+    notify(
+      'info',
+      minutes
+        ? `La sala se cerrará automáticamente en ${minutes} minuto${minutes > 1 ? 's' : ''}.`
+        : 'Temporizador de sala eliminado.',
+      'Configuración de sala'
+    );
+  };
+
   const handleLeaveClick = () => {
     if (isHost) setShowHostExitModal(true);
     else handleLeaveOnlyMe();
   };
 
+  // Clears local data only for THIS room (keeps sessions of other rooms intact)
+  const clearRoomLocalData = () => {
+    try {
+      const raw = localStorage.getItem('watchparty_host_session');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.roomId && parsed.roomId.toUpperCase() === roomId.toUpperCase()) {
+          localStorage.removeItem('watchparty_host_session');
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+    removeRecentRoom(roomId);
+  };
+
   const handleLeaveOnlyMe = () => {
     setShowHostExitModal(false);
-    localStorage.removeItem('watchparty_host_session');
-    socket.emit('leave-room', { roomId, userName });
+    // Host session + recent room are KEPT so the room can be recovered from Home
+    socket.emit('leave-room', { roomId, userName: myName, userId });
     disconnectSocket();
     onLeave();
   };
 
   const handleDeleteRoomForAll = () => {
     setShowHostExitModal(false);
-    localStorage.removeItem('watchparty_host_session');
+    clearRoomLocalData();
     socket.emit('close-room', { roomId });
     disconnectSocket();
     onLeave();
@@ -604,7 +810,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       socket.emit('upload-progress', { roomId, progress: null });
     } catch (err: any) {
       socket.emit('upload-progress', { roomId, progress: null });
-      alert(err.message || 'Error al subir el video');
+      notify('error', err.message || 'Error al subir el video', 'Error al subir');
     } finally {
       setUploadProgress(null);
     }
@@ -617,7 +823,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
       socket.emit('video-changed', { roomId, video: res.video });
     } catch (err: any) {
-      alert(err.message || 'Error al cargar el enlace de video');
+      notify('error', err.message || 'Error al cargar el enlace de video', 'Error al cargar video');
     } finally {
       setLoading(false);
     }
@@ -631,11 +837,11 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
   );
 
   const handleSendMessage = (text: string) => {
-    socket.emit('send-message', { roomId, text, userName });
+    socket.emit('send-message', { roomId, text, userName: myName });
   };
 
   const handleReaction = (emoji: string) => {
-    socket.emit('send-reaction', { roomId, emoji, userName });
+    socket.emit('send-reaction', { roomId, emoji, userName: myName });
   };
 
   // ── Render states ─────────────────────────────────────────────────────────
@@ -665,6 +871,41 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
     );
   }
 
+  // Waiting-list: manual approval rooms block the room UI until accepted
+  if (awaitingApproval && !error) {
+    return (
+      <WaitingApproval
+        roomId={roomId}
+        userName={myName}
+        initialMicOn={pendingMediaPrefRef.current.micOn}
+        initialCamOn={pendingMediaPrefRef.current.camOn}
+        onPrefChange={(micOn, camOn) => {
+          pendingMediaPrefRef.current = { micOn, camOn };
+        }}
+        onCancel={() => {
+          setAwaitingApproval(false);
+          // Cancels the join request server-side (leave-room handles pending users)
+          socket.emit('leave-room', { roomId, userName: myName, userId });
+          // Give the packet a moment to flush before tearing the socket down
+          setTimeout(() => {
+            disconnectSocket();
+            onLeave();
+          }, 120);
+        }}
+      />
+    );
+  }
+
+  // Not yet confirmed by the server (waiting for room-state) → keep loading
+  if (!joined) {
+    return (
+      <div className="room-loading">
+        <Loader2 size={40} className="animate-spin room-loading__icon" />
+        <p className="room-loading__text">Conectando a la sala <strong>{roomId}</strong>…</p>
+      </div>
+    );
+  }
+
   return (
     <div className={`meet-layout ${!isBarVisible ? 'meet-layout--bars-hidden' : ''}`}>
       {/* ── Top Header (Google Meet style) ── */}
@@ -672,8 +913,10 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         roomId={roomData.roomId}
         participantCount={roomData.participants.length}
         isHost={isHost}
-        isTemporary={roomData.isTemporary !== false}
-        onToggleTemporary={handleToggleTemporaryMode}
+        roomName={roomData.settings?.name}
+        roomDescription={roomData.settings?.description}
+        timerEndsAt={roomData.settings?.timerEndsAt}
+        onOpenSettings={() => setShowRoomSettings(true)}
         onLeaveClick={handleLeaveClick}
         className={!isBarVisible ? 'header--hidden' : ''}
       />
@@ -703,7 +946,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
               localStream={localStream}
               remotePeers={remotePeers}
               participants={roomData.participants}
-              currentUserName={userName}
+              currentUserName={myName}
               isHost={isHost}
               isMicOn={isMicOn}
               isCameraOn={isCameraOn}
@@ -713,33 +956,37 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         )}
 
         {/* ── Slide-over Right Drawer for Chat or Participants ── */}
-        {activeSideTab && (
-          <aside className={`meet-drawer ${activeSideTab === 'participants' ? 'meet-drawer--wide' : ''}`}>
+        {drawerPresence.shown && (
+          <aside
+            className={`meet-drawer ${sideTabView === 'participants' ? 'meet-drawer--wide' : ''} ${drawerPresence.closing ? 'meet-drawer--closing' : ''}`}
+            ref={drawerSheetRef}
+          >
             <div className="meet-drawer__body">
-              {activeSideTab === 'chat' && (
+              {sideTabView === 'chat' && (
                 <>
                   <div className="meet-drawer__header">
                     <h3>Mensajes del chat</h3>
-                    <button onClick={() => setActiveSideTab(null)} className="meet-drawer__close-btn">
-                      <X size={18} />
+                    <button onClick={() => setActiveSideTab(null)} className="meet-drawer__close-btn" title="Cerrar">
+                      Cerrar
                     </button>
                   </div>
                   <Chat messages={messages} onSendMessage={handleSendMessage} />
                 </>
               )}
-              {activeSideTab === 'participants' && (
+              {sideTabView === 'participants' && (
                 <Participants
                   participants={roomData.participants}
-                  currentUserName={userName}
+                  currentUserName={myName}
+                  currentUserId={userId}
                   isHost={isHost}
-                  isCoHost={
-                    roomData.participants.some(
-                      (p) =>
-                        p.name.toLowerCase() === userName.toLowerCase() &&
-                        p.role === 'cohost'
-                    )
-                  }
+                  isCoHost={roomData.participants.some(
+                    (p) =>
+                      (p.userId ? p.userId === userId : p.name.toLowerCase() === myName.toLowerCase()) &&
+                      p.role === 'cohost'
+                  )}
                   kickedUsers={roomData.kickedUsers}
+                  joinRequests={roomData.joinRequests}
+                  settings={roomData.settings}
                   peerMediaStates={peerMediaStates}
                   isMicOn={isMicOn}
                   isCameraOn={isCameraOn}
@@ -757,8 +1004,14 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
                   onDisableAllCameras={() => {
                     socket.emit('moderate-disable-all-cameras', { roomId });
                   }}
-                  onKickUser={(targetUserName) => {
-                    socket.emit('kick-user', { roomId, targetUserName, kickedBy: userName });
+                  onKickUser={(targetUserName, targetUserId) => {
+                    socket.emit('kick-user', { roomId, targetUserName, targetUserId, kickedBy: myName, ban: false });
+                  }}
+                  onBanUser={(targetUserName, targetUserId) => {
+                    socket.emit('kick-user', { roomId, targetUserName, targetUserId, kickedBy: myName, ban: true });
+                  }}
+                  onUnbanUser={(targetUserName, targetUserId) => {
+                    socket.emit('unban-user', { roomId, targetUserName, targetUserId });
                   }}
                   onToggleCoHost={(targetUserName, makeCoHost) => {
                     socket.emit('set-role', {
@@ -767,8 +1020,20 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
                       role: makeCoHost ? 'cohost' : 'member',
                     });
                   }}
-                  onRenameUser={(oldName, newName) => {
-                    socket.emit('rename-participant', { roomId, oldName, newName });
+                  onRenameUser={(oldName, newName, targetUserId) => {
+                    socket.emit('rename-participant', { roomId, oldName, newName, targetUserId });
+                  }}
+                  onApproveJoin={(reqUserId, reqName) => {
+                    socket.emit('approve-join', { roomId, userId: reqUserId, name: reqName });
+                  }}
+                  onRejectJoin={(reqUserId, reqName, ban) => {
+                    socket.emit('reject-join', {
+                      roomId,
+                      userId: reqUserId,
+                      name: reqName,
+                      ban,
+                      requestedBy: myName,
+                    });
                   }}
                   onUpdateSettings={(settings) => {
                     socket.emit('update-room-settings', { roomId, settings });
@@ -781,15 +1046,15 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         )}
       </main>
 
-      {/* ── Google Meet Floating Circular Bottom Bar ── */}
+      {/* ── Bottom Bar (text buttons) ── */}
       <footer className={`meet-bottom-bar ${!isBarVisible ? 'meet-bottom-bar--hidden' : ''}`}>
-        {/* Mic toggle — green when ON */}
+        {/* Mic toggle — green when ON, red when OFF */}
         <button
           onClick={toggleMic}
           className={`meet-circle-btn ${isMicOn ? 'meet-circle-btn--mic-on' : 'meet-circle-btn--off'}`}
           title={isMicOn ? 'Silenciar micrófono' : 'Activar micrófono'}
         >
-          {isMicOn ? <Mic size={20} /> : <MicOff size={20} />}
+          {isMicOn ? <Mic size={18} /> : <MicOff size={18} />}
         </button>
 
         {/* Camera toggle */}
@@ -798,7 +1063,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           className={`meet-circle-btn ${isCameraOn ? 'meet-circle-btn--on' : 'meet-circle-btn--off'}`}
           title={isCameraOn ? 'Apagar cámara' : 'Activar cámara'}
         >
-          {isCameraOn ? <Video size={20} /> : <VideoOff size={20} />}
+          {isCameraOn ? <Video size={18} /> : <VideoOff size={18} />}
         </button>
 
         {/* Emoji Reactions trigger */}
@@ -808,11 +1073,11 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             className={`meet-circle-btn ${showEmojiPicker ? 'meet-circle-btn--active' : ''}`}
             title="Enviar reacción"
           >
-            <Smile size={20} />
+            <Smile size={18} />
           </button>
 
-          {showEmojiPicker && (
-            <div className="meet-emoji-popup">
+          {emojiPresence.shown && (
+            <div className={`meet-emoji-popup ${emojiPresence.closing ? 'meet-emoji-popup--closing' : ''}`}>
               <Reactions onReact={(emoji) => { handleReaction(emoji); setShowEmojiPicker(false); }} />
             </div>
           )}
@@ -824,7 +1089,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           className={`meet-circle-btn meet-btn--hide-mobile ${activeSideTab === 'chat' ? 'meet-circle-btn--active' : ''}`}
           title="Chat"
         >
-          <MessageSquare size={20} />
+          <MessageSquare size={18} />
           {unreadCount > 0 && activeSideTab !== 'chat' && (
             <span className="meet-badge-dot" />
           )}
@@ -836,7 +1101,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           className={`meet-circle-btn meet-btn--hide-mobile ${activeSideTab === 'participants' ? 'meet-circle-btn--active' : ''}`}
           title="Ver participantes"
         >
-          <Users size={20} />
+          <Users size={18} />
         </button>
 
         {/* Toggle Collapse Cameras Strip (Accordion) — hidden on mobile */}
@@ -845,10 +1110,10 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           className={`meet-circle-btn meet-btn--hide-mobile ${isRightPanelCollapsed ? 'meet-circle-btn--active' : ''}`}
           title={isRightPanelCollapsed ? 'Mostrar cámaras laterales' : 'Ocultar cámaras laterales'}
         >
-          {isRightPanelCollapsed ? <PanelRightOpen size={20} /> : <PanelRightClose size={20} />}
+          {isRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
         </button>
 
-        {/* ⋯ More Menu — visible only on mobile */}
+        {/* ⋯ More Menu — visible only on mobile (the only icon-only button besides Share) */}
         <div className="meet-more-wrap" ref={moreMenuRef}>
           <button
             onClick={() => setShowMoreMenu((v) => !v)}
@@ -862,8 +1127,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             )}
           </button>
 
-          {showMoreMenu && (
-            <div className="meet-more-dropdown">
+          {morePresence.shown && (
+            <div className={`meet-more-dropdown ${morePresence.closing ? 'meet-more-dropdown--closing' : ''}`}>
               <button
                 className={`meet-more-item ${activeSideTab === 'chat' ? 'meet-more-item--active' : ''}`}
                 onClick={() => { setActiveSideTab((v) => v === 'chat' ? null : 'chat'); setShowMoreMenu(false); }}
@@ -906,52 +1171,11 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           className="meet-circle-btn meet-circle-btn--leave meet-btn--hide-mobile"
           title="Salir de la reunión"
         >
-          <PhoneOff size={20} />
+          <PhoneOff size={18} />
         </button>
       </footer>
 
       {mediaError && <div className="meet-error-banner">⚠️ {mediaError}</div>}
-
-      {/* ── Google Meet-style Toast Notifications ── */}
-      <div className="meet-toasts">
-        {toasts.map((toast) => (
-          <div 
-            key={toast.id} 
-            className={`meet-toast meet-toast--${toast.type}`}
-            onClick={() => {
-              if (toast.type === 'chat') {
-                setActiveSideTab('chat');
-                dismissToast(toast.id);
-              }
-            }}
-            style={{ cursor: toast.type === 'chat' ? 'pointer' : 'default' }}
-          >
-            <span className="meet-toast__avatar">
-              {toast.userName.charAt(0).toUpperCase()}
-            </span>
-            <div className="meet-toast__body">
-              <span className="meet-toast__name">{toast.userName}</span>
-              <span className="meet-toast__action">
-                {toast.type === 'join' 
-                  ? 'se unió a la sala' 
-                  : toast.type === 'leave' 
-                  ? 'salió de la sala' 
-                  : toast.text || 'envió un mensaje'}
-              </span>
-            </div>
-            <button
-              className="meet-toast__close"
-              onClick={(e) => {
-                e.stopPropagation();
-                dismissToast(toast.id);
-              }}
-              title="Cerrar"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
 
       <HostExitModal
         isOpen={showHostExitModal}
@@ -960,6 +1184,32 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         onClose={() => setShowHostExitModal(false)}
         onLeaveOnlyMe={handleLeaveOnlyMe}
         onDeleteRoomForAll={handleDeleteRoomForAll}
+      />
+
+      {/* ⚙ Room settings: name, info, save-mode (temporary/stored), approval and auto-close timer */}
+      <RoomSettingsModal
+        isOpen={showRoomSettings}
+        onClose={() => setShowRoomSettings(false)}
+        isTemporary={roomData.isTemporary !== false}
+        onToggleTemporary={handleToggleTemporaryMode}
+        roomName={roomData.settings?.name || ''}
+        roomDescription={roomData.settings?.description || ''}
+        timerMinutes={roomData.settings?.timerMinutes ?? null}
+        timerEndsAt={roomData.settings?.timerEndsAt || null}
+        requireApproval={roomData.settings?.requireApproval === true}
+        onSaveDetails={handleSaveRoomDetails}
+        onSetTimer={handleSetRoomTimer}
+        onToggleRequireApproval={() => {
+          const next = !(roomData.settings?.requireApproval === true);
+          socket.emit('update-room-settings', { roomId, settings: { ...roomData.settings, requireApproval: next } });
+          notify(
+            'success',
+            next
+              ? 'Los invitados deberán ser aprobados por ti para entrar.'
+              : 'Ahora cualquiera con el código puede entrar directamente.',
+            'Aprobar entrada'
+          );
+        }}
       />
     </div>
   );

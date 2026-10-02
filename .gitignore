@@ -17,3 +17,4 @@ Thumbs.db
 # Project specific
 backend/uploads/*
 !backend/uploads/.gitkeep
+backend/data/

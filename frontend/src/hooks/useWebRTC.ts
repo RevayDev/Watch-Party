@@ -511,7 +511,38 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       isMicOn: boolean;
     }) => {
       if (!d.socketId || d.socketId === socket.id) return;
+      // Keep the peer display name fresh (used to match peers with participants)
+      const meta = peerMeta.current.get(d.socketId);
+      if (meta && d.userName && meta.userName !== d.userName) {
+        meta.userName = d.userName;
+        syncRemotePeersState();
+      }
       updatePeerMediaState(d.socketId, d);
+    };
+
+    // 6.1 Participant renamed: refresh peer names so camera tiles stay in sync
+    const onParticipantRenamed = (d: { oldName?: string; newName?: string }) => {
+      const oldK = (d.oldName || '').trim().toLowerCase();
+      const newK = (d.newName || '').trim().toLowerCase();
+      if (!oldK || !newK || oldK === newK) return;
+
+      let changed = false;
+      peerMeta.current.forEach((meta) => {
+        if (meta.userName.trim().toLowerCase() === oldK) {
+          meta.userName = d.newName!.trim();
+          changed = true;
+        }
+      });
+
+      setPeerMediaStates((prev) => {
+        if (!prev[oldK]) return prev;
+        const next = { ...prev };
+        next[newK] = { ...next[oldK], userName: d.newName!.trim() };
+        delete next[oldK];
+        return next;
+      });
+
+      if (changed) syncRemotePeersState();
     };
 
     // 7. Peer Left
@@ -544,6 +575,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     socket.on('webrtc-ice-candidate', onIceCandidate);
     socket.on('peer-media-state', onPeerMediaState);
     socket.on('user-left', onUserLeft);
+    socket.on('participant-renamed', onParticipantRenamed);
 
     return () => {
       socket.off('room-state', onRoomState);
@@ -553,6 +585,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       socket.off('webrtc-ice-candidate', onIceCandidate);
       socket.off('peer-media-state', onPeerMediaState);
       socket.off('user-left', onUserLeft);
+      socket.off('participant-renamed', onParticipantRenamed);
     };
   }, [socket, roomId, userName, sendOffer, getOrCreatePeerConnection, attachLocalTracksToPC, syncRemotePeersState, updatePeerMediaState]);
 

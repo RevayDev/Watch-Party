@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Video, ArrowLeft, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { ApiService } from '../services/api';
 
 interface CreateRoomProps {
@@ -40,7 +40,6 @@ export const CreateRoom: React.FC<CreateRoomProps> = ({ onBack, onRoomCreated })
           className="btn btn--secondary"
           style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', marginBottom: '1.5rem', alignSelf: 'flex-start' }}
         >
-          <ArrowLeft size={14} />
           Volver
         </button>
 
@@ -81,10 +80,7 @@ export const CreateRoom: React.FC<CreateRoomProps> = ({ onBack, onRoomCreated })
                 Creando sala...
               </>
             ) : (
-              <>
-                <Video size={18} />
-                Iniciar sala
-              </>
+              'Iniciar sala'
             )}
           </button>
         </form>

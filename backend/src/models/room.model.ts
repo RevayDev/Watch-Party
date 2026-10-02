@@ -1,11 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { IRoom, IParticipant, IVideoMetadata } from '../types/room.types.js';
+import { IRoom, IParticipant, IVideoMetadata, IJoinRequest, IKickedParticipant } from '../types/room.types.js';
 
 export interface RoomDocument extends IRoom, Document {}
 
 const ParticipantSchema = new Schema<IParticipant>(
   {
     socketId: { type: String },
+    userId: { type: String },
     name: { type: String, required: true },
     isHost: { type: Boolean, default: false },
     role: { type: String, enum: ['host', 'cohost', 'member'], default: 'member' },
@@ -18,6 +19,7 @@ const ParticipantSchema = new Schema<IParticipant>(
 const JoinRequestSchema = new Schema<IJoinRequest>(
   {
     socketId: { type: String, required: true },
+    userId: { type: String },
     name: { type: String, required: true },
     requestedAt: { type: Date, default: Date.now },
     device: { type: String, default: 'Web Browser' },
@@ -28,8 +30,10 @@ const JoinRequestSchema = new Schema<IJoinRequest>(
 const KickedUserSchema = new Schema<IKickedParticipant>(
   {
     name: { type: String, required: true },
+    userId: { type: String },
     kickedAt: { type: Date, default: Date.now },
     kickedBy: { type: String, default: 'Afitrión' },
+    banned: { type: Boolean, default: false },
   },
   { _id: false }
 );

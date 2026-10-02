@@ -1,7 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Film, UploadCloud, RefreshCw, Loader2, Volume2, Link as LinkIcon, AlertCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../types/room';
+import { useSwipeDown } from '../hooks/useSwipeDown';
+import { usePresence } from '../hooks/usePresence';
 
 interface VideoPlayerProps {
   roomId: string;
@@ -32,12 +34,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsInstanceRef = useRef<Hls | null>(null);
+  const lastLoadKeyRef = useRef<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
   const [urlInput, setUrlInput] = useState('');
   const [titleInput, setTitleInput] = useState('');
   const [isSubmittingUrl, setIsSubmittingUrl] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+  const [showChangePanel, setShowChangePanel] = useState(false);
+
+  // Empty-state picker: on phones it opens as a bottom sheet (like the "Cambiar" modal)
+  const [showEmptyPicker, setShowEmptyPicker] = useState(true);
+
+  // Swipe-down-to-dismiss (phone sheets)
+  const changeSheetRef = useSwipeDown<HTMLDivElement>(() => setShowChangePanel(false), showChangePanel);
+  const emptySheetRef = useSwipeDown<HTMLDivElement>(() => closeEmptyPicker(), showEmptyPicker);
+
+  // Exit animations for the sheets/modals
+  const changePresence = usePresence(showChangePanel);
+  const emptyPresence = usePresence(showEmptyPicker);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -62,17 +78,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     videoRef.current.volume = isMicOn ? 0.30 : 1.0;
   }, [isMicOn]);
 
-  // Auto-hide overlay controls when fullscreen and mouse idle
+  // Auto-hide overlay top bar (filename + "Cambiar") after mouse idle — always, not just fullscreen
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
     if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-    if (isFullscreen) {
-      hideControlsTimer.current = setTimeout(() => setShowControls(false), 3000);
-    }
-  }, [isFullscreen]);
+    hideControlsTimer.current = setTimeout(() => setShowControls(false), 2500);
+  }, []);
 
+  // Keep the top bar visible while the change panel is open
   useEffect(() => {
-    if (!isFullscreen) {
+    if (showChangePanel) {
       setShowControls(true);
       if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
     } else {
@@ -81,25 +96,44 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
     };
-  }, [isFullscreen, resetHideTimer]);
+  }, [showChangePanel, resetHideTimer]);
 
   // HLS and Media Stream Setup with Recovery mechanism
   useEffect(() => {
+    if (!video || !videoRef.current) {
+      setPlaybackError(null);
+      lastLoadKeyRef.current = null;
+      if (hlsInstanceRef.current) {
+        hlsInstanceRef.current.destroy();
+        hlsInstanceRef.current = null;
+      }
+      return;
+    }
+
+    const backendBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
+    const isExternal = (video.sourceType === 'url' || video.sourceType === 'hls') && !!video.directUrl;
+    // External URLs go through the backend CORS proxy so hls.js/XHR are not blocked
+    const videoSrc = isExternal
+      ? `${backendBase}/api/proxy?url=${encodeURIComponent(video.directUrl!)}`
+      : `${backendBase}/api/rooms/${roomId}/video/stream`;
+
+    const vid = videoRef.current;
+    const isHls = video.sourceType === 'hls' || !!video.directUrl?.includes('.m3u8') || videoSrc.includes('.m3u8');
+
+    // Same source already attached (room-state events re-create the video object on every
+    // socket message): re-setting src aborts the in-flight request and fires a bogus error.
+    const loadKey = `${videoSrc}::${retryToken}`;
+    const alreadyLoaded =
+      lastLoadKeyRef.current === loadKey &&
+      (isHls ? !!hlsInstanceRef.current : vid.getAttribute('src') === videoSrc);
+    if (alreadyLoaded) return;
+
     setPlaybackError(null);
     if (hlsInstanceRef.current) {
       hlsInstanceRef.current.destroy();
       hlsInstanceRef.current = null;
     }
-
-    if (!video || !videoRef.current) return;
-
-    const backendBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
-    const videoSrc = video.sourceType === 'url' && video.directUrl 
-      ? video.directUrl 
-      : `${backendBase}/api/rooms/${roomId}/video/stream`;
-
-    const vid = videoRef.current;
-    const isHls = video.sourceType === 'hls' || videoSrc.includes('.m3u8');
+    lastLoadKeyRef.current = loadKey;
 
     if (isHls) {
       if (Hls.isSupported()) {
@@ -112,23 +146,41 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hls.loadSource(videoSrc);
         hls.attachMedia(vid);
 
+        let fatalNetworkRetries = 0;
+        let fatalMediaRetries = 0;
         hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) {
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                console.warn('HLS Network error encountered, attempting to recover...');
+          if (!data.fatal) return;
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              if (fatalNetworkRetries < 3) {
+                fatalNetworkRetries += 1;
+                console.warn(`HLS network error, retrying (${fatalNetworkRetries}/3)...`, data.details);
                 hls.startLoad();
                 break;
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                console.warn('HLS Media error encountered, attempting to recover...');
+              }
+              setPlaybackError(
+                `No se pudo cargar la transmisión (${data.details}). El enlace puede haber expirado o no permitir reproducirlo.`
+              );
+              hls.destroy();
+              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              if (fatalMediaRetries < 3) {
+                fatalMediaRetries += 1;
+                console.warn(`HLS media error, recovering (${fatalMediaRetries}/3)...`, data.details);
                 hls.recoverMediaError();
                 break;
-              default:
-                console.error('Fatal HLS error cannot be recovered:', data);
-                setPlaybackError('No se pudo decodificar el stream HLS o el enlace expiró.');
-                hls.destroy();
-                break;
-            }
+              }
+              setPlaybackError('No se pudo decodificar el video del stream. Prueba con otro enlace.');
+              hls.destroy();
+              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+              break;
+            default:
+              console.error('Fatal HLS error cannot be recovered:', data);
+              setPlaybackError('No se pudo decodificar el stream HLS o el enlace expiró.');
+              hls.destroy();
+              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+              break;
           }
         });
       } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
@@ -148,7 +200,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hlsInstanceRef.current = null;
       }
     };
-  }, [video, roomId]);
+  }, [video, roomId, retryToken]);
 
   // Apply incoming remote sync actions with latency compensation
   useEffect(() => {
@@ -203,7 +255,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      onUploadVideo(e.target.files[0]);
+      handlePickFile(e.target.files[0]);
     }
   };
 
@@ -220,7 +272,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     e.preventDefault();
     setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      onUploadVideo(e.dataTransfer.files[0]);
+      handlePickFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -236,6 +288,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       await onSetVideoUrl(urlInput.trim(), titleInput.trim() || undefined);
       setUrlInput('');
       setTitleInput('');
+      setShowChangePanel(false);
     } finally {
       setIsSubmittingUrl(false);
     }
@@ -243,10 +296,160 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleRetryStream = () => {
     setPlaybackError(null);
-    if (videoRef.current) {
-      videoRef.current.load();
+    setRetryToken((token) => token + 1);
+  };
+
+  // Human description of where the current video comes from (debug helper)
+  const describeVideoSource = (): string => {
+    if (!video) return 'origen desconocido';
+    const direct = video.directUrl || '';
+    if (video.sourceType === 'file') return 'archivo subido';
+    if (direct.includes('drive.google.com') || direct.includes('drive.usercontent.google.com')) {
+      return 'enlace de Google Drive';
+    }
+    if (video.sourceType === 'hls' || direct.includes('.m3u8')) return 'enlace HLS';
+    if (direct) return 'enlace web';
+    return 'archivo de la sala';
+  };
+
+  // Asks the proxy what the source actually answers, so the error says WHY it failed
+  const diagnoseVideoSrc = async (src: string, kind: string): Promise<string> => {
+    if (!src) {
+      return `No se pudo cargar el video (${kind}). Recarga la página e inténtalo otra vez.`;
+    }
+    try {
+      const res = await fetch(src, { headers: { Range: 'bytes=0-1' } });
+      const contentType = (res.headers.get('content-type') || '').split(';')[0].trim();
+      await res.body?.cancel().catch(() => {});
+
+      if (!res.ok) {
+        return `No se pudo cargar el video (${kind}): el servidor respondió HTTP ${res.status}. El enlace puede haber expirado o no ser público.`;
+      }
+      if (contentType.includes('text/html')) {
+        return `No se pudo cargar el video (${kind}): el enlace devolvió una página HTML en vez del video. Verifica que el archivo sea público.`;
+      }
+      return `No se pudo cargar el video (${kind}): el origen responde ${res.status} (${contentType || 'sin content-type'}) pero el navegador no pudo reproducirlo. Verifica el formato.`;
+    } catch (err: any) {
+      return `No se pudo conectar con el video (${kind}): ${err?.message || 'error de red'}.`;
     }
   };
+
+  const handleVideoElementError = () => {
+    if (playbackError) return;
+    const kind = describeVideoSource();
+    const src =
+      videoRef.current?.currentSrc ||
+      (lastLoadKeyRef.current ? lastLoadKeyRef.current.split('::')[0] : '');
+    setPlaybackError(`No se pudo cargar el video (${kind}). Verificando el enlace...`);
+    diagnoseVideoSrc(src, kind).then(setPlaybackError);
+  };
+
+  const openChangePanel = (tab?: 'upload' | 'url') => {
+    // Default to the tab matching what is currently loaded (link -> link tab, file -> upload tab)
+    const defaultTab: 'upload' | 'url' = video && video.sourceType !== 'file' ? 'url' : 'upload';
+    setActiveTab(tab ?? defaultTab);
+    setShowChangePanel(true);
+  };
+
+  // The empty-state picker is only dismissible when it is shown as a phone bottom sheet
+  const closeEmptyPicker = () => {
+    if (window.matchMedia('(max-width: 768px)').matches) setShowEmptyPicker(false);
+  };
+
+  const handlePickFile = (file: File) => {
+    setShowChangePanel(false);
+    onUploadVideo(file);
+  };
+
+  // ── Shared picker UI (used by the empty state and the "Change video" modal) ──
+  const renderPickerTabs = () => (
+    <div className="dropzone-tabs">
+      <button
+        type="button"
+        className={`dropzone-tab-btn ${activeTab === 'upload' ? 'dropzone-tab-btn--active' : ''}`}
+        onClick={() => setActiveTab('upload')}
+      >
+        <span>Subir Archivo</span>
+      </button>
+      <button
+        type="button"
+        className={`dropzone-tab-btn ${activeTab === 'url' ? 'dropzone-tab-btn--active' : ''}`}
+        onClick={() => setActiveTab('url')}
+      >
+        <span>Enlace Web / HLS</span>
+      </button>
+    </div>
+  );
+
+  const renderUploadZone = () => (
+    <div
+      className={`dropzone-box ${isDragOver ? 'dropzone-box--active' : ''}`}
+      onClick={triggerFileInput}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <div className="dropzone-box__title">Sube un archivo multimedia</div>
+      <div className="dropzone-box__subtitle">
+        Arrastra tu archivo aquí o haz clic (.mp4, .mkv, .webm)
+      </div>
+      <button
+        type="button"
+        className="btn btn--primary"
+        style={{ marginTop: '0.25rem', padding: '0.5rem 1.25rem', fontSize: '0.84rem' }}
+      >
+        Seleccionar de mi PC
+      </button>
+    </div>
+  );
+
+  const renderUrlForm = () => (
+    <form onSubmit={handleUrlSubmit} className="dropzone-url-card">
+      <div className="dropzone-input-group">
+        <label>Enlace del video o transmisión:</label>
+        <input
+          type="url"
+          required
+          placeholder="https://... playlist.m3u8 o Google Drive"
+          className="dropzone-input"
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+        />
+      </div>
+      <div className="dropzone-input-group">
+        <label>Título del archivo (opcional):</label>
+        <input
+          type="text"
+          placeholder="Ej: Nuestro viaje de verano"
+          className="dropzone-input"
+          value={titleInput}
+          onChange={(e) => setTitleInput(e.target.value)}
+        />
+      </div>
+
+      <div className="dropzone-supported-hints">
+        <span>✓ Compatible con transmisiones HLS (.m3u8, Yandex, etc.)</span>
+        <span>✓ Compatible con enlaces públicos de Google Drive</span>
+        <span>✓ Compatible con URLs directas (.mp4, .webm)</span>
+      </div>
+
+      <button
+        type="submit"
+        disabled={isSubmittingUrl || !urlInput.trim()}
+        className="btn btn--primary"
+        style={{ marginTop: '0.4rem', padding: '0.65rem', justifyContent: 'center' }}
+      >
+        {isSubmittingUrl ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            <span>Cargando enlace...</span>
+          </>
+        ) : (
+          'Transmitir Enlace en la Sala'
+        )}
+      </button>
+    </form>
+  );
 
   // 1. Upload in progress state (Visible to Host and all Room Members)
   if (uploadProgress !== null) {
@@ -297,99 +500,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         <div className="player-container__placeholder">
           {isHost ? (
-            <div className="dropzone-container">
-              {/* Tab selector: Archivo Local vs Enlace Web / HLS / Drive */}
-              <div className="dropzone-tabs">
-                <button
-                  type="button"
-                  className={`dropzone-tab-btn ${activeTab === 'upload' ? 'dropzone-tab-btn--active' : ''}`}
-                  onClick={() => setActiveTab('upload')}
-                >
-                  <UploadCloud size={16} />
-                  <span>Subir Archivo</span>
-                </button>
-                <button
-                  type="button"
-                  className={`dropzone-tab-btn ${activeTab === 'url' ? 'dropzone-tab-btn--active' : ''}`}
-                  onClick={() => setActiveTab('url')}
-                >
-                  <LinkIcon size={16} />
-                  <span>Enlace Web / HLS</span>
-                </button>
-              </div>
-
-              {activeTab === 'upload' ? (
+            <>
+              {/* Phone-style bottom sheet wrapper (only ≤768px becomes an overlay) */}
+              <div
+                className={`empty-picker-sheet ${showEmptyPicker || emptyPresence.closing ? 'empty-picker-sheet--open' : ''} ${emptyPresence.closing ? 'empty-picker-sheet--closing' : ''}`}
+                onClick={closeEmptyPicker}
+              >
                 <div
-                  className={`dropzone-box ${isDragOver ? 'dropzone-box--active' : ''}`}
-                  onClick={triggerFileInput}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
+                  className="dropzone-container"
+                  ref={emptySheetRef}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <UploadCloud size={40} className="dropzone-box__icon" />
-                  <div className="dropzone-box__title">Sube una película o video</div>
-                  <div className="dropzone-box__subtitle">
-                    Arrastra tu archivo aquí o haz clic (.mp4, .mkv, .webm)
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    style={{ marginTop: '0.25rem', padding: '0.5rem 1.25rem', fontSize: '0.84rem' }}
-                  >
-                    Seleccionar de mi PC
-                  </button>
+                  {/* Tab selector: Archivo Local vs Enlace Web / HLS / Drive */}
+                  {renderPickerTabs()}
+                  {activeTab === 'upload' ? renderUploadZone() : renderUrlForm()}
                 </div>
-              ) : (
-                <form onSubmit={handleUrlSubmit} className="dropzone-url-card">
-                  <div className="dropzone-input-group">
-                    <label>Enlace del video o transmisión:</label>
-                    <input
-                      type="url"
-                      required
-                      placeholder="https://... playlist.m3u8 o Google Drive"
-                      className="dropzone-input"
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                    />
-                  </div>
-                  <div className="dropzone-input-group">
-                    <label>Título de la película (opcional):</label>
-                    <input
-                      type="text"
-                      placeholder="Ej: Interstellar (2014)"
-                      className="dropzone-input"
-                      value={titleInput}
-                      onChange={(e) => setTitleInput(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="dropzone-supported-hints">
-                    <span>✓ Compatible con transmisiones HLS (.m3u8, Yandex, etc.)</span>
-                    <span>✓ Compatible con enlaces públicos de Google Drive</span>
-                    <span>✓ Compatible con URLs directas (.mp4, .webm)</span>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmittingUrl || !urlInput.trim()}
-                    className="btn btn--primary"
-                    style={{ marginTop: '0.4rem', padding: '0.65rem', justifyContent: 'center' }}
-                  >
-                    {isSubmittingUrl ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Cargando enlace...</span>
-                      </>
-                    ) : (
-                      'Transmitir Enlace en la Sala'
-                    )}
-                  </button>
-                </form>
+              </div>
+              {!showEmptyPicker && (
+                <button
+                  type="button"
+                  className="btn btn--primary empty-picker-reopen"
+                  onClick={() => setShowEmptyPicker(true)}
+                >
+                  <span>Subir video o pegar enlace</span>
+                </button>
               )}
-            </div>
+            </>
           ) : (
             <div className="dropzone-container" style={{ textAlign: 'center', alignItems: 'center' }}>
-              <Film size={44} color="#818cf8" />
               <div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>Aún no hay video en la sala</h3>
                 <p style={{ fontSize: '0.84rem', color: '#94a3b8', marginTop: '0.35rem' }}>
@@ -413,6 +551,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ref={containerRef}
       className={`player-container ${isFullscreen ? 'player-container--fullscreen' : ''}`}
       onMouseMove={resetHideTimer}
+      onTouchStart={resetHideTimer}
     >
       <input
         ref={fileInputRef}
@@ -443,24 +582,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               className="player-volume-duck"
               title="Volumen reducido porque el micrófono está activo"
             >
-              <Volume2 size={13} color="#f59e0b" />
-              <span>30%</span>
+              <span>Volumen 30%</span>
             </span>
           )}
 
           {isHost && (
             <button
-              onClick={triggerFileInput}
+              onClick={() => openChangePanel()}
               className="player-change-btn"
-              title="Cambiar video de la sala"
+              title="Cambiar video: subir archivo o pegar enlace"
               type="button"
             >
-              <RefreshCw size={14} />
               <span>Cambiar</span>
             </button>
           )}
         </div>
       </div>
+
+      {/* Mobile-only floating button: opens the "Cambiar video" panel (top bar auto-hides on touch) */}
+      {isHost && !changePresence.shown && (
+        <button
+          onClick={() => openChangePanel()}
+          className="player-change-fab"
+          title="Cambiar video: subir archivo o pegar enlace"
+          type="button"
+        >
+          <span>Cambiar</span>
+        </button>
+      )}
 
       {/* Playback error fallback overlay */}
       {playbackError && (
@@ -477,19 +626,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           padding: '1.5rem',
           textAlign: 'center'
         }}>
-          <AlertCircle size={40} color="#ef4444" />
           <h4 style={{ color: '#f8fafc', fontSize: '1.1rem', margin: 0 }}>Error de Reproducción</h4>
           <p style={{ color: '#cbd5e1', fontSize: '0.85rem', maxWidth: '400px', margin: 0 }}>
             {playbackError}
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
             <button onClick={handleRetryStream} className="btn btn--primary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
-              <RefreshCw size={14} />
               <span>Reintentar</span>
             </button>
             {isHost && (
-              <button onClick={triggerFileInput} className="btn btn--secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
-                <span>Subir otro archivo</span>
+              <button onClick={() => openChangePanel()} className="btn btn--secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
+                <span>Cambiar video (archivo o enlace)</span>
               </button>
             )}
           </div>
@@ -520,14 +667,41 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onPlay={handlePlay}
         onPause={handlePause}
         onSeeked={handleSeeked}
-        onError={() => {
-          if (!playbackError) {
-            setPlaybackError('Hubo un problema al cargar el archivo de video. Verifica el formato o el enlace.');
-          }
-        }}
+        onError={handleVideoElementError}
       >
         Tu navegador no soporta reproducción de video HTML5.
       </video>
+
+      {/* Change-video modal: upload a file OR paste a link (also reachable from the error overlay) */}
+      {changePresence.shown && isHost && (
+        <div
+          className={`modal-overlay ${changePresence.closing ? 'modal-overlay--closing' : ''}`}
+          onClick={() => setShowChangePanel(false)}
+        >
+          <div
+            className={`modal-card modal-card--change ${changePresence.closing ? 'modal-card--closing' : ''}`}
+            ref={changeSheetRef}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-card__header">
+              <h3 style={{ margin: 0, fontSize: '1.02rem', color: '#f8fafc' }}>Cambiar video de la sala</h3>
+            </div>
+            <div className="dropzone-container" style={{ border: 'none', padding: 0 }}>
+              {renderPickerTabs()}
+              {activeTab === 'upload' ? renderUploadZone() : renderUrlForm()}
+            </div>
+            <div className="room-settings__actions">
+              <button
+                type="button"
+                className="host-exit-modal__cancel-btn"
+                onClick={() => setShowChangePanel(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

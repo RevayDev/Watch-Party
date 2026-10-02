@@ -118,10 +118,10 @@ const CameraTile: React.FC<{
         </div>
       )}
 
-      {/* Mic Badge */}
+      {/* Mic Badge — icon stays white; speaking is shown by the tile/avatar frame only */}
       <div className={`cam-tile__mic-badge ${isMicOn ? '' : 'cam-tile__mic-badge--off'}`}>
         {isMicOn
-          ? <Mic size={12} color={isSpeaking ? '#10b981' : '#ffffff'} />
+          ? <Mic size={12} color="#ffffff" />
           : <MicOff size={12} color="#ffffff" />}
       </div>
 

@@ -7,6 +7,8 @@ interface SocketUser {
   roomId: string;
   userName: string;
   isHost: boolean;
+  userId?: string;
+  pending?: boolean;
 }
 
 // In-memory socket user directory & media states
@@ -26,32 +28,93 @@ export function setupSocketHandlers(io: Server): void {
     console.log(`⚡ Socket conectado: ${socket.id}`);
 
     // 1. Join Room
-    socket.on('join-room', async (data: { roomId: string; userName: string; isHost?: boolean }) => {
-      const { roomId, userName, isHost = false } = data;
+    socket.on('join-room', async (data: { roomId: string; userName: string; isHost?: boolean; userId?: string }) => {
+      const { roomId, userName, isHost = false, userId } = data;
       if (!roomId || !userName) return;
 
       const cleanRoomId = roomId.toUpperCase().trim();
-      socket.join(cleanRoomId);
+      const cleanName = userName.trim();
+
+      // Rejoin on the SAME socket (e.g. state refresh): don't re-broadcast join
+      const previousEntry = activeUsers.get(socket.id);
+      const isSameSocketRejoin = previousEntry?.roomId === cleanRoomId;
 
       // Check if this room already exists and who is current host
       const existingRoom = await RoomService.getRoomById(cleanRoomId);
+
+      // ── Ban check: banned users cannot re-enter ──
+      const bannedEntry = (existingRoom?.kickedUsers || []).find((k) => {
+        if (!k.banned) return false;
+        if (userId && k.userId) return k.userId === userId;
+        return k.name.toLowerCase() === cleanName.toLowerCase();
+      });
+      if (bannedEntry) {
+        activeUsers.delete(socket.id);
+        socket.emit('join-rejected', {
+          reason: 'banned',
+          message: 'Has sido baneado de esta sala y no puedes volver a entrar.',
+        });
+        return;
+      }
+
+      // Is this person ALREADY a participant? (identity = userId, name = legacy fallback)
+      const alreadyParticipant = (existingRoom?.participants || []).some((p) => {
+        if (userId && p.userId) return p.userId === userId;
+        return !p.userId && p.name.toLowerCase() === cleanName.toLowerCase();
+      });
+
+      const participantMatch = (existingRoom?.participants || []).find((p) => {
+        if (userId && p.userId) return p.userId === userId;
+        return !p.userId && p.name.toLowerCase() === cleanName.toLowerCase();
+      });
+
       const isActuallyHost =
         isHost ||
-        (existingRoom && existingRoom.hostName.toLowerCase() === userName.trim().toLowerCase());
+        (existingRoom && existingRoom.hostName.toLowerCase() === cleanName.toLowerCase()) ||
+        Boolean(participantMatch?.isHost);
+
+      // ── Manual approval (waiting list): hold newcomers until host approves ──
+      const requireApproval = existingRoom?.settings?.requireApproval === true;
+      if (requireApproval && !isActuallyHost && !alreadyParticipant) {
+        activeUsers.set(socket.id, {
+          socketId: socket.id,
+          roomId: cleanRoomId,
+          userName: cleanName,
+          isHost: false,
+          userId,
+          pending: true,
+        });
+        const updated = await RoomService.addJoinRequest(cleanRoomId, {
+          socketId: socket.id,
+          userId,
+          name: cleanName,
+        });
+        console.log(`⏳ Solicitud de unión de ${cleanName} en sala [${cleanRoomId}]`);
+        socket.emit('join-pending', {
+          message: 'Esperando aprobación del anfitrión para entrar a la sala.',
+        });
+        io.to(cleanRoomId).emit('join-requests-updated', {
+          joinRequests: updated?.joinRequests || [],
+        });
+        return;
+      }
+
+      socket.join(cleanRoomId);
 
       const socketUser: SocketUser = {
         socketId: socket.id,
         roomId: cleanRoomId,
-        userName: userName.trim(),
+        userName: cleanName,
         isHost: !!isActuallyHost,
+        userId,
       };
       activeUsers.set(socket.id, socketUser);
 
       // Add to database/memory participant list
-      await RoomService.joinRoom(cleanRoomId, userName.trim());
+      await RoomService.joinRoom(cleanRoomId, cleanName, 'Web Browser', userId);
       const room = await RoomService.getRoomById(cleanRoomId);
 
-      console.log(`👤 ${userName} se unió a la sala [${cleanRoomId}] (Host: ${socketUser.isHost})`);
+      console.log(`👤 ${cleanName} se unió a la sala [${cleanRoomId}] (Host: ${socketUser.isHost})`);
 
       // Build existing peers list and media states for WebRTC mesh
       const existingPeers: Array<{ socketId: string; userName: string; isHost: boolean }> = [];
@@ -75,13 +138,15 @@ export function setupSocketHandlers(io: Server): void {
         }
       }
 
-      // Notify others in room of new participant
-      socket.to(cleanRoomId).emit('user-joined', {
-        socketId: socket.id,
-        userName: userName.trim(),
-        isHost: socketUser.isHost,
-        participants: room?.participants || [],
-      });
+      // Notify others in room of new participant (skip for same-socket rejoins)
+      if (!isSameSocketRejoin) {
+        socket.to(cleanRoomId).emit('user-joined', {
+          socketId: socket.id,
+          userName: cleanName,
+          isHost: socketUser.isHost,
+          participants: room?.participants || [],
+        });
+      }
 
       // Get current playback state for this room (if video is playing)
       const playback = roomPlayback.get(cleanRoomId);
@@ -104,6 +169,8 @@ export function setupSocketHandlers(io: Server): void {
         video: room?.video || null,
         status: room?.status || 'waiting',
         participants: room?.participants || [],
+        joinRequests: room?.joinRequests || [],
+        kickedUsers: room?.kickedUsers || [],
         peers: existingPeers,
         mediaStates: existingMediaStates,
         playback: syncedCurrentTime !== null
@@ -130,17 +197,31 @@ export function setupSocketHandlers(io: Server): void {
     });
 
     // 3. User leaves voluntarily (with Host role transfer if host leaves)
-    socket.on('leave-room', async (data: { roomId: string; userName: string }) => {
-      const { roomId, userName } = data;
+    socket.on('leave-room', async (data: { roomId: string; userName: string; userId?: string }) => {
+      const { roomId, userName, userId } = data;
       if (!roomId) return;
       const cleanRoomId = roomId.toUpperCase().trim();
 
+      const entry = activeUsers.get(socket.id);
       socket.leave(cleanRoomId);
       activeUsers.delete(socket.id);
 
+      // Pending (waiting-list) users just cancel their request
+      if (entry?.pending) {
+        const updated = await RoomService.rejectJoinRequest(cleanRoomId, {
+          userId: entry.userId,
+          name: entry.userName,
+        });
+        io.to(cleanRoomId).emit('join-requests-updated', {
+          joinRequests: updated?.joinRequests || [],
+        });
+        return;
+      }
+
       const { room, newHostName } = await RoomService.removeParticipantAndTransferHost(
         cleanRoomId,
-        userName
+        userName,
+        userId || entry?.userId
       );
 
       if (newHostName) {
@@ -330,22 +411,133 @@ export function setupSocketHandlers(io: Server): void {
       io.to(cleanRoomId).emit('force-disable-all-cameras');
     });
 
-    // Kick participant
-    socket.on('kick-user', async (data: { roomId: string; targetUserName: string; kickedBy: string }) => {
-      const { roomId, targetUserName, kickedBy } = data;
-      if (!roomId || !targetUserName) return;
+    // Kick (ban=false → can rejoin) or Ban (ban=true → rejoin blocked)
+    socket.on(
+      'kick-user',
+      async (data: { roomId: string; targetUserName: string; targetUserId?: string; kickedBy: string; ban?: boolean }) => {
+        const { roomId, targetUserName, targetUserId, kickedBy, ban = false } = data;
+        if (!roomId || !targetUserName) return;
+        const cleanRoomId = roomId.toUpperCase().trim();
+
+        console.log(
+          `${ban ? '⛔ Baneado' : '🚫 Expulsado'} ${targetUserName} por ${kickedBy} en sala [${cleanRoomId}]`
+        );
+        const updatedRoom = await RoomService.kickParticipant(
+          cleanRoomId,
+          { name: targetUserName, userId: targetUserId },
+          kickedBy,
+          ban
+        );
+
+        io.to(cleanRoomId).emit('user-kicked', {
+          targetUserName,
+          targetUserId,
+          kickedBy,
+          banned: ban,
+          participants: updatedRoom?.participants || [],
+          kickedUsers: updatedRoom?.kickedUsers || [],
+        });
+      }
+    );
+
+    // Unban / remove from the Expulsados list
+    socket.on('unban-user', async (data: { roomId: string; targetUserName?: string; targetUserId?: string }) => {
+      const { roomId, targetUserName, targetUserId } = data;
+      if (!roomId || (!targetUserName && !targetUserId)) return;
       const cleanRoomId = roomId.toUpperCase().trim();
 
-      console.log(`🚫 ${targetUserName} expulsado por ${kickedBy} en sala [${cleanRoomId}]`);
-      const updatedRoom = await RoomService.kickParticipant(cleanRoomId, targetUserName, kickedBy);
+      const updatedRoom = await RoomService.unbanParticipant(cleanRoomId, {
+        name: targetUserName,
+        userId: targetUserId,
+      });
+      console.log(`✅ ${targetUserName || targetUserId} desbaneado en sala [${cleanRoomId}]`);
 
-      io.to(cleanRoomId).emit('user-kicked', {
-        targetUserName,
-        kickedBy,
-        participants: updatedRoom?.participants || [],
+      io.to(cleanRoomId).emit('kicked-users-updated', {
         kickedUsers: updatedRoom?.kickedUsers || [],
       });
     });
+
+    // ── WAITING LIST: approve / reject join requests ────────────────────────
+    socket.on('approve-join', async (data: { roomId: string; userId?: string; name?: string }) => {
+      const { roomId, userId, name } = data;
+      if (!roomId || (!userId && !name)) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      const { room, request } = await RoomService.approveJoinRequest(cleanRoomId, { userId, name });
+      if (!request) return;
+      console.log(`✅ Solicitud aprobada: ${request.name} en sala [${cleanRoomId}]`);
+
+      io.to(cleanRoomId).emit('join-requests-updated', {
+        joinRequests: room?.joinRequests || [],
+      });
+
+      // Locate the requester's current socket (they are NOT in the room channel yet)
+      let requesterSocketId: string | undefined;
+      for (const [, u] of activeUsers.entries()) {
+        if (u.roomId !== cleanRoomId || !u.pending) continue;
+        const matchById = Boolean(u.userId && request.userId && u.userId === request.userId);
+        const matchByName = u.userName.toLowerCase() === (request.name || '').toLowerCase();
+        if (matchById || matchByName) {
+          requesterSocketId = u.socketId;
+          if (matchById) break;
+        }
+      }
+
+      if (requesterSocketId) {
+        // Let them re-run join-room (they will receive room-state + peers)
+        io.to(requesterSocketId).emit('join-approved', { roomId: cleanRoomId });
+        // Tell everyone else the user joined (their socket will join the channel next)
+        socket.to(cleanRoomId).emit('user-joined', {
+          socketId: requesterSocketId,
+          userName: request.name,
+          isHost: false,
+          participants: room?.participants || [],
+        });
+      }
+    });
+
+    socket.on(
+      'reject-join',
+      async (data: { roomId: string; userId?: string; name?: string; ban?: boolean; requestedBy?: string }) => {
+        const { roomId, userId, name, ban = false, requestedBy } = data;
+        if (!roomId || (!userId && !name)) return;
+        const cleanRoomId = roomId.toUpperCase().trim();
+
+        const updated = await RoomService.rejectJoinRequest(
+          cleanRoomId,
+          { userId, name },
+          { ban, rejectedBy: requestedBy }
+        );
+        console.log(
+          `${ban ? '⛔ Solicitud baneada' : '❌ Solicitud rechazada'}: ${name || userId} en sala [${cleanRoomId}]`
+        );
+
+        // Notify the requester so they can leave gracefully
+        for (const [, u] of activeUsers.entries()) {
+          const matchesUser =
+            u.roomId === cleanRoomId &&
+            ((userId && u.userId === userId) || (!userId && u.userName.toLowerCase() === (name || '').toLowerCase()));
+          if (matchesUser) {
+            io.to(u.socketId).emit('join-rejected', {
+              reason: ban ? 'banned' : 'rejected',
+              message: ban
+                ? 'Has sido baneado de esta sala.'
+                : 'El anfitrión rechazó tu solicitud para unirte a la sala.',
+            });
+            activeUsers.delete(u.socketId);
+          }
+        }
+
+        io.to(cleanRoomId).emit('join-requests-updated', {
+          joinRequests: updated?.joinRequests || [],
+        });
+        if (ban) {
+          io.to(cleanRoomId).emit('kicked-users-updated', {
+            kickedUsers: updated?.kickedUsers || [],
+          });
+        }
+      }
+    );
 
     // Toggle Co-host Role
     socket.on('set-role', async (data: { roomId: string; targetUserName: string; role: 'cohost' | 'member' }) => {
@@ -363,31 +555,71 @@ export function setupSocketHandlers(io: Server): void {
       });
     });
 
-    // Rename Participant
-    socket.on('rename-participant', async (data: { roomId: string; oldName: string; newName: string }) => {
-      const { roomId, oldName, newName } = data;
-      if (!roomId || !oldName || !newName.trim()) return;
-      const cleanRoomId = roomId.toUpperCase().trim();
+    // Rename Participant (identity = userId; name kept as legacy fallback)
+    socket.on(
+      'rename-participant',
+      async (data: { roomId: string; oldName: string; newName: string; targetUserId?: string }) => {
+        const { roomId, oldName, newName, targetUserId } = data;
+        if (!roomId || !oldName || !newName.trim()) return;
+        const cleanRoomId = roomId.toUpperCase().trim();
+        const cleanNewName = newName.trim();
 
-      const updatedRoom = await RoomService.renameParticipant(cleanRoomId, oldName, newName.trim());
-      console.log(`✏️ Usuario ${oldName} renombrado a: ${newName.trim()}`);
+        const updatedRoom = await RoomService.renameParticipant(cleanRoomId, cleanNewName, {
+          userId: targetUserId,
+          oldName,
+        });
+        console.log(`✏️ Usuario ${oldName} renombrado a: ${cleanNewName}`);
 
-      io.to(cleanRoomId).emit('participant-renamed', {
-        oldName,
-        newName: newName.trim(),
-        participants: updatedRoom?.participants || [],
-      });
-    });
+        // Keep the in-memory socket directory in sync (prevents stale names on rejoin)
+        for (const [, u] of activeUsers.entries()) {
+          if (u.roomId !== cleanRoomId) continue;
+          const matchesUser =
+            (targetUserId && u.userId === targetUserId) ||
+            (!targetUserId && u.userName.toLowerCase() === oldName.trim().toLowerCase());
+          if (matchesUser) u.userName = cleanNewName;
+        }
 
-    // Update Room Settings (Mute on entry, etc.)
+        // Re-key media states stored by lowercase name
+        const oldKey = oldName.trim().toLowerCase();
+        const media = activeMediaStates.get(oldKey);
+        if (media) {
+          activeMediaStates.delete(oldKey);
+          activeMediaStates.set(cleanNewName.toLowerCase(), media);
+        }
+
+        io.to(cleanRoomId).emit('participant-renamed', {
+          oldName,
+          newName: cleanNewName,
+          userId: targetUserId,
+          participants: updatedRoom?.participants || [],
+        });
+      }
+    );
+
+    // Update Room Settings (Mute on entry, name, info, timer, etc.)
     socket.on('update-room-settings', async (data: { roomId: string; settings: any }) => {
       const { roomId, settings } = data;
-      if (!roomId) return;
+      if (!roomId || !settings) return;
       const cleanRoomId = roomId.toUpperCase().trim();
 
-      const updatedRoom = await RoomService.updateSettings(cleanRoomId, settings);
+      // Only the host may change room settings
+      const caller = activeUsers.get(socket.id);
+      if (caller && !caller.isHost) return;
+
+      // Normalize the auto-close timer (invalid dates are treated as "no timer")
+      const payload = { ...settings };
+      if ('timerEndsAt' in payload) {
+        if (payload.timerEndsAt) {
+          const parsed = new Date(payload.timerEndsAt);
+          payload.timerEndsAt = Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+        } else {
+          payload.timerEndsAt = null;
+        }
+      }
+
+      const updatedRoom = await RoomService.updateSettings(cleanRoomId, payload);
       io.to(cleanRoomId).emit('room-settings-updated', {
-        settings: updatedRoom?.settings || settings,
+        settings: updatedRoom?.settings || payload,
       });
     });
 
@@ -412,9 +644,24 @@ export function setupSocketHandlers(io: Server): void {
       const user = activeUsers.get(socket.id);
       if (user) {
         activeUsers.delete(socket.id);
+
+        // Pending (waiting-list) users: never joined the participant list.
+        // Drop their join request too, so it doesn't linger as an orphan.
+        if (user.pending) {
+          const updated = await RoomService.rejectJoinRequest(user.roomId, {
+            userId: user.userId,
+            name: user.userName,
+          });
+          io.to(user.roomId).emit('join-requests-updated', {
+            joinRequests: updated?.joinRequests || [],
+          });
+          return;
+        }
+
         const { room, newHostName } = await RoomService.removeParticipantAndTransferHost(
           user.roomId,
-          user.userName
+          user.userName,
+          user.userId
         );
 
         console.log(`🔌 ${user.userName} se desconectó de la sala [${user.roomId}]`);
@@ -449,4 +696,29 @@ export function setupSocketHandlers(io: Server): void {
       }
     });
   });
+
+  // ⏱ Room auto-close timer sweep: closes rooms whose settings.timerEndsAt has passed.
+  // Works for both storage modes (MongoDB and the in-memory fallback) and survives
+  // because the deadline is persisted with the room itself.
+  const timerSweep = setInterval(async () => {
+    try {
+      const expiredRooms = await RoomService.getRoomsPastTimer();
+      for (const room of expiredRooms) {
+        const cleanRoomId = room.roomId.toUpperCase().trim();
+        console.log(`⏱ Temporizador finalizado: cerrando la sala [${cleanRoomId}]`);
+
+        io.to(cleanRoomId).emit('room-closed', {
+          message: 'El temporizador de la sala finalizó. La sala se ha cerrado.',
+          reason: 'timer',
+        });
+        io.in(cleanRoomId).socketsLeave(cleanRoomId);
+        roomPlayback.delete(cleanRoomId);
+        // Video is only removed when the room is temporary (deleteRoom handles that)
+        await RoomService.deleteRoom(cleanRoomId, false);
+      }
+    } catch (err) {
+      console.warn('⚠️ Error en el barrido de temporizadores de sala:', err);
+    }
+  }, 15_000);
+  timerSweep.unref();
 }

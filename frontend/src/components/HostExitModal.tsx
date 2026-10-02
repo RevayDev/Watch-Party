@@ -1,5 +1,6 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { useSwipeDown } from '../hooks/useSwipeDown';
+import { usePresence } from '../hooks/usePresence';
 
 interface HostExitModalProps {
   isOpen: boolean;
@@ -18,18 +19,18 @@ export const HostExitModal: React.FC<HostExitModalProps> = ({
   onLeaveOnlyMe,
   onDeleteRoomForAll,
 }) => {
-  if (!isOpen) return null;
+  const hostExitSheetRef = useSwipeDown<HTMLDivElement>(onClose, isOpen);
+  const { shown, closing } = usePresence(isOpen);
+
+  if (!shown) return null;
 
   const hasOtherParticipants = participantCount > 1;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-card host-exit-modal">
+    <div className={`modal-overlay ${closing ? 'modal-overlay--closing' : ''}`}>
+      <div className={`modal-card host-exit-modal ${closing ? 'modal-card--closing' : ''}`} ref={hostExitSheetRef}>
         <div className="modal-card__header">
           <h3 className="host-exit-modal__title">Opciones de salida</h3>
-          <button onClick={onClose} className="meet-drawer__close-btn" title="Cancelar">
-            <X size={18} />
-          </button>
         </div>
 
         <p className="host-exit-modal__desc">
