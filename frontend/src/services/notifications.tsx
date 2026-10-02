@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react';
 import { usePresence } from '../hooks/usePresence';
+import { useSwipeDown } from '../hooks/useSwipeDown';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -68,6 +69,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const confirmPresence = usePresence(confirmOpen, 200);
+  const confirmSheetRef = useSwipeDown<HTMLDivElement>(
+    () => resolveConfirm(false),
+    confirmOpen,
+  );
   const timersRef = useRef<Map<string, ToastTimers>>(new Map());
 
   const removeToast = useCallback((id: string) => {
@@ -189,6 +194,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         >
           <div
             className={`modal-card notif-confirm ${confirmPresence.closing ? 'modal-card--closing' : ''}`}
+            ref={confirmSheetRef}
             onClick={(e) => e.stopPropagation()}
             role="alertdialog"
             aria-modal="true"

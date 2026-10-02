@@ -635,7 +635,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <span>Reintentar</span>
             </button>
             {isHost && (
-              <button onClick={() => openChangePanel()} className="btn btn--secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
+              <button onClick={() => openChangePanel()} className="btn btn--primary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
                 <span>Cambiar video (archivo o enlace)</span>
               </button>
             )}

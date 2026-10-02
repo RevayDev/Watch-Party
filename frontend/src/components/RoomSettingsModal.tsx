@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { useSwipeDown } from "../hooks/useSwipeDown";
 import { usePresence } from "../hooks/usePresence";
 import { notify } from "../services/notifications";
 
@@ -34,7 +33,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   onSetTimer,
   onToggleRequireApproval,
 }) => {
-  const sheetRef = useSwipeDown<HTMLDivElement>(onClose, isOpen);
   const { shown, closing } = usePresence(isOpen);
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
@@ -76,12 +74,11 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
 
   return (
     <div
-      className={`modal-overlay ${closing ? "modal-overlay--closing" : ""}`}
+      className={`modal-overlay modal-overlay--settings ${closing ? "modal-overlay--closing" : ""}`}
       onClick={onClose}
     >
       <div
         className={`modal-card modal-card--settings ${closing ? "modal-card--closing" : ""}`}
-        ref={sheetRef}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-card__header">

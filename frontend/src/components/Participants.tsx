@@ -199,6 +199,22 @@ export const Participants: React.FC<ParticipantsProps> = ({
     setIsRenaming(true);
   };
 
+  const saveRename = () => {
+    if (!selectedParticipant) return;
+    const nextName = newNameVal.trim();
+    if (nextName && nextName !== selectedParticipant.name) {
+      onRenameUser?.(
+        selectedParticipant.name,
+        nextName,
+        selectedParticipant.userId,
+      );
+      setSelectedParticipant((participant) =>
+        participant ? { ...participant, name: nextName } : participant,
+      );
+    }
+    setIsRenaming(false);
+  };
+
   const floatingNameActions = (p: IParticipant) => (
     <span
       className="part-float-actions"
@@ -691,46 +707,48 @@ export const Participants: React.FC<ParticipantsProps> = ({
             </button>
           </div>
 
-          {/* Formulario de Renombrado en Línea (abierto con el botón "Renombrar" junto al nombre) */}
+          {/* Pop-up de renombrado (abierto con el lápiz junto al nombre) */}
           {isRenaming && (
-            <div className="part-rename-box">
-              <input
-                type="text"
-                value={newNameVal}
-                onChange={(e) => setNewNameVal(e.target.value)}
-                placeholder="Nuevo nombre..."
-                className="part-search-input"
-                autoFocus
-              />{" "}
-              <button
-                className="part-icon-btn"
-                title="Cancelar"
-                onClick={() => setIsRenaming(false)}
-              >
-                <X size={13} />
-              </button>
-              <button
-                className="part-rename-save-btn"
-                title="Guardar nombre"
-                onClick={() => {
-                  if (
-                    newNameVal.trim() &&
-                    newNameVal.trim() !== detailView.name
-                  ) {
-                    onRenameUser?.(
-                      detailView.name,
-                      newNameVal.trim(),
-                      detailView.userId,
-                    );
-                    setSelectedParticipant((prev) =>
-                      prev ? { ...prev, name: newNameVal.trim() } : prev,
-                    );
-                  }
-                  setIsRenaming(false);
+            <div
+              className="part-rename-dialog"
+              role="presentation"
+              onClick={() => setIsRenaming(false)}
+            >
+              <form
+                className="part-rename-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Renombrar a ${detailView.name}`}
+                onClick={(event) => event.stopPropagation()}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  saveRename();
                 }}
               >
-                <Check size={13} />
-              </button>
+                <h3>Renombrar usuario</h3>
+                <p>El nuevo nombre será visible para todos en la sala.</p>
+                <input
+                  type="text"
+                  value={newNameVal}
+                  maxLength={50}
+                  onChange={(e) => setNewNameVal(e.target.value)}
+                  placeholder="Nuevo nombre"
+                  className="part-search-input"
+                  autoFocus
+                />
+                <div className="part-rename-modal__actions">
+                  <button
+                    type="button"
+                    className="host-exit-modal__cancel-btn"
+                    onClick={() => setIsRenaming(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button type="submit" className="part-rename-save-btn">
+                    Guardar
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 

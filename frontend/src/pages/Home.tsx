@@ -28,7 +28,7 @@ import {
   MonitorPlay,
   FolderUp,
   ArrowRight,
-  X,
+  WandSparkles,
 } from "lucide-react";
 import exampleImg from "../Example.png";
 import { ApiService } from "../services/api";
@@ -106,58 +106,35 @@ const timelineEvents = [
   {
     date: "Sept 2026",
     title: "Inicio del proyecto",
-    summary:
-      "Nace la idea de una plataforma para ver contenido audiovisual sincronizado con amigos y familiares a distancia.",
-    paragraphs: [
-      "La idea nació al identificar una necesidad: poder disfrutar contenido audiovisual con amigos y familiares que se encuentran en diferentes lugares, manteniendo una experiencia compartida a distancia.",
-      "Inicialmente se consideraron las plataformas tradicionales de videoconferencia, pero presentaban limitaciones para este propósito: restricciones de tiempo, pérdida de calidad en el contenido compartido, retrasos en la reproducción y video borroso.",
-      "A partir de ese problema surgió la idea de crear una plataforma especializada en ver contenido audiovisual de forma sincronizada con otras personas, priorizando la calidad de reproducción, la comunicación en tiempo real y una experiencia sencilla al compartir una sala.",
-      "El proyecto comenzó como un monorepo con un backend en Express + Socket.IO y un frontend en React, Vite y TypeScript.",
-    ],
+    desc: "Nace la idea para ver contenido audiovisual a distancia con amigos y familia, superando limitaciones de calidad y retrasos de apps tradicionales. Se inicia el monorepo con Express, Socket.IO, React, Vite y TypeScript.",
     status: "Completado",
     tone: "done" as const,
   },
   {
     date: "Sept 2026",
     title: "Sincronización y comunicación en vivo",
-    summary:
-      "Reproducción sincronizada con WebSockets, chat en tiempo real y videollamadas mediante WebRTC.",
-    paragraphs: [
-      "Se incorporó la reproducción sincronizada mediante WebSockets, permitiendo que todos los participantes vean el contenido al mismo tiempo. También se añadió chat en tiempo real y videollamadas mediante WebRTC para mejorar la interacción entre los usuarios.",
-    ],
+    desc: "Reproducción sincronizada por WebSockets para ver contenido al mismo tiempo, junto a chat en vivo y videollamadas WebRTC de baja latencia entre participantes.",
     status: "Completado",
     tone: "done" as const,
   },
   {
     date: "Oct 2026",
     title: "Salas con aprobación y control del anfitrión",
-    summary:
-      "Solicitud de entrada, permisos, reacciones flotantes y cierre automático de las salas.",
-    paragraphs: [
-      "Se implementó un sistema de salas donde el anfitrión tiene mayor control sobre los participantes. Se añadieron solicitudes de entrada, permisos, reacciones flotantes y un temporizador para el cierre automático de las salas.",
-    ],
+    desc: "Sistema de control para el creador: aprobación de solicitudes de entrada, permisos individuales de participantes, reacciones flotantes animadas y cierre automático por inactividad.",
     status: "Completado",
     tone: "done" as const,
   },
   {
     date: "Oct 2026",
     title: "Rediseño del Home",
-    summary:
-      "Nueva portada con tecnologías, roadmap, donaciones y footer completo.",
-    paragraphs: [
-      "Se renovó la página principal para mejorar la navegación y la presentación del proyecto, incorporando las tecnologías utilizadas, la línea de tiempo, el roadmap, las opciones de donación y un footer completo.",
-    ],
+    desc: "Renovación completa de la página principal: catálogo de tecnologías, línea de tiempo histórica, roadmap interactivo de funciones, vías de donación y pie de página completo.",
     status: "Completado",
     tone: "done" as const,
   },
   {
     date: "Oct 2026",
     title: "PWA, subtítulos y planes de mantenimiento",
-    summary:
-      "App instalable, pistas de subtítulos .srt y planes de apoyo para mantener el proyecto.",
-    paragraphs: [
-      "El proyecto continúa evolucionando con una aplicación instalable como PWA, soporte para pistas de subtítulos .srt y la definición de planes de apoyo para garantizar el mantenimiento y el crecimiento de la plataforma.",
-    ],
+    desc: "Evolución a Progressive Web App (PWA) instalable, soporte para subtítulos externos .srt y definición de planes de apoyo para servidores y almacenamiento.",
     status: "En curso",
     tone: "wip" as const,
   },
@@ -184,7 +161,7 @@ const donationCards = [
   },
   {
     id: "roadmap",
-    icon: Lightbulb,
+    icon: WandSparkles,
     title: "Lo que queremos construir",
     desc: "Revisa el roadmap y decide qué función desarrollamos a continuación.",
     cta: "Ver lo que viene",
@@ -289,19 +266,21 @@ export const Home: React.FC<HomeProps> = ({
 
   // FAQ accordion state
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-
-  // Modal con el detalle completo de un hito de la línea de tiempo
   const [timelineEvent, setTimelineEvent] = useState<
     (typeof timelineEvents)[number] | null
   >(null);
+  const timelineSheetRef = useSwipeDown<HTMLElement>(
+    () => setTimelineEvent(null),
+    Boolean(timelineEvent),
+  );
 
   useEffect(() => {
     if (!timelineEvent) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setTimelineEvent(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTimelineEvent(null);
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
   }, [timelineEvent]);
 
   useEffect(() => {
@@ -383,6 +362,16 @@ export const Home: React.FC<HomeProps> = ({
     setOpenFaq(openFaq === index ? null : index);
   };
 
+  const handleRoadmapShortcut = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    const roadmap = document.getElementById("roadmap");
+    if (!roadmap) return;
+
+    roadmap.scrollIntoView({ behavior: "smooth", block: "start" });
+    roadmap.setAttribute("tabindex", "-1");
+    roadmap.focus({ preventScroll: true });
+  };
+
   const faqs = [
     {
       q: "¿Cómo funciona la sincronización de video?",
@@ -452,6 +441,15 @@ export const Home: React.FC<HomeProps> = ({
       <div className="home-hero-grid">
         {/* Left Column: Title, Subtitle, Reconnect banner & Action Buttons */}
         <div className="home-hero-left">
+          <aside className="home-future-note" aria-label="Planes futuros">
+            <Lightbulb size={18} strokeWidth={2.2} aria-hidden="true" />
+            <p>
+              A futuro se agregarán <strong>planes de apoyo</strong> para
+              mantener el proyecto: servidor, almacenamiento y desarrollo de
+              nuevas funciones.
+            </p>
+          </aside>
+
           <h1 className="home-hero-title">
             Tus videos,&nbsp;
             <span className="home-hero-title--accent">
@@ -741,7 +739,7 @@ export const Home: React.FC<HomeProps> = ({
                   aria-label={`Ver detalles de ${event.title}`}
                 >
                   <span className="home-timeline__title">{event.title}</span>
-                  <span className="home-timeline__desc">{event.summary}</span>
+                  <span className="home-timeline__desc">{event.desc}</span>
                   <span className="home-timeline__more">
                     Ver detalles
                     <ArrowRight size={13} strokeWidth={2.4} />
@@ -759,8 +757,7 @@ export const Home: React.FC<HomeProps> = ({
           <span className="home-section__badge">Roadmap</span>
           <h2 className="home-section__title">Lo que queremos construir</h2>
           <p className="home-section__subtitle">
-            Tu aporte y tus comentarios deciden el orden de esta lista. A futuro
-            se sumarán planes para mantener el proyecto.
+            Tu aporte y tus comentarios deciden el orden de esta lista.
           </p>
         </div>
 
@@ -918,6 +915,7 @@ export const Home: React.FC<HomeProps> = ({
                 key={card.id}
                 className="home-donate-card"
                 href={card.url}
+                onClick={card.id === "roadmap" ? handleRoadmapShortcut : undefined}
                 target={isExternal ? "_blank" : undefined}
                 rel={isExternal ? "noopener noreferrer" : undefined}
               >
@@ -1207,48 +1205,33 @@ export const Home: React.FC<HomeProps> = ({
         </div>
       )}
 
-      {/* ── Modal: detalle de hito de la línea de tiempo ── */}
       {timelineEvent && (
         <div className="modal-overlay" onClick={() => setTimelineEvent(null)}>
-          <div
+          <section
             className="modal-card timeline-modal"
+            ref={timelineSheetRef}
             role="dialog"
             aria-modal="true"
-            aria-label={timelineEvent.title}
-            onClick={(e) => e.stopPropagation()}
+            aria-label={`Detalle: ${timelineEvent.title}`}
+            onClick={(event) => event.stopPropagation()}
           >
-            <div className="modal-card__header">
-              <div className="timeline-modal__meta">
-                <span className="home-timeline__date">
-                  {timelineEvent.date}
-                </span>
-                <span
-                  className={`home-status home-status--${timelineEvent.tone}`}
-                >
-                  {timelineEvent.status}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="timeline-modal__close"
-                onClick={() => setTimelineEvent(null)}
-                aria-label="Cerrar"
-                autoFocus
-              >
-                <X size={18} strokeWidth={2.4} />
-              </button>
+            <div className="timeline-modal__meta">
+              <span className="home-timeline__date">{timelineEvent.date}</span>
+              <span className={`home-status home-status--${timelineEvent.tone}`}>
+                {timelineEvent.status}
+              </span>
             </div>
-
             <h3 className="timeline-modal__title">{timelineEvent.title}</h3>
-
-            <div className="timeline-modal__content">
-              {timelineEvent.paragraphs.map((paragraph) => (
-                <p className="timeline-modal__desc" key={paragraph}>
-                  {paragraph}
-                </p>
-              ))}
-            </div>
-          </div>
+            <p className="timeline-modal__desc">{timelineEvent.desc}</p>
+            <button
+              type="button"
+              className="btn btn--primary timeline-modal__action"
+              onClick={() => setTimelineEvent(null)}
+              autoFocus
+            >
+              Entendido
+            </button>
+          </section>
         </div>
       )}
 

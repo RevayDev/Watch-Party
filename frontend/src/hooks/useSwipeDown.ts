@@ -5,8 +5,7 @@ import { useEffect, useRef, type RefObject } from 'react';
  *
  * Attach the returned ref to the sheet element. The gesture only starts when the
  * content inside is scrolled to the top (or there is nothing scrollable), so normal
- * scrolling still works. Once the finger travels `threshold` px downwards the sheet
- * is closed via `onClose`.
+ * scrolling still works. A deliberate 64 px downward drag closes the sheet.
  */
 export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
   onClose: () => void,
@@ -73,7 +72,7 @@ export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
       dy = 0;
       el.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
       el.style.transform = '';
-      if (travelled > 100) onCloseRef.current();
+      if (travelled > 64) onCloseRef.current();
     };
 
     el.addEventListener('touchstart', onStart, { passive: true });
