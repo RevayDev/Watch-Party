@@ -3023,18 +3023,28 @@ div[id] {
     opacity: 1;
   }
 }
-@keyframes slideOutRight {
+@keyframes slideUpBottom {
   from {
-    transform: translateX(0);
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes slideDownBottom {
+  from {
+    transform: translateY(0);
     opacity: 1;
   }
   to {
-    transform: translateX(100%);
+    transform: translateY(100%);
     opacity: 0;
   }
 }
 .meet-drawer--closing {
-  animation: slideOutRight 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: slideDownBottom 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
   pointer-events: none;
 }
 
@@ -4493,45 +4503,61 @@ div[id] {
   /* Drawer covers full screen on phones (fixed: also covers the bottom bar) */
   .meet-drawer {
     position: fixed;
-    top: 0;
+    top: auto;
     right: 0;
     bottom: 0;
     left: 0;
-    border-radius: 0;
+    height: 85dvh;
+    max-height: 85dvh;
+    border-radius: 20px 20px 0 0;
     width: 100%;
     max-width: 100%;
     z-index: 120;
     border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    animation: slideUpBottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
-  /* Phone sheet style: handle bar only — close by swiping the sheet down */
+  /* Phone sheet style: handle bar as a clickable close element */
   .meet-drawer::before {
-    content: "";
-    display: block;
-    width: 40px;
-    height: 4px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.28);
-    margin: 0.55rem auto 0.1rem;
-    flex-shrink: 0;
+    display: none;
   }
-  /* Drawer header close button / X button visibility on mobile */
+  .meet-drawer-handle {
+    width: 40px;
+    height: 6px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.35);
+    margin: 0.6rem auto 0.2rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .meet-drawer-handle:hover {
+    background: rgba(255, 255, 255, 0.6);
+  }
+  /* Drawer header close button / X button visibility on mobile - larger X */
   .meet-drawer .meet-drawer__header .meet-drawer__close-btn,
   .meet-drawer .part-header__close {
     display: flex !important;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.12);
     border: none;
-    color: #94a3b8;
+    color: #ffffff;
     cursor: pointer;
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
+    font-size: 1.25rem;
+  }
+  .meet-drawer .meet-drawer__header .meet-drawer__close-btn svg,
+  .meet-drawer .part-header__close svg {
+    width: 22px !important;
+    height: 22px !important;
   }
   .meet-drawer .meet-drawer__header .meet-drawer__close-btn:hover,
   .meet-drawer .part-header__close:hover {
     color: #fff;
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.22);
   }
   /* Beat the desktop `.meet-drawer--wide` !important rules that leave a 32px gap */
   .meet-drawer--wide {

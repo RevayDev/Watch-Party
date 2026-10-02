@@ -239,6 +239,9 @@ export const Participants: React.FC<ParticipantsProps> = ({
     <div className="part-layout">
       {/* ── LEFT PANEL: PARTICIPANTS MAIN LIST ── */}
       <div className="part-main-panel">
+        {/* Mobile Swipe Handle Bar */}
+        <div className="meet-drawer-handle" onClick={onClose} title="Cerrar" />
+
         {/* Header with Title and Close */}
         <div className="part-header">
           <div className="part-header__title">

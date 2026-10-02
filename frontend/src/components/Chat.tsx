@@ -28,6 +28,9 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, onClose }) 
 
   return (
     <div className="drawer-chat" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Mobile Swipe Handle Bar */}
+      <div className="meet-drawer-handle" onClick={onClose} title="Cerrar" />
+
       {/* Mobile Close Button Header */}
       <div className="meet-drawer__header part-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
         <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Mensajes del chat</h3>
