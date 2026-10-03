@@ -1163,7 +1163,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           className="meet-circle-btn meet-circle-btn--leave meet-btn--hide-mobile"
           title="Salir de la reunión"
         >
-          <PhoneOff size={20} />
+          <PhoneOff size={18} />
         </button>
       </footer>
 

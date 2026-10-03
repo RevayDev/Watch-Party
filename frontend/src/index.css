@@ -3191,7 +3191,7 @@ div[id] {
   color: #818cf8;
 }
 
-/* Leave call — simple flat red button */
+/* Leave call — same design as mic/camera buttons (translucent tint + border) */
 .meet-circle-btn--leave {
   width: 46px;
   height: 46px;
@@ -3200,14 +3200,21 @@ div[id] {
   justify-content: center;
   padding: 0;
   border-radius: 50%;
-  background: #ea4335;
-  border: none;
-  color: #fff;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 .meet-circle-btn--leave:hover {
-  background: #d93025;
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+.meet-circle-btn--leave:active {
+  background: rgba(239, 68, 68, 0.35);
 }
 
 /* ── Unread badge dot ── */
@@ -4495,7 +4502,8 @@ div[id] {
     padding: 0 0.85rem;
   }
   .meet-circle-btn--leave {
-    width: 48px;
+    width: 40px;
+    height: 40px;
     padding: 0;
     border-radius: 50%;
   }
@@ -4756,7 +4764,8 @@ div[id] {
     padding: 0 0.75rem !important;
   }
   .meet-circle-btn--leave {
-    width: 44px !important;
+    width: 36px !important;
+    height: 36px !important;
     padding: 0 !important;
     border-radius: 50% !important;
   }
