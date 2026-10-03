@@ -59,6 +59,8 @@ export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
       if (dy <= 0) {
         active = false;
         el.style.transform = '';
+        el.style.animation = '';
+        el.style.transition = '';
         return;
       }
       el.style.transform = `translateY(${dy}px)`;
@@ -70,9 +72,20 @@ export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
       active = false;
       const travelled = dy;
       dy = 0;
+      if (travelled === 0) {
+        // A plain tap: release the overrides so a later close can still animate
+        el.style.animation = '';
+        el.style.transition = '';
+        return;
+      }
       el.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
       el.style.transform = '';
-      if (travelled > 64) onCloseRef.current();
+      if (travelled > 64) {
+        // Release the inline overrides so the CSS exit animation can play
+        el.style.animation = '';
+        el.style.transition = '';
+        onCloseRef.current();
+      }
     };
 
     el.addEventListener('touchstart', onStart, { passive: true });

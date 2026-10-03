@@ -3033,6 +3033,16 @@ div[id] {
     opacity: 1;
   }
 }
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
 @keyframes slideDownBottom {
   from {
     transform: translateY(0);
@@ -3044,7 +3054,7 @@ div[id] {
   }
 }
 .meet-drawer--closing {
-  animation: slideDownBottom 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+  animation: slideOutRight 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
   pointer-events: none;
 }
 
@@ -3705,15 +3715,9 @@ div[id] {
     animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     gap: 1rem;
   }
-  /* Drag-handle bar, same as the "Cambiar video" sheet */
+  /* Drag-handle bar, same as every other sheet (rendered by <SheetHandle/>) */
   .empty-picker-sheet--open > .dropzone-container::before {
-    content: "";
-    display: block;
-    width: 40px;
-    height: 4px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.28);
-    margin: -0.35rem auto 0.35rem;
+    content: none;
   }
   /* Exit: sheet slides back down, dim fades out */
   .empty-picker-sheet--closing {
@@ -3721,7 +3725,7 @@ div[id] {
     pointer-events: none;
   }
   .empty-picker-sheet--closing > .dropzone-container {
-    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
     pointer-events: none;
   }
 }
@@ -4508,65 +4512,6 @@ div[id] {
     border-radius: 50%;
   }
 
-  /* Universal mobile drawers and modals: bottom sheet sliding up from bottom */
-  .meet-drawer,
-  .modal-card,
-  .modal-card--change {
-    position: fixed !important;
-    top: auto !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    height: 85dvh !important;
-    max-height: 85dvh !important;
-    border-radius: 20px 20px 0 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    z-index: 150 !important;
-    border: none !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
-    animation: slideUpBottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: contain !important;
-    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
-  }
-  .meet-drawer--wide {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-  .modal-overlay {
-    padding: 0 !important;
-    align-items: flex-end !important;
-    justify-content: center !important;
-    animation: sheetFadeIn 0.2s ease !important;
-  }
-  .modal-overlay--closing {
-    animation: overlayOut 0.2s ease forwards !important;
-  }
-  .meet-drawer--closing,
-  .modal-card--closing,
-  .modal-card--change.modal-card--closing {
-    animation: slideDownBottom 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
-    pointer-events: none !important;
-  }
-  /* Phone sheet style: handle bar as a clickable close element */
-  .meet-drawer::before {
-    display: none;
-  }
-  .meet-drawer-handle {
-    width: 40px;
-    height: 6px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.35);
-    margin: 0.6rem auto 0.2rem;
-    flex-shrink: 0;
-    cursor: pointer;
-    touch-action: none;
-  }
-  .meet-drawer-handle:hover {
-    background: rgba(255, 255, 255, 0.6);
-  }
   /* Drawer header close button / X button visibility on mobile - larger X */
   .meet-drawer .meet-drawer__header .meet-drawer__close-btn,
   .meet-drawer .part-header__close {
@@ -5831,18 +5776,9 @@ div[id] {
     gap: 0.55rem;
   }
 
-  /* Drag handle bar at the top of participant detail card on mobile */
+  /* Handle bar rendered by <SheetHandle/> on the participant detail card */
   .part-detail-card::before {
-    content: "";
-    display: block;
-    width: 40px;
-    height: 6px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.35);
-    margin: -0.25rem auto 0.4rem;
-    cursor: pointer;
-    touch-action: none;
-    flex-shrink: 0;
+    content: none;
   }
   .part-detail-card {
     position: fixed;
@@ -5859,6 +5795,9 @@ div[id] {
     border: none;
     border-top: 1px solid rgba(255, 255, 255, 0.15);
     animation: slideUpBottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .part-detail-card--closing {
+    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
   }
   .part-detail-header .part-detail-close {
     display: flex !important;
@@ -6041,16 +5980,23 @@ div[id] {
 }
 
 /* ==========================================================================
-   Mobile fixes (≤768px): modal as bottom sheet, compact picker, header pills
+   Mobile fixes (≤768px): unified phone bottom-sheet system
+   Exactly the same behavior as the file/link picker sheet:
+   - dimmed overlay that closes the sheet when tapped outside
+   - sheet docks at the bottom, slides up on open / down on close
+   - drag handle (SheetHandle) closes it on tap
+   - swipe-down gesture closes it (useSwipeDown hook)
    ========================================================================== */
 @media (max-width: 768px) {
-  /* Modal becomes a bottom sheet ("phone menu" style) that fits the viewport */
+  /* Overlay: dim background + tap outside to close */
   .modal-overlay {
     padding: 0;
     align-items: flex-end;
     justify-content: center;
     animation: sheetFadeIn 0.2s ease;
   }
+
+  /* Modals: crear sala, unirse, línea de tiempo, configuración, salida, cambiar video */
   .modal-card,
   .modal-card--change {
     width: 100%;
@@ -6061,29 +6007,119 @@ div[id] {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     border-radius: 1.25rem 1.25rem 0 0;
-    padding: 1.15rem 1rem calc(1.15rem + env(safe-area-inset-bottom));
+    border-bottom: none;
+    padding: 0.35rem 1rem calc(1.15rem + env(safe-area-inset-bottom));
+    margin: 0;
+    z-index: 210;
     animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  /* Drag-handle bar on every bottom-sheet modal — phones close by swipe-down or clicking the handle */
-  .modal-card::before {
-    content: "";
+
+  /* Drawers: chat & participantes — same sheet system */
+  .meet-drawer {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    height: 85dvh;
+    max-height: 92dvh;
+    border-radius: 1.25rem 1.25rem 0 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: none;
+    overflow: hidden;
+    padding-top: 0.1rem;
+    z-index: 210;
+    animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .meet-drawer--wide {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Dim area above the drawer → tap to close (like the modal overlay) */
+  .sheet-backdrop {
     display: block;
-    width: 40px;
-    height: 6px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.35);
-    margin: -0.35rem auto 0.75rem;
-    cursor: pointer;
-    touch-action: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 205;
+    animation: sheetFadeIn 0.2s ease;
   }
-  .modal-card::before:hover {
-    background: rgba(255, 255, 255, 0.6);
+
+  /* Exit: sheet slides back down, dim fades out (!important beats the inline
+     `animation: none` that useSwipeDown applies while dragging) */
+  .modal-overlay--closing {
+    animation: overlayOut 0.2s ease forwards;
   }
+  .modal-card--closing,
+  .modal-card--change.modal-card--closing,
+  .meet-drawer--closing {
+    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+    pointer-events: none;
+  }
+  .sheet-backdrop--closing {
+    animation: overlayOut 0.2s ease forwards;
+    pointer-events: none;
+  }
+
   .modal-card__header .meet-drawer__close-btn {
     display: none;
   }
   .modal-card .dropzone-container {
     gap: 1rem;
+  }
+
+  /* Rename popup: same bottom-sheet system */
+  .part-rename-dialog {
+    align-items: flex-end;
+    justify-items: stretch;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: sheetFadeIn 0.2s ease;
+  }
+  .part-rename-modal {
+    width: 100%;
+    max-width: none;
+    border-radius: 1.25rem 1.25rem 0 0;
+    border-bottom: none;
+    padding: 0.35rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
+    animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* ── Reusable drag handle (SheetHandle) — hidden on desktop, active on phones ── */
+.sheet-handle {
+  display: none;
+}
+/* Backdrop behind phone drawers — only rendered as a dim overlay on mobile */
+.sheet-backdrop {
+  display: none;
+}
+@media (max-width: 768px) {
+  .sheet-handle {
+    display: block;
+    width: 40px;
+    height: 5px;
+    padding: 0;
+    border: none;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.35);
+    margin: 0.4rem auto 0.55rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease;
+  }
+  .sheet-handle:hover,
+  .sheet-handle:active {
+    background: rgba(255, 255, 255, 0.65);
   }
 }
 
@@ -6135,7 +6171,7 @@ div[id] {
 }
 
 @media (max-width: 768px) {
-  /* Bottom sheet slides back down on close */
+  /* Bottom sheet slides back down on close (fallback for stacked closings) */
   .modal-overlay--closing {
     animation: overlayOut 0.2s ease forwards;
   }
@@ -6679,23 +6715,34 @@ div[id] {
   }
 }
 
-/* La configuración siempre permanece centrada y no responde al gesto de hoja móvil. */
+/* La configuración usa el MISMO sistema de hoja móvil que el resto de popups:
+   se ancla abajo, tiene barra arrastrable y se cierra con gesto / clic fuera. */
 @media (max-width: 768px) {
   .modal-overlay--settings {
-    align-items: center;
-    padding: 0.75rem;
-    overflow-y: auto;
+    align-items: flex-end;
+    padding: 0;
+    overflow: hidden;
   }
 
   .modal-overlay--settings .modal-card--settings {
-    width: min(750px, calc(100vw - 1.5rem));
-    max-height: calc(100dvh - 1.5rem);
-    margin: auto;
-    border-radius: var(--radius-xl);
-    animation: modalCardIn 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+    width: 100%;
+    max-width: none;
+    max-height: 92dvh;
+    margin: 0;
+    border-radius: 1.25rem 1.25rem 0 0;
+    border-bottom: none;
+    padding: 0.35rem 1rem calc(1.15rem + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .modal-overlay--settings .modal-card--settings::before {
-    display: none;
+    content: none;
+  }
+
+  .modal-overlay--settings .modal-card--settings.modal-card--closing {
+    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
   }
 }

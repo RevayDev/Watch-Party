@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { usePresence } from "../hooks/usePresence";
+import { useSwipeDown } from "../hooks/useSwipeDown";
 import { notify } from "../services/notifications";
+import { SheetHandle } from "./SheetHandle";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -34,6 +36,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   onToggleRequireApproval,
 }) => {
   const { shown, closing } = usePresence(isOpen);
+  // Swipe-down-to-dismiss on phones (same system as the file/link picker sheet)
+  const sheetRef = useSwipeDown<HTMLDivElement>(onClose, isOpen);
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
   const [choice, setChoice] = useState<number | null>(timerMinutes);
@@ -79,8 +83,10 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
     >
       <div
         className={`modal-card modal-card--settings ${closing ? "modal-card--closing" : ""}`}
+        ref={sheetRef}
         onClick={(e) => e.stopPropagation()}
       >
+        <SheetHandle onClose={onClose} />
         <div className="modal-card__header">
           <h3 className="host-exit-modal__title">Configuración de la sala</h3>
         </div>

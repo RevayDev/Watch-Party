@@ -19,6 +19,7 @@ import {
 } from "../types/room";
 import { confirmAction, notify } from "../services/notifications";
 import { usePresence } from "../hooks/usePresence";
+import { SheetHandle } from "./SheetHandle";
 
 interface ParticipantsProps {
   participants: IParticipant[];
@@ -239,9 +240,6 @@ export const Participants: React.FC<ParticipantsProps> = ({
     <div className="part-layout">
       {/* ── LEFT PANEL: PARTICIPANTS MAIN LIST ── */}
       <div className="part-main-panel">
-        {/* Mobile Swipe Handle Bar */}
-        <div className="meet-drawer-handle" onClick={onClose} title="Cerrar" />
-
         {/* Header with Title and Close */}
         <div className="part-header">
           <div className="part-header__title">
@@ -669,6 +667,12 @@ export const Participants: React.FC<ParticipantsProps> = ({
         <div
           className={`part-detail-card ${detailPresence.closing ? "part-detail-card--closing" : ""}`}
         >
+          <SheetHandle
+            onClose={() => {
+              setSelectedParticipant(null);
+              setIsRenaming(false);
+            }}
+          />
           {/* Top User Header */}
           <div className="part-detail-header">
             <div
@@ -726,6 +730,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
                   saveRename();
                 }}
               >
+                <SheetHandle onClose={() => setIsRenaming(false)} />
                 <h3>Renombrar usuario</h3>
                 <p>El nuevo nombre será visible para todos en la sala.</p>
                 <input

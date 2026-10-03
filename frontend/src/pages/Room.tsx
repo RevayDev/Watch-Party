@@ -8,6 +8,7 @@ import { CameraGrid } from '../components/CameraGrid';
 import { HostExitModal } from '../components/HostExitModal';
 import { RoomSettingsModal } from '../components/RoomSettingsModal';
 import { WaitingApproval } from '../components/WaitingApproval';
+import { SheetHandle } from '../components/SheetHandle';
 import { IRoomData, ChatMessage, ReactionItem } from '../types/room';
 import { ApiService } from '../services/api';
 import { getSocket, disconnectSocket } from '../services/socket';
@@ -957,11 +958,18 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
 
         {/* ── Slide-over Right Drawer for Chat or Participants ── */}
         {drawerPresence.shown && (
-          <aside
-            className={`meet-drawer ${sideTabView === 'participants' ? 'meet-drawer--wide' : ''} ${drawerPresence.closing ? 'meet-drawer--closing' : ''}`}
-            ref={drawerSheetRef}
-          >
-            <div className="meet-drawer__body">
+          <>
+            {/* Dim backdrop → tap outside closes the sheet (phones/tablets) */}
+            <div
+              className={`sheet-backdrop ${drawerPresence.closing ? 'sheet-backdrop--closing' : ''}`}
+              onClick={() => setActiveSideTab(null)}
+            />
+            <aside
+              className={`meet-drawer ${sideTabView === 'participants' ? 'meet-drawer--wide' : ''} ${drawerPresence.closing ? 'meet-drawer--closing' : ''}`}
+              ref={drawerSheetRef}
+            >
+              <SheetHandle onClose={() => setActiveSideTab(null)} />
+              <div className="meet-drawer__body">
               {sideTabView === 'chat' && (
                 <Chat messages={messages} onSendMessage={handleSendMessage} onClose={() => setActiveSideTab(null)} />
               )}
@@ -1033,8 +1041,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
                   onClose={() => setActiveSideTab(null)}
                 />
               )}
-            </div>
-          </aside>
+              </div>
+            </aside>
+          </>
         )}
       </main>
 

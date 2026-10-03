@@ -4,6 +4,7 @@ import Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../types/room';
 import { useSwipeDown } from '../hooks/useSwipeDown';
 import { usePresence } from '../hooks/usePresence';
+import { SheetHandle } from './SheetHandle';
 
 interface VideoPlayerProps {
   roomId: string;
@@ -511,6 +512,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   ref={emptySheetRef}
                   onClick={(e) => e.stopPropagation()}
                 >
+                  <SheetHandle onClose={closeEmptyPicker} />
                   {/* Tab selector: Archivo Local vs Enlace Web / HLS / Drive */}
                   {renderPickerTabs()}
                   {activeTab === 'upload' ? renderUploadZone() : renderUrlForm()}
@@ -683,6 +685,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             ref={changeSheetRef}
             onClick={(e) => e.stopPropagation()}
           >
+            <SheetHandle onClose={() => setShowChangePanel(false)} />
             <div className="modal-card__header">
               <h3 style={{ margin: 0, fontSize: '1.02rem', color: '#f8fafc' }}>Cambiar video de la sala</h3>
             </div>

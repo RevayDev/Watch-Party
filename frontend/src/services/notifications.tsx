@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useRef, useState } from 
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react';
 import { usePresence } from '../hooks/usePresence';
 import { useSwipeDown } from '../hooks/useSwipeDown';
+import { SheetHandle } from '../components/SheetHandle';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -199,6 +200,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             role="alertdialog"
             aria-modal="true"
           >
+            <SheetHandle onClose={() => resolveConfirm(false)} />
             <h3 className="notif-confirm__title">{confirmState.options.title}</h3>
             <p className="notif-confirm__message">{confirmState.options.message}</p>
             <div className="notif-confirm__actions">

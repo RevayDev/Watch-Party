@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Loader2,
   Video,
@@ -40,6 +40,7 @@ import {
 } from "../services/recentRooms";
 import { useSwipeDown } from "../hooks/useSwipeDown";
 import { usePresence } from "../hooks/usePresence";
+import { SheetHandle } from "../components/SheetHandle";
 
 /**
  * Enlaces de donaciones.
@@ -273,6 +274,11 @@ export const Home: React.FC<HomeProps> = ({
     () => setTimelineEvent(null),
     Boolean(timelineEvent),
   );
+  // Keep the last opened event so the sheet renders while its exit animation plays
+  const timelinePresence = usePresence(Boolean(timelineEvent));
+  const lastTimelineRef = useRef<(typeof timelineEvents)[number] | null>(null);
+  if (timelineEvent) lastTimelineRef.current = timelineEvent;
+  const timelineView = timelineEvent ?? lastTimelineRef.current;
 
   useEffect(() => {
     if (!timelineEvent) return;
@@ -954,6 +960,7 @@ export const Home: React.FC<HomeProps> = ({
             ref={createSheetRef}
             onClick={(e) => e.stopPropagation()}
           >
+            <SheetHandle onClose={() => setShowCreateModal(false)} />
             <div className="modal-card__header">
               <h3 className="host-exit-modal__title">Crear una nueva sala</h3>
             </div>
@@ -1095,6 +1102,7 @@ export const Home: React.FC<HomeProps> = ({
             ref={joinSheetRef}
             onClick={(e) => e.stopPropagation()}
           >
+            <SheetHandle onClose={() => setShowJoinModal(false)} />
             <div className="modal-card__header">
               <h3 className="host-exit-modal__title">
                 {isUrlInvite && roomCode
@@ -1222,24 +1230,28 @@ export const Home: React.FC<HomeProps> = ({
         </div>
       )}
 
-      {timelineEvent && (
-        <div className="modal-overlay" onClick={() => setTimelineEvent(null)}>
+      {timelinePresence.shown && timelineView && (
+        <div
+          className={`modal-overlay ${timelinePresence.closing ? "modal-overlay--closing" : ""}`}
+          onClick={() => setTimelineEvent(null)}
+        >
           <section
-            className="modal-card timeline-modal"
+            className={`modal-card timeline-modal ${timelinePresence.closing ? "modal-card--closing" : ""}`}
             ref={timelineSheetRef}
             role="dialog"
             aria-modal="true"
-            aria-label={`Detalle: ${timelineEvent.title}`}
+            aria-label={`Detalle: ${timelineView.title}`}
             onClick={(event) => event.stopPropagation()}
           >
+            <SheetHandle onClose={() => setTimelineEvent(null)} />
             <div className="timeline-modal__meta">
-              <span className="home-timeline__date">{timelineEvent.date}</span>
-              <span className={`home-status home-status--${timelineEvent.tone}`}>
-                {timelineEvent.status}
+              <span className="home-timeline__date">{timelineView.date}</span>
+              <span className={`home-status home-status--${timelineView.tone}`}>
+                {timelineView.status}
               </span>
             </div>
-            <h3 className="timeline-modal__title">{timelineEvent.title}</h3>
-            <p className="timeline-modal__desc">{timelineEvent.desc}</p>
+            <h3 className="timeline-modal__title">{timelineView.title}</h3>
+            <p className="timeline-modal__desc">{timelineView.desc}</p>
             <button
               type="button"
               className="btn btn--primary timeline-modal__action"
