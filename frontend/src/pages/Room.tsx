@@ -153,6 +153,15 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
   const drawerPresence = usePresence(!!activeSideTab);
   const morePresence = usePresence(showMoreMenu, 160);
   const emojiPresence = usePresence(showEmojiPicker, 160);
+  // Same swipe-down-to-close for the phone popovers (⋯ menu, emoji reactions)
+  const moreSheetRef = useSwipeDown<HTMLDivElement>(
+    () => setShowMoreMenu(false),
+    showMoreMenu
+  );
+  const emojiSheetRef = useSwipeDown<HTMLDivElement>(
+    () => setShowEmojiPicker(false),
+    showEmojiPicker
+  );
   // Keep the last opened tab so the drawer still renders content while closing
   const lastSideTabRef = useRef<'chat' | 'participants'>('chat');
   if (activeSideTab) lastSideTabRef.current = activeSideTab;
@@ -1078,7 +1087,10 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           </button>
 
           {emojiPresence.shown && (
-            <div className={`meet-emoji-popup ${emojiPresence.closing ? 'meet-emoji-popup--closing' : ''}`}>
+            <div
+              className={`meet-emoji-popup ${emojiPresence.closing ? 'meet-emoji-popup--closing' : ''}`}
+              ref={emojiSheetRef}
+            >
               <Reactions onReact={(emoji) => { handleReaction(emoji); setShowEmojiPicker(false); }} />
             </div>
           )}
@@ -1129,7 +1141,10 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           </button>
 
           {morePresence.shown && (
-            <div className={`meet-more-dropdown ${morePresence.closing ? 'meet-more-dropdown--closing' : ''}`}>
+            <div
+              className={`meet-more-dropdown ${morePresence.closing ? 'meet-more-dropdown--closing' : ''}`}
+              ref={moreSheetRef}
+            >
               <button
                 className={`meet-more-item ${activeSideTab === 'chat' ? 'meet-more-item--active' : ''}`}
                 onClick={() => { setActiveSideTab((v) => v === 'chat' ? null : 'chat'); setShowMoreMenu(false); }}

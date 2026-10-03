@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Tv, Hash, Link as LinkIcon, Share2, Users, Settings } from 'lucide-react';
 import { usePresence } from '../hooks/usePresence';
+import { useSwipeDown } from '../hooks/useSwipeDown';
 
 interface RoomHeaderProps {
   roomId: string;
@@ -36,6 +37,11 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
 }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const sharePresence = usePresence(showShareMenu, 160);
+  // Same swipe-down-to-close as the phone sheets
+  const shareSheetRef = useSwipeDown<HTMLDivElement>(
+    () => setShowShareMenu(false),
+    showShareMenu
+  );
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
@@ -124,7 +130,10 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           </button>
 
           {sharePresence.shown && (
-            <div className={`header-share-menu ${sharePresence.closing ? 'header-share-menu--closing' : ''}`}>
+            <div
+              className={`header-share-menu ${sharePresence.closing ? 'header-share-menu--closing' : ''}`}
+              ref={shareSheetRef}
+            >
               {/* Room code */}
               <div className="header-share-menu__row">
                 <div className="header-share-menu__info">

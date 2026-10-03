@@ -1,12 +1,17 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
 /**
- * Swipe-down-to-dismiss for phone bottom sheets (touch only, desktop mouse is ignored).
+ * Swipe-down-to-dismiss for phone bottom sheets and popovers (touch only, desktop mouse is ignored).
  *
  * Attach the returned ref to the sheet element. The gesture only starts when the
  * content inside is scrolled to the top (or there is nothing scrollable), so normal
  * scrolling still works. A deliberate 64 px downward drag closes the sheet.
+ *
+ * Nested popups (rename dialog inside the participant sheet inside the drawer)
+ * share one gesture owner, so a drag always closes only the innermost one.
  */
+let gestureOwner: symbol | null = null;
+
 export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
   onClose: () => void,
   enabled = true
@@ -19,6 +24,7 @@ export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
     const el = ref.current;
     if (!enabled || !el) return;
 
+    const owner = Symbol('swipe-down');
     let startY = 0;
     let dy = 0;
     let active = false;
@@ -38,13 +44,23 @@ export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
       return isScrollable(el) ? el : null;
     };
 
+    const releaseGesture = () => {
+      if (gestureOwner === owner) gestureOwner = null;
+    };
+
     const onStart = (e: TouchEvent) => {
+      // An inner popup already claimed this touch: only that one may close.
+      if (gestureOwner && gestureOwner !== owner) {
+        active = false;
+        return;
+      }
       const scrollEl = findScrollable(e.target);
       if (scrollEl && scrollEl.scrollTop > 0) {
         active = false;
         return;
       }
       active = true;
+      gestureOwner = owner;
       startY = e.touches[0].clientY;
       dy = 0;
       // The CSS entry animation owns `transform` while it runs — disable it for the drag
@@ -68,6 +84,7 @@ export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
     };
 
     const onEnd = () => {
+      releaseGesture();
       if (!active) return;
       active = false;
       const travelled = dy;
@@ -98,6 +115,7 @@ export function useSwipeDown<T extends HTMLElement = HTMLDivElement>(
       el.removeEventListener('touchmove', onMove);
       el.removeEventListener('touchend', onEnd);
       el.removeEventListener('touchcancel', onEnd);
+      releaseGesture();
       el.style.animation = '';
       el.style.transition = '';
       el.style.transform = '';

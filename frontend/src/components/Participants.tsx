@@ -19,6 +19,7 @@ import {
 } from "../types/room";
 import { confirmAction, notify } from "../services/notifications";
 import { usePresence } from "../hooks/usePresence";
+import { useSwipeDown } from "../hooks/useSwipeDown";
 import { SheetHandle } from "./SheetHandle";
 
 interface ParticipantsProps {
@@ -110,6 +111,20 @@ export const Participants: React.FC<ParticipantsProps> = ({
   const lastDetailRef = useRef<IParticipant | null>(null);
   if (selectedParticipant) lastDetailRef.current = selectedParticipant;
   const detailView = selectedParticipant ?? lastDetailRef.current;
+
+  // Same swipe-down-to-close as every other phone sheet (handle + drag)
+  const closeDetail = () => {
+    setSelectedParticipant(null);
+    setIsRenaming(false);
+  };
+  const detailSheetRef = useSwipeDown<HTMLDivElement>(
+    closeDetail,
+    !!selectedParticipant,
+  );
+  const renameSheetRef = useSwipeDown<HTMLFormElement>(
+    () => setIsRenaming(false),
+    isRenaming,
+  );
 
   // Can the current user moderate (Host or Co-host)?
   const canModerate = isHost || isCoHost;
@@ -666,13 +681,9 @@ export const Participants: React.FC<ParticipantsProps> = ({
       {detailPresence.shown && detailView && (
         <div
           className={`part-detail-card ${detailPresence.closing ? "part-detail-card--closing" : ""}`}
+          ref={detailSheetRef}
         >
-          <SheetHandle
-            onClose={() => {
-              setSelectedParticipant(null);
-              setIsRenaming(false);
-            }}
-          />
+          <SheetHandle onClose={closeDetail} />
           {/* Top User Header */}
           <div className="part-detail-header">
             <div
@@ -702,10 +713,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
 
             <button
               className="part-icon-btn part-detail-close"
-              onClick={() => {
-                setSelectedParticipant(null);
-                setIsRenaming(false);
-              }}
+              onClick={closeDetail}
               title="Cerrar perfil"
             >
               <X size={14} />
@@ -724,6 +732,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Renombrar a ${detailView.name}`}
+                ref={renameSheetRef}
                 onClick={(event) => event.stopPropagation()}
                 onSubmit={(event) => {
                   event.preventDefault();
