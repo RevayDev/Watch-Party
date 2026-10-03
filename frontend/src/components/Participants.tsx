@@ -231,26 +231,6 @@ export const Participants: React.FC<ParticipantsProps> = ({
     setIsRenaming(false);
   };
 
-  const floatingNameActions = (p: IParticipant) => (
-    <span
-      className="part-float-actions"
-      onClick={(e) => e.stopPropagation()}
-      role="group"
-      aria-label={`Acciones para ${p.name}`}
-    >
-      {(canModerate || isSameUser(p)) && (
-        <button
-          type="button"
-          className="part-float-btn part-float-btn--text"
-          title="Renombrar"
-          onClick={() => openRename(p)}
-        >
-          <Pencil size={13} />
-        </button>
-      )}
-    </span>
-  );
-
   return (
     <div className="part-layout">
       {/* ── LEFT PANEL: PARTICIPANTS MAIN LIST ── */}
@@ -350,22 +330,19 @@ export const Participants: React.FC<ParticipantsProps> = ({
                     />
                   </div>
 
-                  {/* Middle: Name & Role Badge (+ floating actions) */}
+                  {/* Middle: Name & role tag */}
                   <div className="part-info">
                     <div className="part-name-row">
                       <span className="part-name">{p.name}</span>
-                      {isMe && <span className="part-me-tag">(Tú)</span>}
-                      {isHostUser && (
-                        <span className="part-badge-host">
-                          <span>Host</span>
+                      {(isMe || isHostUser || isCoHostUser) && (
+                        <span className="part-name-tag">
+                          {isMe
+                            ? "(Tú)"
+                            : isHostUser
+                              ? "(Host)"
+                              : "(Co-Host)"}
                         </span>
                       )}
-                      {isCoHostUser && (
-                        <span className="part-badge-cohost">
-                          <span>Co-Host</span>
-                        </span>
-                      )}
-                      {floatingNameActions(p)}
                     </div>
                   </div>
 
@@ -697,16 +674,13 @@ export const Participants: React.FC<ParticipantsProps> = ({
             <div className="part-detail-identity">
               <div className="part-detail-name-row">
                 <h3>{detailView.name}</h3>
-                {(detailView.isHost || detailView.role === "host") && (
-                  <span className="part-badge-host">
-                    <span>Host</span>
-                  </span>
-                )}
-                {detailView.role === "cohost" && (
-                  <span className="part-badge-cohost">
-                    <span>Co-Host</span>
-                  </span>
-                )}
+                {isSameUser(detailView) ? (
+                  <span className="part-name-tag">(Tú)</span>
+                ) : detailView.isHost || detailView.role === "host" ? (
+                  <span className="part-name-tag">(Host)</span>
+                ) : detailView.role === "cohost" ? (
+                  <span className="part-name-tag">(Co-Host)</span>
+                ) : null}
               </div>
               <span className="part-detail-status">● En línea</span>
             </div>
@@ -720,7 +694,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
             </button>
           </div>
 
-          {/* Pop-up de renombrado (abierto con el lápiz junto al nombre) */}
+          {/* Pop-up de renombrado (botón "Renombrar" de la ficha) */}
           {isRenaming && (
             <div
               className="part-rename-dialog"
@@ -767,49 +741,61 @@ export const Participants: React.FC<ParticipantsProps> = ({
             </div>
           )}
 
-          {/* Botones extra: Expulsar / Banear */}
-          {canModerateTarget(detailView) && (
+          {/* Acciones: renombrar (antes el lápiz de la lista) + expulsar / banear */}
+          {(canModerate || isSameUser(detailView)) && (
             <div className="part-detail-actions">
               <button
                 type="button"
-                className="part-outline-action-btn part-outline-action-btn--danger"
-                onClick={() => {
-                  confirmAction({
-                    title: "Expulsar usuario",
-                    message: `¿Expulsar a ${detailView.name}? Podrá volver a entrar a la sala.`,
-                    confirmLabel: "Expulsar",
-                    danger: true,
-                  }).then((ok) => {
-                    if (ok) {
-                      onKickUser?.(detailView.name, detailView.userId);
-                      setSelectedParticipant(null);
-                    }
-                  });
-                }}
+                className="part-outline-action-btn part-detail-rename-btn"
+                onClick={() => openRename(detailView)}
               >
-                <UserX size={14} />
-                <span>Expulsar</span>
+                <Pencil size={14} />
+                <span>Renombrar</span>
               </button>
-              <button
-                type="button"
-                className="part-outline-action-btn part-outline-action-btn--danger"
-                onClick={() => {
-                  confirmAction({
-                    title: "Banear usuario",
-                    message: `¿Banear a ${detailView.name}? No podrá volver a entrar a la sala.`,
-                    confirmLabel: "Banear",
-                    danger: true,
-                  }).then((ok) => {
-                    if (ok) {
-                      onBanUser?.(detailView.name, detailView.userId);
-                      setSelectedParticipant(null);
-                    }
-                  });
-                }}
-              >
-                <Ban size={14} />
-                <span>Banear</span>
-              </button>
+              {canModerateTarget(detailView) && (
+                <button
+                  type="button"
+                  className="part-outline-action-btn part-outline-action-btn--danger"
+                  onClick={() => {
+                    confirmAction({
+                      title: "Expulsar usuario",
+                      message: `¿Expulsar a ${detailView.name}? Podrá volver a entrar a la sala.`,
+                      confirmLabel: "Expulsar",
+                      danger: true,
+                    }).then((ok) => {
+                      if (ok) {
+                        onKickUser?.(detailView.name, detailView.userId);
+                        setSelectedParticipant(null);
+                      }
+                    });
+                  }}
+                >
+                  <UserX size={14} />
+                  <span>Expulsar</span>
+                </button>
+              )}
+              {canModerateTarget(detailView) && (
+                <button
+                  type="button"
+                  className="part-outline-action-btn part-outline-action-btn--danger"
+                  onClick={() => {
+                    confirmAction({
+                      title: "Banear usuario",
+                      message: `¿Banear a ${detailView.name}? No podrá volver a entrar a la sala.`,
+                      confirmLabel: "Banear",
+                      danger: true,
+                    }).then((ok) => {
+                      if (ok) {
+                        onBanUser?.(detailView.name, detailView.userId);
+                        setSelectedParticipant(null);
+                      }
+                    });
+                  }}
+                >
+                  <Ban size={14} />
+                  <span>Banear</span>
+                </button>
+              )}
             </div>
           )}
 
