@@ -4779,7 +4779,8 @@ div[id] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .part-header__title {
@@ -4791,7 +4792,7 @@ div[id] {
 .part-header__title h2 {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #f9fafb;
+  color: #fff;
   margin: 0;
 }
 
@@ -4825,6 +4826,22 @@ div[id] {
 }
 
 .part-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Header close X: identical look to the chat drawer X (same colors + pill) */
+.part-icon-btn.part-header__close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.part-icon-btn.part-header__close:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
