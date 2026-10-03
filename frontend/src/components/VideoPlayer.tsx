@@ -2,9 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../types/room';
-import { useSwipeDown } from '../hooks/useSwipeDown';
-import { usePresence } from '../hooks/usePresence';
-import { SheetHandle } from './SheetHandle';
+import { BottomSheet } from './BottomSheet';
 
 interface VideoPlayerProps {
   roomId: string;
@@ -47,14 +45,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Empty-state picker: on phones it opens as a bottom sheet (like the "Cambiar" modal)
   const [showEmptyPicker, setShowEmptyPicker] = useState(true);
-
-  // Swipe-down-to-dismiss (phone sheets)
-  const changeSheetRef = useSwipeDown<HTMLDivElement>(() => setShowChangePanel(false), showChangePanel);
-  const emptySheetRef = useSwipeDown<HTMLDivElement>(() => closeEmptyPicker(), showEmptyPicker);
-
-  // Exit animations for the sheets/modals
-  const changePresence = usePresence(showChangePanel);
-  const emptyPresence = usePresence(showEmptyPicker);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -502,22 +492,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <div className="player-container__placeholder">
           {isHost ? (
             <>
-              {/* Phone-style bottom sheet wrapper (only ≤768px becomes an overlay) */}
-              <div
-                className={`empty-picker-sheet ${showEmptyPicker || emptyPresence.closing ? 'empty-picker-sheet--open' : ''} ${emptyPresence.closing ? 'empty-picker-sheet--closing' : ''}`}
-                onClick={closeEmptyPicker}
+              {/* Phone bottom sheet, plain inline picker on desktop */}
+              <BottomSheet
+                open={showEmptyPicker}
+                onClose={closeEmptyPicker}
+                variant="inline"
+                desktopClassName="empty-picker-sheet"
+                label="Subir video o pegar enlace"
               >
-                <div
-                  className="dropzone-container"
-                  ref={emptySheetRef}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <SheetHandle onClose={closeEmptyPicker} />
+                <div className="dropzone-container">
                   {/* Tab selector: Archivo Local vs Enlace Web / HLS / Drive */}
                   {renderPickerTabs()}
                   {activeTab === 'upload' ? renderUploadZone() : renderUrlForm()}
                 </div>
-              </div>
+              </BottomSheet>
               {!showEmptyPicker && (
                 <button
                   type="button"
@@ -602,7 +590,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </div>
 
       {/* Mobile-only floating button: opens the "Cambiar video" panel (top bar auto-hides on touch) */}
-      {isHost && !changePresence.shown && (
+      {isHost && !showChangePanel && (
         <button
           onClick={() => openChangePanel()}
           className="player-change-fab"
@@ -675,17 +663,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </video>
 
       {/* Change-video modal: upload a file OR paste a link (also reachable from the error overlay) */}
-      {changePresence.shown && isHost && (
-        <div
-          className={`modal-overlay ${changePresence.closing ? 'modal-overlay--closing' : ''}`}
-          onClick={() => setShowChangePanel(false)}
+      {isHost && (
+        <BottomSheet
+          open={showChangePanel}
+          onClose={() => setShowChangePanel(false)}
+          label="Cambiar video de la sala"
+          className="modal-card--change"
         >
-          <div
-            className={`modal-card modal-card--change ${changePresence.closing ? 'modal-card--closing' : ''}`}
-            ref={changeSheetRef}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <SheetHandle onClose={() => setShowChangePanel(false)} />
             <div className="modal-card__header">
               <h3 style={{ margin: 0, fontSize: '1.02rem', color: '#f8fafc' }}>Cambiar video de la sala</h3>
             </div>
@@ -702,8 +686,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 Cancelar
               </button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </div>
   );

@@ -1,7 +1,5 @@
 import React from 'react';
-import { useSwipeDown } from '../hooks/useSwipeDown';
-import { usePresence } from '../hooks/usePresence';
-import { SheetHandle } from './SheetHandle';
+import { BottomSheet } from './BottomSheet';
 
 interface HostExitModalProps {
   isOpen: boolean;
@@ -20,21 +18,15 @@ export const HostExitModal: React.FC<HostExitModalProps> = ({
   onLeaveOnlyMe,
   onDeleteRoomForAll,
 }) => {
-  const hostExitSheetRef = useSwipeDown<HTMLDivElement>(onClose, isOpen);
-  const { shown, closing } = usePresence(isOpen);
-
-  if (!shown) return null;
-
   const hasOtherParticipants = participantCount > 1;
 
   return (
-    <div className={`modal-overlay ${closing ? 'modal-overlay--closing' : ''}`} onClick={onClose}>
-      <div
-        className={`modal-card host-exit-modal ${closing ? 'modal-card--closing' : ''}`}
-        ref={hostExitSheetRef}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <SheetHandle onClose={onClose} />
+    <BottomSheet
+      open={isOpen}
+      onClose={onClose}
+      label="Opciones de salida"
+      className="host-exit-modal"
+    >
         <div className="modal-card__header">
           <h3 className="host-exit-modal__title">Opciones de salida</h3>
         </div>
@@ -82,7 +74,6 @@ export const HostExitModal: React.FC<HostExitModalProps> = ({
         >
           Cancelar
         </button>
-      </div>
-    </div>
+    </BottomSheet>
   );
 };

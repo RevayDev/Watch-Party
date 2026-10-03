@@ -18,9 +18,7 @@ import {
   IRoomSettings,
 } from "../types/room";
 import { confirmAction, notify } from "../services/notifications";
-import { usePresence } from "../hooks/usePresence";
-import { useSwipeDown } from "../hooks/useSwipeDown";
-import { SheetHandle } from "./SheetHandle";
+import { BottomSheet } from "./BottomSheet";
 
 interface ParticipantsProps {
   participants: IParticipant[];
@@ -59,7 +57,6 @@ interface ParticipantsProps {
     ban: boolean,
   ) => void;
   onUpdateSettings?: (settings: Partial<IRoomSettings>) => void;
-  onClose?: () => void;
 }
 
 export const Participants: React.FC<ParticipantsProps> = ({
@@ -87,7 +84,6 @@ export const Participants: React.FC<ParticipantsProps> = ({
   onApproveJoin,
   onRejectJoin,
   onUpdateSettings,
-  onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<"room" | "requests" | "kicked">(
     "room",
@@ -107,24 +103,14 @@ export const Participants: React.FC<ParticipantsProps> = ({
   );
 
   // Detail card keeps rendering while its exit animation plays
-  const detailPresence = usePresence(!!selectedParticipant, 220);
   const lastDetailRef = useRef<IParticipant | null>(null);
   if (selectedParticipant) lastDetailRef.current = selectedParticipant;
   const detailView = selectedParticipant ?? lastDetailRef.current;
 
-  // Same swipe-down-to-close as every other phone sheet (handle + drag)
   const closeDetail = () => {
     setSelectedParticipant(null);
     setIsRenaming(false);
   };
-  const detailSheetRef = useSwipeDown<HTMLDivElement>(
-    closeDetail,
-    !!selectedParticipant,
-  );
-  const renameSheetRef = useSwipeDown<HTMLFormElement>(
-    () => setIsRenaming(false),
-    isRenaming,
-  );
 
   // Can the current user moderate (Host or Co-host)?
   const canModerate = isHost || isCoHost;
@@ -235,7 +221,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
     <div className="part-layout">
       {/* ── LEFT PANEL: PARTICIPANTS MAIN LIST ── */}
       <div className="part-main-panel">
-        {/* Header with Title and Close */}
+        {/* Header with Title */}
         <div className="part-header">
           <div className="part-header__title">
             <h2>
@@ -243,13 +229,6 @@ export const Participants: React.FC<ParticipantsProps> = ({
               <span className="part-count">({participants.length})</span>
             </h2>
           </div>
-          <button
-            className="part-icon-btn part-header__close"
-            onClick={onClose}
-            title="Cerrar"
-          >
-            <X size={16} />
-          </button>
         </div>
 
         {/* Top 3 Navigation Tabs */}
@@ -447,15 +426,16 @@ export const Participants: React.FC<ParticipantsProps> = ({
                   <div className="part-info">
                     <div className="part-name-row">
                       <span className="part-name">{r.name}</span>
-                      <span className="part-request-time">
-                        pidió unirse{" "}
-                        {new Date(r.requestedAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      {/* Floating actions next to the name */}
-                      <span className="part-float-actions">
+                    </div>
+                    <span className="part-request-time">
+                      pidió unirse{" "}
+                      {new Date(r.requestedAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    {/* Actions below the name: own wrapping row, never clipped */}
+                    <div className="part-request-actions">
                         <button
                           type="button"
                           className="part-float-btn part-float-btn--ok part-float-btn--text"
@@ -522,7 +502,6 @@ export const Participants: React.FC<ParticipantsProps> = ({
                           <Ban size={13} />
                           Banear
                         </button>
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -655,12 +634,14 @@ export const Participants: React.FC<ParticipantsProps> = ({
       </div>
 
       {/* ── RIGHT PANEL: PARTICIPANT INSPECT / MODERATION CARD ── */}
-      {detailPresence.shown && detailView && (
-        <div
-          className={`part-detail-card ${detailPresence.closing ? "part-detail-card--closing" : ""}`}
-          ref={detailSheetRef}
+      {detailView && (
+        <BottomSheet
+          open={!!selectedParticipant}
+          onClose={closeDetail}
+          variant="inline"
+          desktopClassName="part-detail-card"
+          label={`Detalle de ${detailView.name}`}
         >
-          <SheetHandle onClose={closeDetail} />
           {/* Top User Header */}
           <div className="part-detail-header">
             <div
@@ -684,36 +665,22 @@ export const Participants: React.FC<ParticipantsProps> = ({
               </div>
               <span className="part-detail-status">● En línea</span>
             </div>
-
-            <button
-              className="part-icon-btn part-detail-close"
-              onClick={closeDetail}
-              title="Cerrar perfil"
-            >
-              <X size={14} />
-            </button>
           </div>
 
           {/* Pop-up de renombrado (botón "Renombrar" de la ficha) */}
-          {isRenaming && (
-            <div
-              className="part-rename-dialog"
-              role="presentation"
-              onClick={() => setIsRenaming(false)}
-            >
+          <BottomSheet
+            open={isRenaming}
+            onClose={() => setIsRenaming(false)}
+            label={`Renombrar a ${detailView.name}`}
+            className="sheet--sm"
+          >
               <form
                 className="part-rename-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-label={`Renombrar a ${detailView.name}`}
-                ref={renameSheetRef}
-                onClick={(event) => event.stopPropagation()}
                 onSubmit={(event) => {
                   event.preventDefault();
                   saveRename();
                 }}
               >
-                <SheetHandle onClose={() => setIsRenaming(false)} />
                 <h3>Renombrar usuario</h3>
                 <p>El nuevo nombre será visible para todos en la sala.</p>
                 <input
@@ -738,8 +705,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
                   </button>
                 </div>
               </form>
-            </div>
-          )}
+          </BottomSheet>
 
           {/* Acciones: renombrar (antes el lápiz de la lista) + expulsar / banear */}
           {(canModerate || isSameUser(detailView)) && (
@@ -834,7 +800,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </BottomSheet>
       )}
     </div>
   );

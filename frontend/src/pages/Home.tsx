@@ -38,9 +38,7 @@ import {
   getLastUsername,
   RecentRoom,
 } from "../services/recentRooms";
-import { useSwipeDown } from "../hooks/useSwipeDown";
-import { usePresence } from "../hooks/usePresence";
-import { SheetHandle } from "../components/SheetHandle";
+import { BottomSheet } from "../components/BottomSheet";
 
 /**
  * Enlaces de donaciones.
@@ -237,18 +235,6 @@ export const Home: React.FC<HomeProps> = ({
   // Popups state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(Boolean(initialRoomCode));
-  // Swipe-down-to-dismiss for the phone sheets
-  const createSheetRef = useSwipeDown<HTMLDivElement>(
-    () => setShowCreateModal(false),
-    showCreateModal,
-  );
-  const joinSheetRef = useSwipeDown<HTMLDivElement>(
-    () => setShowJoinModal(false),
-    showJoinModal,
-  );
-  // Exit animations for the pop-up modals
-  const createPresence = usePresence(showCreateModal);
-  const joinPresence = usePresence(showJoinModal);
 
   // Create room modal form state
   const [createHostName, setCreateHostName] = useState("");
@@ -270,24 +256,10 @@ export const Home: React.FC<HomeProps> = ({
   const [timelineEvent, setTimelineEvent] = useState<
     (typeof timelineEvents)[number] | null
   >(null);
-  const timelineSheetRef = useSwipeDown<HTMLElement>(
-    () => setTimelineEvent(null),
-    Boolean(timelineEvent),
-  );
   // Keep the last opened event so the sheet renders while its exit animation plays
-  const timelinePresence = usePresence(Boolean(timelineEvent));
   const lastTimelineRef = useRef<(typeof timelineEvents)[number] | null>(null);
   if (timelineEvent) lastTimelineRef.current = timelineEvent;
   const timelineView = timelineEvent ?? lastTimelineRef.current;
-
-  useEffect(() => {
-    if (!timelineEvent) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setTimelineEvent(null);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [timelineEvent]);
 
   useEffect(() => {
     setRecentRooms(getRecentRooms());
@@ -950,17 +922,12 @@ export const Home: React.FC<HomeProps> = ({
       </section>
 
       {/* ── Modal Pop-up: Crear Nueva Sala ── */}
-      {createPresence.shown && (
-        <div
-          className={`modal-overlay ${createPresence.closing ? "modal-overlay--closing" : ""}`}
-          onClick={() => setShowCreateModal(false)}
-        >
-          <div
-            className={`modal-card host-exit-modal ${createPresence.closing ? "modal-card--closing" : ""}`}
-            ref={createSheetRef}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <SheetHandle onClose={() => setShowCreateModal(false)} />
+      <BottomSheet
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        label="Crear una nueva sala"
+        className="host-exit-modal"
+      >
             <div className="modal-card__header">
               <h3 className="host-exit-modal__title">Crear una nueva sala</h3>
             </div>
@@ -1087,22 +1054,15 @@ export const Home: React.FC<HomeProps> = ({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </BottomSheet>
 
       {/* ── Modal Pop-up: Unirse a Sala ── */}
-      {joinPresence.shown && (
-        <div
-          className={`modal-overlay ${joinPresence.closing ? "modal-overlay--closing" : ""}`}
-          onClick={() => setShowJoinModal(false)}
-        >
-          <div
-            className={`modal-card host-exit-modal ${joinPresence.closing ? "modal-card--closing" : ""}`}
-            ref={joinSheetRef}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <SheetHandle onClose={() => setShowJoinModal(false)} />
+      <BottomSheet
+        open={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
+        label="Unirse a una sala"
+        className="host-exit-modal"
+      >
             <div className="modal-card__header">
               <h3 className="host-exit-modal__title">
                 {isUrlInvite && roomCode
@@ -1226,24 +1186,15 @@ export const Home: React.FC<HomeProps> = ({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </BottomSheet>
 
-      {timelinePresence.shown && timelineView && (
-        <div
-          className={`modal-overlay ${timelinePresence.closing ? "modal-overlay--closing" : ""}`}
-          onClick={() => setTimelineEvent(null)}
+      {timelineView && (
+        <BottomSheet
+          open={Boolean(timelineEvent)}
+          onClose={() => setTimelineEvent(null)}
+          label={`Detalle: ${timelineView.title}`}
+          className="timeline-modal"
         >
-          <section
-            className={`modal-card timeline-modal ${timelinePresence.closing ? "modal-card--closing" : ""}`}
-            ref={timelineSheetRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Detalle: ${timelineView.title}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <SheetHandle onClose={() => setTimelineEvent(null)} />
             <div className="timeline-modal__meta">
               <span className="home-timeline__date">{timelineView.date}</span>
               <span className={`home-status home-status--${timelineView.tone}`}>
@@ -1260,8 +1211,7 @@ export const Home: React.FC<HomeProps> = ({
             >
               Entendido
             </button>
-          </section>
-        </div>
+        </BottomSheet>
       )}
 
       {/* ── Footer ── */}

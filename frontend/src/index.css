@@ -2604,39 +2604,8 @@ div[id] {
 }
 
 /* ==========================================================================
-   Block: Modal
+   Block: Modal content hooks (chrome now owned by BottomSheet: `.sheet`)
    ========================================================================== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 1rem;
-  animation: overlayIn 0.2s ease;
-}
-.modal-card {
-  max-width: 480px;
-  width: 100%;
-  padding: 1.75rem;
-  text-align: left;
-  background: rgba(13, 19, 33, 0.96);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-xl);
-  animation: modalCardIn 0.26s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes overlayIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 @keyframes modalCardIn {
   from {
     opacity: 0;
@@ -3023,16 +2992,6 @@ div[id] {
     opacity: 1;
   }
 }
-@keyframes slideUpBottom {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
 @keyframes slideOutRight {
   from {
     transform: translateX(0);
@@ -3043,48 +3002,9 @@ div[id] {
     opacity: 0;
   }
 }
-@keyframes slideDownBottom {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-}
 .meet-drawer--closing {
   animation: slideOutRight 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
   pointer-events: none;
-}
-
-.meet-drawer__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-.meet-drawer__header h3 {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #fff;
-}
-.meet-drawer__close-btn {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 0.35rem 0.75rem;
-  border-radius: 9999px;
-  font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.meet-drawer__close-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
 }
 
 .meet-drawer__body {
@@ -3092,16 +3012,6 @@ div[id] {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.meet-drawer__body .panel {
-  border: none;
-  flex: 1;
-  overflow: hidden;
-}
-
-.meet-drawer__body .panel__header {
-  display: none;
 }
 
 /* ── Google Meet Floating Circular Bottom Bar ── */
@@ -3661,10 +3571,8 @@ div[id] {
   gap: 1rem;
 }
 
-/* ── Empty-state picker: phone-style bottom sheet (≤768px) ──
-   Desktop: plain inline block (default). On phones it only closes by
-   swiping the sheet down (or tapping the dimmed backdrop) and the
-   "reopen" pill takes over once dismissed. */
+/* ── Empty-state picker: inline block on desktop, BottomSheet on phones ──
+   The "reopen" pill takes over once the phone sheet is dismissed. */
 .empty-picker-sheet {
   display: block;
   width: 100%;
@@ -3675,59 +3583,6 @@ div[id] {
   gap: 0.45rem;
   padding: 0.6rem 1.35rem;
   font-size: 0.88rem;
-}
-
-@media (max-width: 768px) {
-  /* Hidden while dismissed on phones → placeholder shows the reopen pill */
-  .empty-picker-sheet {
-    display: none;
-  }
-  /* Open: full-screen dim overlay with the picker docked at the bottom */
-  .empty-picker-sheet--open {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding: 0;
-    background: rgba(0, 0, 0, 0.78);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    animation: sheetFadeIn 0.2s ease;
-  }
-  .empty-picker-sheet--open > .dropzone-container {
-    position: relative;
-    width: 100%;
-    max-width: none;
-    margin: 0;
-    background: rgba(13, 19, 33, 0.96);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-bottom: none;
-    border-radius: 1.25rem 1.25rem 0 0;
-    padding: 1.15rem 1rem calc(1.15rem + env(safe-area-inset-bottom));
-    max-height: 92dvh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-    gap: 1rem;
-  }
-  /* Drag-handle bar, same as every other sheet (rendered by <SheetHandle/>) */
-  .empty-picker-sheet--open > .dropzone-container::before {
-    content: none;
-  }
-  /* Exit: sheet slides back down, dim fades out */
-  .empty-picker-sheet--closing {
-    animation: overlayOut 0.2s ease forwards;
-    pointer-events: none;
-  }
-  .empty-picker-sheet--closing > .dropzone-container {
-    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
-    pointer-events: none;
-  }
 }
 
 .dropzone-tabs {
@@ -4512,9 +4367,8 @@ div[id] {
     border-radius: 50%;
   }
 
-  /* Drawer header close button / X button visibility on mobile - larger X */
-  .meet-drawer .meet-drawer__header .meet-drawer__close-btn,
-  .meet-drawer .part-header__close {
+  /* Participants header X on phones (drawer is a BottomSheet now) - larger X */
+  .sheet .part-header__close {
     display: flex !important;
     align-items: center;
     justify-content: center;
@@ -4527,20 +4381,13 @@ div[id] {
     border-radius: 50%;
     font-size: 1.25rem;
   }
-  .meet-drawer .meet-drawer__header .meet-drawer__close-btn svg,
-  .meet-drawer .part-header__close svg {
+  .sheet .part-header__close svg {
     width: 22px !important;
     height: 22px !important;
   }
-  .meet-drawer .meet-drawer__header .meet-drawer__close-btn:hover,
-  .meet-drawer .part-header__close:hover {
+  .sheet .part-header__close:hover {
     color: #fff;
     background: rgba(255, 255, 255, 0.22);
-  }
-  /* Beat the desktop `.meet-drawer--wide` !important rules that leave a 32px gap */
-  .meet-drawer--wide {
-    width: 100% !important;
-    max-width: 100% !important;
   }
 
   /* Home page: single column, tighter */
@@ -5026,7 +4873,7 @@ div[id] {
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   overflow: hidden;
 }
 
@@ -5037,9 +4884,9 @@ div[id] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 120px;
+  max-width: 160px;
 }
 
 .part-name-tag {
@@ -5335,26 +5182,9 @@ div[id] {
   pointer-events: none;
 }
 
-/* Pop-up de cambio de nombre: no se limita al panel lateral. */
-.part-rename-dialog {
-  position: fixed;
-  inset: 0;
-  z-index: 500;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: rgba(2, 6, 23, 0.68);
-  backdrop-filter: blur(6px);
-}
-
+/* Rename form content (the BottomSheet panel owns padding/background). */
 .part-rename-modal {
-  width: min(100%, 360px);
   box-sizing: border-box;
-  padding: 1.25rem;
-  background: rgba(13, 19, 33, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.42);
 }
 
 .part-rename-modal h3,
@@ -5531,6 +5361,44 @@ div[id] {
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* Join-request actions: own row below the name so buttons never clip.
+   Aceptar + Rechazar share the first row, Banear takes the full second row. */
+.part-request-item {
+  align-items: flex-start;
+}
+.part-request-item .part-avatar {
+  margin-top: 0.15rem;
+}
+.part-request-item .part-info {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.part-request-time {
+  display: block;
+  margin-top: 0.15rem;
+}
+.part-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.part-kicked-item:hover .part-request-actions,
+.part-request-actions:focus-within {
+  opacity: 1;
+}
+.part-request-actions .part-float-btn--text {
+  flex: 1 1 0;
+  justify-content: center;
+  min-height: 28px;
+}
+.part-request-actions .part-float-btn--ban {
+  flex: 1 1 100%;
 }
 
 /* Inline Rename Input */
@@ -5713,137 +5581,88 @@ div[id] {
 @media (max-width: 768px) {
   .part-layout {
     flex-direction: column;
+    padding: 0;
   }
-  .part-detail-card {
-    width: 100%;
-    min-width: unset;
-    border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  .part-main-panel {
+    min-width: 100%;
+    border-right: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .part-header {
+    padding: 0.85rem 1rem;
+  }
+  .part-tabs {
+    padding: 0 1rem 0.6rem;
+    gap: 0.35rem;
+  }
+  .part-tab {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.72rem;
+  }
+  .part-search-wrap {
+    margin: 0 1rem 0.6rem;
+  }
+  .part-list {
+    padding: 0 0.75rem;
+    gap: 0.2rem;
+  }
+  .part-item {
+    padding: 0.55rem 0.6rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 0.25rem;
+  }
+  .part-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 0.8rem;
+  }
+  .part-name {
+    font-size: 0.9rem;
+  }
+  .part-actions {
+    gap: 0.3rem;
+  }
+  .part-media-btn {
+    min-width: 34px;
+    height: 30px;
+    padding: 0 0.65rem;
+    font-size: 0.72rem;
+  }
+  .part-more-btn {
+    width: 30px;
+    height: 30px;
+  }
+  .part-kicked-item {
+    padding: 0.6rem 0.75rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 0.3rem;
+  }
+  .part-request-actions {
+    opacity: 1;
+    margin-top: 0.6rem;
+    gap: 0.4rem;
+  }
+  .part-request-actions .part-float-btn--text {
+    min-height: 36px;
+    font-size: 0.78rem;
+    border-radius: 9999px;
   }
   .part-footer-controls {
     grid-template-columns: 1fr;
-  }
-  .part-tab span {
-    font-size: 0.7rem;
-  }
-  .part-float-actions {
-    opacity: 1;
-  }
-
-  /* Header + tabs: same insets as the chat header (1.25rem), tabs scroll */
-  .part-header {
-    padding: 1rem 1.25rem;
-  }
-  .part-header__title h2 {
-    font-size: 1rem;
-  }
-  .part-tabs {
-    padding: 0 1.25rem 0.6rem;
-    gap: 0.35rem;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .part-tabs::-webkit-scrollbar {
-    display: none;
-  }
-  .part-tab {
-    flex: 0 0 auto;
-    padding: 0.45rem 0.65rem;
-  }
-
-  /* Search: same inset as the header */
-  .part-search-wrap {
-    margin: 0 1.25rem 0.6rem;
-  }
-
-  /* List rows: compact so name + 3 buttons never overflow.
-     0.75rem + 0.5rem item padding = 1.25rem, matching the header inset */
-  .part-list {
-    padding: 0 0.75rem;
-    gap: 0.15rem;
-  }
-  .part-item {
-    gap: 0.55rem;
-    padding: 0.5rem;
-  }
-  .part-avatar {
-    width: 32px;
-    height: 32px;
-    font-size: 0.74rem;
-  }
-  .part-name {
-    font-size: 0.84rem;
-  }
-  .part-name-row {
-    gap: 0.3rem;
-  }
-  .part-actions {
-    gap: 0.25rem;
-    flex-shrink: 0;
-  }
-  .part-media-btn {
-    width: auto;
-    min-width: 30px;
-    height: 26px;
-    padding: 0 0.55rem;
-    font-size: 0.68rem;
-  }
-  .part-more-btn {
-    width: 26px;
-    height: 26px;
-  }
-
-  /* Kicked / requests rows equally compact */
-  .part-kicked-item {
-    padding: 0.5rem;
-    gap: 0.55rem;
-  }
-
-  /* Handle bar rendered by <SheetHandle/> on the participant detail card */
-  .part-detail-card::before {
-    content: none;
+    padding: 0.75rem 1rem calc(1rem + env(safe-area-inset-bottom));
+    background: rgba(13, 19, 33, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
   .part-detail-card {
-    position: fixed;
-    top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: 85dvh;
-    max-height: 85dvh;
-    border-radius: 20px 20px 0 0;
-    width: 100%;
-    max-width: 100%;
-    z-index: 150;
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    animation: slideUpBottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    padding: 1.25rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
   }
-  .part-detail-card--closing {
-    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
-  }
-  .part-detail-header .part-detail-close {
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.12);
-    border: none;
-    color: #ffffff;
-    cursor: pointer;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-  }
-  .part-detail-header .part-detail-close svg {
-    width: 22px !important;
-    height: 22px !important;
-  }
-
-  /* Footer controls: single column, compact */
-  .part-footer-controls {
-    padding: 0.6rem 0.85rem;
-    gap: 0.5rem;
+  .part-detail-header {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 }
 
@@ -6003,126 +5822,12 @@ div[id] {
   line-height: 1.35;
 }
 
-/* ==========================================================================
-   Mobile fixes (≤768px): unified phone bottom-sheet system
-   Exactly the same behavior as the file/link picker sheet:
-   - dimmed overlay that closes the sheet when tapped outside
-   - sheet docks at the bottom, slides up on open / down on close
-   - drag handle (SheetHandle) closes it on tap
-   - swipe-down gesture closes it (useSwipeDown hook)
-   ========================================================================== */
-@media (max-width: 768px) {
-  /* Overlay: dim background + tap outside to close */
-  .modal-overlay {
-    padding: 0;
-    align-items: flex-end;
-    justify-content: center;
-    animation: sheetFadeIn 0.2s ease;
-  }
+/* ── Phone sheets are fully owned by BottomSheet (see the block at the
+   end of this file). The popovers (⋯ menu, emoji, share) keep their own
+   lightweight useSwipeDown behavior. ── */
 
-  /* Modals: crear sala, unirse, línea de tiempo, configuración, salida, cambiar video */
-  .modal-card,
-  .modal-card--change {
-    width: 100%;
-    max-width: none;
-    max-height: 90vh;
-    max-height: 92dvh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    border-radius: 1.25rem 1.25rem 0 0;
-    border-bottom: none;
-    padding: 0.35rem 1rem calc(1.15rem + env(safe-area-inset-bottom));
-    margin: 0;
-    z-index: 210;
-    animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  /* Drawers: chat & participantes — same sheet system */
-  .meet-drawer {
-    position: fixed;
-    top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    max-width: none;
-    height: 85dvh;
-    max-height: 92dvh;
-    border-radius: 1.25rem 1.25rem 0 0;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-bottom: none;
-    overflow: hidden;
-    padding-top: 0.1rem;
-    z-index: 210;
-    animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .meet-drawer--wide {
-    width: 100% !important;
-    max-width: none !important;
-  }
-
-  /* Dim area above the drawer → tap to close (like the modal overlay) */
-  .sheet-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.78);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    z-index: 205;
-    animation: sheetFadeIn 0.2s ease;
-  }
-
-  /* Exit: sheet slides back down, dim fades out (!important beats the inline
-     `animation: none` that useSwipeDown applies while dragging) */
-  .modal-overlay--closing {
-    animation: overlayOut 0.2s ease forwards;
-  }
-  .modal-card--closing,
-  .modal-card--change.modal-card--closing,
-  .meet-drawer--closing {
-    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
-    pointer-events: none;
-  }
-  .sheet-backdrop--closing {
-    animation: overlayOut 0.2s ease forwards;
-    pointer-events: none;
-  }
-
-  .modal-card__header .meet-drawer__close-btn {
-    display: none;
-  }
-  .modal-card .dropzone-container {
-    gap: 1rem;
-  }
-
-  /* Rename popup: same bottom-sheet system */
-  .part-rename-dialog {
-    align-items: flex-end;
-    justify-items: stretch;
-    padding: 0;
-    background: rgba(0, 0, 0, 0.78);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    animation: sheetFadeIn 0.2s ease;
-  }
-  .part-rename-modal {
-    width: 100%;
-    max-width: none;
-    border-radius: 1.25rem 1.25rem 0 0;
-    border-bottom: none;
-    padding: 0.35rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
-    animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-}
-
-/* ── Reusable drag handle (SheetHandle) — hidden on desktop, active on phones ── */
+/* ── BottomSheet drag handle — hidden on desktop, active on phones ── */
 .sheet-handle {
-  display: none;
-}
-/* Backdrop behind phone drawers — only rendered as a dim overlay on mobile */
-.sheet-backdrop {
   display: none;
 }
 @media (max-width: 768px) {
@@ -6166,15 +5871,7 @@ div[id] {
   }
 }
 
-/* ── Exit animations (usePresence, 250 ms) ── */
-.modal-overlay--closing {
-  animation: overlayOut 0.2s ease forwards;
-  pointer-events: none;
-}
-.modal-card--closing {
-  animation: modalCardOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
-  pointer-events: none;
-}
+/* ── Exit keyframes (reused by BottomSheet `.sheet--closing`) ── */
 @keyframes overlayOut {
   from {
     opacity: 1;
@@ -6194,16 +5891,6 @@ div[id] {
   }
 }
 
-@media (max-width: 768px) {
-  /* Bottom sheet slides back down on close (fallback for stacked closings) */
-  .modal-overlay--closing {
-    animation: overlayOut 0.2s ease forwards;
-  }
-  .modal-card--closing,
-  .modal-card--change.modal-card--closing {
-    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
-  }
-}
 @keyframes sheetSlideDown {
   from {
     opacity: 1;
@@ -6290,6 +5977,8 @@ div[id] {
 }
 
 .waiting-card {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   max-width: 420px;
   display: flex;
@@ -6303,24 +5992,57 @@ div[id] {
   text-align: center;
 }
 
+/* Accent gradient bar on top of the card */
+.waiting-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #10b981);
+}
+
 .waiting-card__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.75rem;
+  width: 100%;
   text-align: left;
+}
+
+.waiting-card__head > div {
+  flex: 1;
+  min-width: 0;
 }
 
 .waiting-card__badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: 14px;
   background: rgba(99, 102, 241, 0.16);
   border: 1px solid rgba(99, 102, 241, 0.45);
   color: #a5b4fc;
+}
+
+.waiting-card__badge svg {
+  animation: waitingPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes waitingPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
 }
 
 .waiting-card__head h2 {
@@ -6426,13 +6148,21 @@ div[id] {
 .waiting-status {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  color: #9ca3af;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #c7d2fe;
   font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .waiting-status svg {
   color: #a5b4fc;
+  flex-shrink: 0;
 }
 
 .waiting-cancel {
@@ -6454,6 +6184,51 @@ div[id] {
   background: rgba(239, 68, 68, 0.22);
   border-color: rgba(239, 68, 68, 0.7);
   color: #fff;
+}
+
+/* Waiting lobby on phones: top-anchored scrollable card, full-width controls */
+@media (max-width: 768px) {
+  .waiting-screen {
+    padding: 0.75rem;
+    align-items: flex-start;
+  }
+  .waiting-card {
+    max-width: 100%;
+    margin: auto;
+    gap: 0.85rem;
+    padding: 1.25rem 1rem calc(1.1rem + env(safe-area-inset-bottom));
+    border-radius: 18px;
+  }
+  .waiting-card__head h2 {
+    font-size: 1rem;
+  }
+  .waiting-card__head p {
+    font-size: 0.78rem;
+  }
+  .waiting-preview {
+    aspect-ratio: 4 / 3;
+    max-height: 38dvh;
+  }
+  .waiting-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .waiting-controls .meet-circle-btn--text {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 0.5rem;
+    font-size: 0.76rem;
+    justify-content: center;
+  }
+  .waiting-status {
+    font-size: 0.8rem;
+  }
+  .waiting-cancel {
+    width: 100%;
+    min-height: 46px;
+    justify-content: center;
+  }
 }
 
 /* ==========================================================================
@@ -6555,20 +6330,24 @@ div[id] {
 }
 
 .notif-toast--success {
-  border-left: 3px solid #34d399;
+  border-left: none;
+  border-bottom: 3px solid #34d399;
 }
 .notif-toast--error {
-  border-left: 3px solid #f87171;
+  border-left: none;
+  border-bottom: 3px solid #f87171;
   background: rgba(69, 18, 26, 0.97);
 }
 .notif-toast--error .notif-toast__title {
   color: #fecaca;
 }
 .notif-toast--warning {
-  border-left: 3px solid #fbbf24;
+  border-left: none;
+  border-bottom: 3px solid #fbbf24;
 }
 .notif-toast--info {
-  border-left: 3px solid #60a5fa;
+  border-left: none;
+  border-bottom: 3px solid #60a5fa;
 }
 
 .notif-toast__close {
@@ -6739,34 +6518,182 @@ div[id] {
   }
 }
 
-/* La configuración usa el MISMO sistema de hoja móvil que el resto de popups:
+/* La configuración usa el MISMO sistema BottomSheet que el resto de popups:
    se ancla abajo, tiene barra arrastrable y se cierra con gesto / clic fuera. */
-@media (max-width: 768px) {
-  .modal-overlay--settings {
-    align-items: flex-end;
-    padding: 0;
-    overflow: hidden;
+
+/* ==========================================================================
+   Block: BottomSheet (global sheet system)
+   Phones: bottom sheet docked at the bottom, drag-to-dismiss.
+   Desktop: centered modal — except `inline` sheets, which render in place
+   with their own `desktopClassName` (drawer / side-panel UIs).
+   Entry/exit reuse the sheet/modal keyframes defined above.
+   ========================================================================== */
+:root {
+  --sheet-bg: rgba(13, 19, 33, 0.98);
+  --sheet-radius: 1.25rem;
+  --sheet-backdrop: rgba(0, 0, 0, 0.78);
+  --sheet-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--sheet-backdrop);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: sheetFadeIn 0.2s ease;
+}
+
+.sheet__backdrop--closing {
+  animation: overlayOut 0.2s ease forwards;
+  pointer-events: none;
+}
+
+.sheet__dock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.sheet {
+  pointer-events: auto;
+  width: 100%;
+  max-width: none;
+  max-height: 92dvh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--sheet-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: none;
+  border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+  padding: 0.35rem 1rem calc(1.15rem + env(safe-area-inset-bottom));
+  animation: sheetSlideUp 0.28s var(--sheet-ease);
+  will-change: transform;
+}
+
+.sheet:focus {
+  outline: none;
+}
+
+.sheet--closing {
+  animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+  pointer-events: none;
+}
+
+.sheet--full {
+  border-radius: 0;
+}
+
+/* Grip areas: drag handle + optional title header (touch-action none) */
+.sheet__grip {
+  touch-action: none;
+}
+
+.sheet__header {
+  cursor: grab;
+  padding: 0.15rem 0.25rem 0.6rem;
+  flex-shrink: 0;
+}
+
+.sheet__header:active {
+  cursor: grabbing;
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.sheet__footer {
+  flex-shrink: 0;
+  padding-top: 0.85rem;
+}
+
+/* Content-hook sizing survives on the generic panel (phone: full-bleed) */
+.sheet.timeline-modal,
+.sheet.modal-card--change,
+.sheet.modal-card--settings {
+  width: 100%;
+  max-width: none;
+}
+
+.sheet.modal-card--settings {
+  max-height: 92dvh;
+}
+
+/* Desktop: centered modal */
+@media (min-width: 769px) {
+  .sheet__dock {
+    align-items: center;
+    padding: 1rem;
   }
 
-  .modal-overlay--settings .modal-card--settings {
+  .sheet {
     width: 100%;
-    max-width: none;
-    max-height: 92dvh;
-    margin: 0;
-    border-radius: 1.25rem 1.25rem 0 0;
-    border-bottom: none;
-    padding: 0.35rem 1rem calc(1.15rem + env(safe-area-inset-bottom));
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 480px;
+    max-height: 90vh;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-xl);
+    padding: 1.75rem;
+    animation: modalCardIn 0.26s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .modal-overlay--settings .modal-card--settings::before {
-    content: none;
+  .sheet--closing {
+    animation: modalCardOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards !important;
   }
 
-  .modal-overlay--settings .modal-card--settings.modal-card--closing {
-    animation: sheetSlideDown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+  .sheet .sheet-handle {
+    display: none;
+  }
+
+  .sheet--sm {
+    max-width: 360px;
+  }
+
+  .sheet.timeline-modal {
+    max-width: 560px;
+    max-height: 85vh;
+  }
+
+  .sheet.modal-card--change {
+    max-width: 540px;
+  }
+
+  .sheet.modal-card--settings {
+    width: min(1500px, calc(100vw - 40px));
+    max-height: 95vh;
+  }
+}
+
+/* Reduced motion: instant transitions, drag still works (JS-driven) */
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet__backdrop {
+    animation-duration: 0.01ms !important;
   }
 }

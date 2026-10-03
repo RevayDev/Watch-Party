@@ -8,7 +8,7 @@ import { CameraGrid } from '../components/CameraGrid';
 import { HostExitModal } from '../components/HostExitModal';
 import { RoomSettingsModal } from '../components/RoomSettingsModal';
 import { WaitingApproval } from '../components/WaitingApproval';
-import { SheetHandle } from '../components/SheetHandle';
+import { BottomSheet } from '../components/BottomSheet';
 import { IRoomData, ChatMessage, ReactionItem } from '../types/room';
 import { ApiService } from '../services/api';
 import { getSocket, disconnectSocket } from '../services/socket';
@@ -144,13 +144,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
   const moreMenuRef = useRef<HTMLDivElement>(null);
   // Room settings gear modal (name, info, save-mode, timer)
   const [showRoomSettings, setShowRoomSettings] = useState(false);
-  // Swipe-down-to-dismiss for the phone drawer (chat / participants)
-  const drawerSheetRef = useSwipeDown<HTMLElement>(
-    () => setActiveSideTab(null),
-    !!activeSideTab
-  );
-  // Exit animations (drawer, ⋯ menu, emoji popup)
-  const drawerPresence = usePresence(!!activeSideTab);
+  // Exit animations (⋯ menu, emoji popup — the drawer is a BottomSheet now)
   const morePresence = usePresence(showMoreMenu, 160);
   const emojiPresence = usePresence(showEmojiPicker, 160);
   // Same swipe-down-to-close for the phone popovers (⋯ menu, emoji reactions)
@@ -966,18 +960,14 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         )}
 
         {/* ── Slide-over Right Drawer for Chat or Participants ── */}
-        {drawerPresence.shown && (
-          <>
-            {/* Dim backdrop → tap outside closes the sheet (phones/tablets) */}
-            <div
-              className={`sheet-backdrop ${drawerPresence.closing ? 'sheet-backdrop--closing' : ''}`}
-              onClick={() => setActiveSideTab(null)}
-            />
-            <aside
-              className={`meet-drawer ${sideTabView === 'participants' ? 'meet-drawer--wide' : ''} ${drawerPresence.closing ? 'meet-drawer--closing' : ''}`}
-              ref={drawerSheetRef}
-            >
-              <SheetHandle onClose={() => setActiveSideTab(null)} />
+        <BottomSheet
+          open={!!activeSideTab}
+          onClose={() => setActiveSideTab(null)}
+          variant="inline"
+          desktopClassName={`meet-drawer ${sideTabView === 'participants' ? 'meet-drawer--wide' : ''}`}
+          height={85}
+          label={sideTabView === 'participants' ? 'Participantes' : 'Chat'}
+        >
               <div className="meet-drawer__body">
               {sideTabView === 'chat' && (
                 <Chat messages={messages} onSendMessage={handleSendMessage} onClose={() => setActiveSideTab(null)} />
@@ -1047,13 +1037,10 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
                   onUpdateSettings={(settings) => {
                     socket.emit('update-room-settings', { roomId, settings });
                   }}
-                  onClose={() => setActiveSideTab(null)}
                 />
               )}
               </div>
-            </aside>
-          </>
-        )}
+        </BottomSheet>
       </main>
 
       {/* ── Bottom Bar (text buttons) ── */}

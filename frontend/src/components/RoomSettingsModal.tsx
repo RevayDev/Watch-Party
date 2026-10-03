@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { usePresence } from "../hooks/usePresence";
-import { useSwipeDown } from "../hooks/useSwipeDown";
 import { notify } from "../services/notifications";
-import { SheetHandle } from "./SheetHandle";
+import { BottomSheet } from "./BottomSheet";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -35,9 +33,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   onSetTimer,
   onToggleRequireApproval,
 }) => {
-  const { shown, closing } = usePresence(isOpen);
-  // Swipe-down-to-dismiss on phones (same system as the file/link picker sheet)
-  const sheetRef = useSwipeDown<HTMLDivElement>(onClose, isOpen);
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
   const [choice, setChoice] = useState<number | null>(timerMinutes);
@@ -51,8 +46,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  if (!shown) return null;
 
   const handleSave = () => {
     onSaveDetails(name.trim(), description.trim());
@@ -77,16 +70,12 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
     : null;
 
   return (
-    <div
-      className={`modal-overlay modal-overlay--settings ${closing ? "modal-overlay--closing" : ""}`}
-      onClick={onClose}
+    <BottomSheet
+      open={isOpen}
+      onClose={onClose}
+      label="Configuración de la sala"
+      className="modal-card--settings"
     >
-      <div
-        className={`modal-card modal-card--settings ${closing ? "modal-card--closing" : ""}`}
-        ref={sheetRef}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <SheetHandle onClose={onClose} />
         <div className="modal-card__header">
           <h3 className="host-exit-modal__title">Configuración de la sala</h3>
         </div>
@@ -240,7 +229,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             Guardar
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 };

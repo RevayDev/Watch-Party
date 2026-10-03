@@ -1,8 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react';
-import { usePresence } from '../hooks/usePresence';
-import { useSwipeDown } from '../hooks/useSwipeDown';
-import { SheetHandle } from '../components/SheetHandle';
+import { BottomSheet } from '../components/BottomSheet';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -69,11 +67,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     resolve: (value: boolean) => void;
   } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const confirmPresence = usePresence(confirmOpen, 200);
-  const confirmSheetRef = useSwipeDown<HTMLDivElement>(
-    () => resolveConfirm(false),
-    confirmOpen,
-  );
   const timersRef = useRef<Map<string, ToastTimers>>(new Map());
 
   const removeToast = useCallback((id: string) => {
@@ -180,6 +173,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 dismissToast(toast.id);
               }}
               title="Cerrar"
+              style={{ display: 'none' }}
             >
               <X size={14} />
             </button>
@@ -187,20 +181,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         ))}
       </div>
 
-      {/* ── Confirmation modal (with exit animation) ── */}
-      {confirmPresence.shown && confirmState && (
-        <div
-          className={`modal-overlay ${confirmPresence.closing ? 'modal-overlay--closing' : ''}`}
-          onClick={() => resolveConfirm(false)}
+      {/* ── Confirmation modal ── */}
+      {confirmState && (
+        <BottomSheet
+          open={confirmOpen}
+          onClose={() => resolveConfirm(false)}
+          role="alertdialog"
+          label={confirmState.options.title}
+          className="notif-confirm"
         >
-          <div
-            className={`modal-card notif-confirm ${confirmPresence.closing ? 'modal-card--closing' : ''}`}
-            ref={confirmSheetRef}
-            onClick={(e) => e.stopPropagation()}
-            role="alertdialog"
-            aria-modal="true"
-          >
-            <SheetHandle onClose={() => resolveConfirm(false)} />
             <h3 className="notif-confirm__title">{confirmState.options.title}</h3>
             <p className="notif-confirm__message">{confirmState.options.message}</p>
             <div className="notif-confirm__actions">
@@ -224,8 +213,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 {confirmState.options.confirmLabel || 'Aceptar'}
               </button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </NotificationsContext.Provider>
   );

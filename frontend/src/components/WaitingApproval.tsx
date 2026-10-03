@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Loader2, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Loader2, Mic, MicOff, Video, VideoOff, Clock } from 'lucide-react';
 
 interface WaitingApprovalProps {
   roomId: string;
@@ -157,6 +157,9 @@ export const WaitingApproval: React.FC<WaitingApprovalProps> = ({
     <div className="waiting-screen">
       <div className="waiting-card">
         <div className="waiting-card__head">
+          <span className="waiting-card__badge" aria-hidden="true">
+            <Clock size={18} />
+          </span>
           <div>
             <h2>Esperando aprobación</h2>
             <p>
