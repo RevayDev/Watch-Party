@@ -12,7 +12,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { IRoomData, ChatMessage, ReactionItem } from '../types/room';
 import { ApiService } from '../services/api';
 import { getSocket, disconnectSocket } from '../services/socket';
-import { removeRecentRoom } from '../services/recentRooms';
+import { removeRecentRoom, updateRecentRoomMeta } from '../services/recentRooms';
 import { notify } from '../services/notifications';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useSwipeDown } from '../hooks/useSwipeDown';
@@ -110,6 +110,18 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
   const applyMediaOnJoinRef = useRef(false);
 
   const [roomData, setRoomData] = useState<IRoomData | null>(null);
+  const settingsName = roomData?.settings?.name;
+  const settingsDescription = roomData?.settings?.description;
+
+  // Guarda nombre/descripción en "salas recientes" cuando se conocen (no cambia funcionalidad)
+  useEffect(() => {
+    if (settingsName?.trim() || settingsDescription?.trim()) {
+      updateRecentRoomMeta(roomId, {
+        roomName: settingsName,
+        roomDescription: settingsDescription,
+      });
+    }
+  }, [roomId, settingsName, settingsDescription]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // True once the server confirmed entry with 'room-state' (blocks UI flash)
@@ -755,13 +767,6 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           }
         : null
     );
-    notify(
-      'info',
-      minutes
-        ? `La sala se cerrará automáticamente en ${minutes} minuto${minutes > 1 ? 's' : ''}.`
-        : 'Temporizador de sala eliminado.',
-      'Configuración de sala'
-    );
   };
 
   const handleLeaveClick = () => {
@@ -881,6 +886,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       <WaitingApproval
         roomId={roomId}
         userName={myName}
+        roomName={roomData?.settings?.name}
+        roomDescription={roomData?.settings?.description}
         initialMicOn={pendingMediaPrefRef.current.micOn}
         initialCamOn={pendingMediaPrefRef.current.camOn}
         onPrefChange={(micOn, camOn) => {
@@ -921,6 +928,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         roomDescription={roomData.settings?.description}
         timerEndsAt={roomData.settings?.timerEndsAt}
         onOpenSettings={() => setShowRoomSettings(true)}
+        onOpenParticipants={() => setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
+        participantsActive={sideTabView === 'participants'}
         onLeaveClick={handleLeaveClick}
         className={!isBarVisible ? 'header--hidden' : ''}
       />
@@ -937,6 +946,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             onSetVideoUrl={handleSetVideoUrl}
             uploadProgress={uploadProgress}
             onSyncAction={handleSyncAction}
+            onPlaybackHeartbeat={(currentTime, isPlaying) => {
+              socket.emit('playback-heartbeat', { roomId, currentTime, isPlaying });
+            }}
             remoteAction={remoteAction}
             reactions={reactions}
             isMicOn={isMicOn}
@@ -970,7 +982,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         >
               <div className="meet-drawer__body">
               {sideTabView === 'chat' && (
-                <Chat messages={messages} onSendMessage={handleSendMessage} onClose={() => setActiveSideTab(null)} />
+                <Chat messages={messages} onSendMessage={handleSendMessage} currentUserName={myName} />
               )}
               {sideTabView === 'participants' && (
                 <Participants
@@ -1205,13 +1217,6 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         onToggleRequireApproval={() => {
           const next = !(roomData.settings?.requireApproval === true);
           socket.emit('update-room-settings', { roomId, settings: { ...roomData.settings, requireApproval: next } });
-          notify(
-            'success',
-            next
-              ? 'Los invitados deberán ser aprobados por ti para entrar.'
-              : 'Ahora cualquiera con el código puede entrar directamente.',
-            'Aprobar entrada'
-          );
         }}
       />
     </div>

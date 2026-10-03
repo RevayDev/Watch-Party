@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Tv, Hash, Link as LinkIcon, Share2, Users, Settings } from 'lucide-react';
+import { Video, Hash, Link as LinkIcon, Share2, Users, Settings } from 'lucide-react';
 import { usePresence } from '../hooks/usePresence';
 import { useSwipeDown } from '../hooks/useSwipeDown';
 
@@ -12,6 +12,9 @@ interface RoomHeaderProps {
   timerEndsAt?: string | null;
   onOpenSettings?: () => void;
   onLeaveClick?: () => void;
+  /** Abre/cierra el panel de participantes (igual que el botón de abajo) */
+  onOpenParticipants?: () => void;
+  participantsActive?: boolean;
   className?: string;
 }
 
@@ -33,6 +36,8 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   roomDescription,
   timerEndsAt,
   onOpenSettings,
+  onOpenParticipants,
+  participantsActive = false,
   className = '',
 }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -86,32 +91,37 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomId);
     setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
+    setTimeout(() => setCopiedCode(false), 3000);
   };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(fullUrl);
     setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+    setTimeout(() => setCopiedLink(false), 3000);
   };
 
   const hasRoomName = Boolean(roomName && roomName.trim());
 
   return (
     <header className={`header ${className} ${hasRoomName ? 'header--has-name' : ''}`}>
-      {/* Brand */}
+      {/* Brand (mismo logo del Home) */}
       <div className="header__brand">
-        <Tv className="header__logo-icon" size={20} />
+        <span className="header__logo-icon" aria-hidden="true">
+          <Video size={17} />
+        </span>
         <span className="header__brand-text">Watch Party</span>
       </div>
 
-      {/* Room name (set from ⚙ Configuración de sala) */}
+      {/* Nombre / descripción de la sala (desde ⚙ Configuración de sala) */}
       {hasRoomName && (
         <div
           className="header__name-pill"
           title={roomDescription?.trim() ? `${roomName} — ${roomDescription}` : roomName}
         >
-          <span>{roomName}</span>
+          <span className="header__name-pill__name">{roomName}</span>
+          {roomDescription?.trim() && (
+            <span className="header__name-pill__desc">{roomDescription}</span>
+          )}
         </div>
       )}
 
@@ -169,12 +179,6 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                   {copiedLink ? 'Copiado' : 'Copiar'}
                 </button>
               </div>
-
-              {(copiedCode || copiedLink) && (
-                <span className="header-share-menu__toast">
-                  {copiedCode && !copiedLink ? '¡Código copiado!' : '¡Link copiado!'}
-                </span>
-              )}
             </div>
           )}
         </div>
@@ -189,11 +193,16 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           </div>
         )}
 
-        {/* Participant count */}
-        <div className="header__users-pill" title={`${participantCount} participantes`}>
+        {/* Participant count: abre el panel igual que el botón de abajo */}
+        <button
+          type="button"
+          onClick={onOpenParticipants}
+          className={`header__users-pill ${participantsActive ? 'header__users-pill--active' : ''}`}
+          title={`${participantCount} participantes — ver lista`}
+        >
           <Users size={14} />
           <span>{participantCount}</span>
-        </div>
+        </button>
 
         {/* ⚙ Room settings (host only): name, info, save-mode, approval, timer */}
         {isHost && onOpenSettings && (

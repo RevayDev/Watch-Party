@@ -4,6 +4,8 @@ import { Loader2, Mic, MicOff, Video, VideoOff, Clock } from 'lucide-react';
 interface WaitingApprovalProps {
   roomId: string;
   userName: string;
+  roomName?: string;
+  roomDescription?: string;
   /** Initial media preferences (kept from a previous attempt, if any) */
   initialMicOn?: boolean;
   initialCamOn?: boolean;
@@ -21,6 +23,8 @@ interface WaitingApprovalProps {
 export const WaitingApproval: React.FC<WaitingApprovalProps> = ({
   roomId,
   userName,
+  roomName,
+  roomDescription,
   initialMicOn = false,
   initialCamOn = true,
   onPrefChange,
@@ -156,6 +160,10 @@ export const WaitingApproval: React.FC<WaitingApprovalProps> = ({
   return (
     <div className="waiting-screen">
       <div className="waiting-card">
+        {/* Barra de carga: borde superior de la card, color dominante de la interfaz */}
+        <div className="waiting-card__topbar" aria-hidden="true">
+          <span />
+        </div>
         <div className="waiting-card__head">
           <span className="waiting-card__badge" aria-hidden="true">
             <Clock size={18} />
@@ -167,6 +175,13 @@ export const WaitingApproval: React.FC<WaitingApprovalProps> = ({
             </p>
           </div>
         </div>
+
+        {(roomName?.trim() || roomDescription?.trim()) && (
+          <div className="waiting-card__room">
+            {roomName?.trim() && <strong>{roomName.trim()}</strong>}
+            {roomDescription?.trim() && <span>{roomDescription.trim()}</span>}
+          </div>
+        )}
 
         {/* Camera preview */}
         <div className={`waiting-preview ${camOn ? '' : 'waiting-preview--off'}`}>
@@ -206,11 +221,6 @@ export const WaitingApproval: React.FC<WaitingApprovalProps> = ({
             {camOn ? <Video size={16} /> : <VideoOff size={16} />}
             <span>Cámara {camOn ? 'encendida' : 'apagada'}</span>
           </button>
-        </div>
-
-        <div className="waiting-status">
-          <Loader2 size={15} className="animate-spin" />
-          <span>Esperando a que te autoricen entrar…</span>
         </div>
 
         <button type="button" className="waiting-cancel" onClick={onCancel}>

@@ -707,9 +707,53 @@ export const Participants: React.FC<ParticipantsProps> = ({
               </form>
           </BottomSheet>
 
-          {/* Acciones: renombrar (antes el lápiz de la lista) + expulsar / banear */}
+          {/* Acciones: moderación arriba (TOP), renombrar separado abajo */}
           {(canModerate || isSameUser(detailView)) && (
             <div className="part-detail-actions">
+              {canModerateTarget(detailView) && (
+                <div className="part-detail-modrow">
+                  <button
+                    type="button"
+                    className="part-outline-action-btn part-outline-action-btn--danger"
+                    onClick={() => {
+                      confirmAction({
+                        title: "Expulsar usuario",
+                        message: `¿Expulsar a ${detailView.name}? Podrá volver a entrar a la sala.`,
+                        confirmLabel: "Expulsar",
+                        danger: true,
+                      }).then((ok) => {
+                        if (ok) {
+                          onKickUser?.(detailView.name, detailView.userId);
+                          setSelectedParticipant(null);
+                        }
+                      });
+                    }}
+                  >
+                    <UserX size={14} />
+                    <span>Expulsar</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="part-outline-action-btn part-outline-action-btn--danger"
+                    onClick={() => {
+                      confirmAction({
+                        title: "Banear usuario",
+                        message: `¿Banear a ${detailView.name}? No podrá volver a entrar a la sala.`,
+                        confirmLabel: "Banear",
+                        danger: true,
+                      }).then((ok) => {
+                        if (ok) {
+                          onBanUser?.(detailView.name, detailView.userId);
+                          setSelectedParticipant(null);
+                        }
+                      });
+                    }}
+                  >
+                    <Ban size={14} />
+                    <span>Banear</span>
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 className="part-outline-action-btn part-detail-rename-btn"
@@ -718,50 +762,6 @@ export const Participants: React.FC<ParticipantsProps> = ({
                 <Pencil size={14} />
                 <span>Renombrar</span>
               </button>
-              {canModerateTarget(detailView) && (
-                <button
-                  type="button"
-                  className="part-outline-action-btn part-outline-action-btn--danger"
-                  onClick={() => {
-                    confirmAction({
-                      title: "Expulsar usuario",
-                      message: `¿Expulsar a ${detailView.name}? Podrá volver a entrar a la sala.`,
-                      confirmLabel: "Expulsar",
-                      danger: true,
-                    }).then((ok) => {
-                      if (ok) {
-                        onKickUser?.(detailView.name, detailView.userId);
-                        setSelectedParticipant(null);
-                      }
-                    });
-                  }}
-                >
-                  <UserX size={14} />
-                  <span>Expulsar</span>
-                </button>
-              )}
-              {canModerateTarget(detailView) && (
-                <button
-                  type="button"
-                  className="part-outline-action-btn part-outline-action-btn--danger"
-                  onClick={() => {
-                    confirmAction({
-                      title: "Banear usuario",
-                      message: `¿Banear a ${detailView.name}? No podrá volver a entrar a la sala.`,
-                      confirmLabel: "Banear",
-                      danger: true,
-                    }).then((ok) => {
-                      if (ok) {
-                        onBanUser?.(detailView.name, detailView.userId);
-                        setSelectedParticipant(null);
-                      }
-                    });
-                  }}
-                >
-                  <Ban size={14} />
-                  <span>Banear</span>
-                </button>
-              )}
             </div>
           )}
 

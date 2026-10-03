@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Send } from 'lucide-react';
 import { ChatMessage } from '../types/room';
-import { X } from 'lucide-react';
 
 interface ChatProps {
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
-  onClose?: () => void;
+  currentUserName?: string;
 }
 
-export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, onClose }) => {
+export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, currentUserName }) => {
   const [input, setInput] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -28,17 +28,9 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, onClose }) 
 
   return (
     <div className="drawer-chat" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Mobile Close Button Header */}
-      <div className="meet-drawer__header part-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+      {/* Mobile header (sin botón X: el cierre es por backdrop, Esc o arrastre) */}
+      <div className="meet-drawer__header part-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
         <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Mensajes del chat</h3>
-        <button
-          className="part-icon-btn part-header__close"
-          onClick={onClose}
-          title="Cerrar"
-          style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.35rem 0.75rem', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <X size={16} />
-        </button>
       </div>
 
       {/* Message list */}
@@ -60,7 +52,16 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, onClose }) 
               );
             }
             return (
-              <div key={m.id} className="drawer-chat__msg">
+              <div
+                key={m.id}
+                className={`drawer-chat__msg ${
+                  currentUserName &&
+                  m.user.trim().toLowerCase() ===
+                    currentUserName.trim().toLowerCase()
+                    ? 'drawer-chat__msg--mine'
+                    : ''
+                }`}
+              >
                 <span className="drawer-chat__author">{m.user}</span>
                 <span className="drawer-chat__text">{m.text}</span>
                 <span className="drawer-chat__time">{m.timestamp}</span>
@@ -80,8 +81,14 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, onClose }) 
           onChange={(e) => setInput(e.target.value)}
           autoComplete="off"
         />
-        <button type="submit" className="drawer-chat__send" disabled={!input.trim()}>
-          Enviar
+        <button
+          type="submit"
+          className="drawer-chat__send"
+          disabled={!input.trim()}
+          title="Enviar mensaje"
+          aria-label="Enviar mensaje"
+        >
+          <Send size={16} />
         </button>
       </form>
     </div>

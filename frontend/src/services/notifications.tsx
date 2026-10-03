@@ -173,7 +173,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 dismissToast(toast.id);
               }}
               title="Cerrar"
-              style={{ display: 'none' }}
+              aria-label="Cerrar notificación"
             >
               <X size={14} />
             </button>

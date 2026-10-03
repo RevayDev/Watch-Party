@@ -547,6 +547,21 @@ export const Home: React.FC<HomeProps> = ({
                       {room.role === "host" ? "Anfitrión" : "Invitado"}
                     </span>
                   </div>
+                  {room.roomName?.trim() && (
+                    <span
+                      className="home-recent-item__room"
+                      title={
+                        room.roomDescription?.trim()
+                          ? `${room.roomName.trim()} — ${room.roomDescription.trim()}`
+                          : room.roomName.trim()
+                      }
+                    >
+                      {room.roomName.trim()}
+                      {room.roomDescription?.trim()
+                        ? ` — ${room.roomDescription.trim()}`
+                        : ""}
+                    </span>
+                  )}
                   <span className="home-recent-item__meta">
                     {room.hostName} · {formatRelativeTime(room.lastJoined)}
                   </span>
@@ -1097,7 +1112,7 @@ export const Home: React.FC<HomeProps> = ({
               <div
                 className="form-group"
                 style={{
-                  marginBottom: isUrlInvite && roomCode ? "1.25rem" : "0.85rem",
+                  marginBottom: isUrlInvite && roomCode ? "0.4rem" : "0.85rem",
                 }}
               >
                 <label

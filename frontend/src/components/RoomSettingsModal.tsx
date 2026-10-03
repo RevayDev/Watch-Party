@@ -106,7 +106,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <textarea
                 className="room-settings__textarea"
                 maxLength={240}
-                rows={5}
+                rows={3}
                 placeholder="Ej: Cada viernes compartimos videos. Respeto y buen ambiente."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}

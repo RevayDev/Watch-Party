@@ -15,6 +15,8 @@ interface VideoPlayerProps {
   remoteAction: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number; timestamp: number } | null;
   reactions: ReactionItem[];
   isMicOn?: boolean; // used for auto-duck
+  /** Periodic position report so the room can resolve a consensus time for newcomers */
+  onPlaybackHeartbeat?: (currentTime: number, isPlaying: boolean) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -28,6 +30,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   remoteAction,
   reactions,
   isMicOn = false,
+  onPlaybackHeartbeat,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +71,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!videoRef.current) return;
     videoRef.current.volume = isMicOn ? 0.30 : 1.0;
   }, [isMicOn]);
+
+  // Position heartbeat (5s): lets the server resolve the consensus time
+  // a (re)joining member should adopt. Skipped without video or on error.
+  useEffect(() => {
+    if (!video || playbackError || !onPlaybackHeartbeat) return;
+    const report = () => {
+      const vid = videoRef.current;
+      if (!vid || !Number.isFinite(vid.currentTime)) return;
+      onPlaybackHeartbeat(vid.currentTime, !vid.paused && !vid.ended);
+    };
+    report();
+    const iv = window.setInterval(report, 5000);
+    return () => window.clearInterval(iv);
+  }, [video, playbackError, onPlaybackHeartbeat, roomId]);
 
   // Auto-hide overlay top bar (filename + "Cambiar") after mouse idle — always, not just fullscreen
   const resetHideTimer = useCallback(() => {
@@ -596,6 +613,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           className="player-change-fab"
           title="Cambiar video: subir archivo o pegar enlace"
           type="button"
+          style={{ opacity: showControls ? 1 : 0, pointerEvents: showControls ? 'auto' : 'none' }}
         >
           <span>Cambiar</span>
         </button>
