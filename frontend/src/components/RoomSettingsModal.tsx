@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { notify } from "../services/notifications";
-import { BottomSheet } from "./BottomSheet";
+import { BottomSheet } from "../shared/components/BottomSheet";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;

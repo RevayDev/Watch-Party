@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { RoomModel } from '../models/room.model.js';
 import {
   IRoom,
   IVideoMetadata,
@@ -11,62 +10,15 @@ import {
   IJoinRequest,
   IKickedParticipant,
 } from '../types/room.types.js';
-import { isMongoConnected } from '../config/database.js';
+import { roomRepository } from '../adapters/room-repository.routing.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsDir = path.join(__dirname, '../../uploads');
-const dataDir = path.join(__dirname, '../../data');
-const roomsFile = path.join(dataDir, 'rooms.json');
 
-// In-memory store used when MongoDB is not running locally
-const inMemoryRooms = new Map<string, IRoom>();
-
-// ── Disk persistence for the in-memory mode (survives server restarts) ──
-function loadRoomsFromDisk(): void {
-  try {
-    if (!fs.existsSync(roomsFile)) return;
-    const raw = fs.readFileSync(roomsFile, 'utf-8');
-    const parsed = JSON.parse(raw) as IRoom[];
-    const reviveDate = (value: any): any => (value ? new Date(value) : value);
-    for (const room of parsed) {
-      if (!room?.roomId) continue;
-      room.createdAt = reviveDate(room.createdAt) || new Date();
-      room.updatedAt = reviveDate(room.updatedAt) || new Date();
-      room.hostName = room.hostName || '';
-      room.participants = (room.participants || []).map((p) => ({ ...p, joinedAt: reviveDate(p.joinedAt) || new Date() }));
-      room.kickedUsers = (room.kickedUsers || []).map((k) => ({ ...k, kickedAt: reviveDate(k.kickedAt) || new Date() }));
-      room.joinRequests = (room.joinRequests || []).map((j) => ({ ...j, requestedAt: reviveDate(j.requestedAt) || new Date() }));
-      inMemoryRooms.set(room.roomId.toUpperCase().trim(), room);
-    }
-    console.log(`💾 ${inMemoryRooms.size} sala(s) restaurada(s) desde data/rooms.json`);
-  } catch (err) {
-    console.warn('⚠️ No se pudieron cargar las salas guardadas en disco:', err);
-  }
+function cleanIdOf(roomId: string): string {
+  return roomId.toUpperCase().trim();
 }
-
-function persistRoomsToDisk(): void {
-  try {
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    const tmpFile = `${roomsFile}.tmp`;
-    fs.writeFileSync(tmpFile, JSON.stringify([...inMemoryRooms.values()], null, 2), 'utf-8');
-    fs.renameSync(tmpFile, roomsFile);
-  } catch (err) {
-    console.warn('⚠️ No se pudieron guardar las salas en disco:', err);
-  }
-}
-
-let persistTimer: ReturnType<typeof setTimeout> | null = null;
-function schedulePersist(): void {
-  if (isMongoConnected) return;
-  if (persistTimer) clearTimeout(persistTimer);
-  persistTimer = setTimeout(() => {
-    persistTimer = null;
-    persistRoomsToDisk();
-  }, 300);
-}
-
-loadRoomsFromDisk();
 
 export class RoomService {
   /**
@@ -106,12 +58,7 @@ export class RoomService {
     let exists = true;
     while (exists) {
       roomId = this.generateRoomCode(6);
-      if (isMongoConnected) {
-        const found = await RoomModel.findOne({ roomId });
-        if (!found) exists = false;
-      } else {
-        if (!inMemoryRooms.has(roomId)) exists = false;
-      }
+      exists = await roomRepository.exists(roomId);
     }
     return roomId;
   }
@@ -153,25 +100,15 @@ export class RoomService {
       updatedAt: now,
     };
 
-    if (isMongoConnected) {
-      const room = await RoomModel.create(roomData);
-      return { room, hostSecret };
-    } else {
-      inMemoryRooms.set(roomId, roomData);
-      schedulePersist();
-      return { room: roomData, hostSecret };
-    }
+    const room = await roomRepository.create(roomData);
+    return { room, hostSecret };
   }
 
   /**
    * Find room by its public ID.
    */
   public static async getRoomById(roomId: string): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
-    if (isMongoConnected) {
-      return RoomModel.findOne({ roomId: cleanId });
-    }
-    return inMemoryRooms.get(cleanId) || null;
+    return roomRepository.findById(cleanIdOf(roomId));
   }
 
   /**
@@ -184,7 +121,7 @@ export class RoomService {
     device = 'Web Browser',
     userId?: string
   ): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
+    const cleanId = cleanIdOf(roomId);
     const trimmedName = userName.trim();
 
     const findParticipantIndex = (participants: IParticipant[]): number => {
@@ -198,53 +135,29 @@ export class RoomService {
       );
     };
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
 
-      const existingIndex = findParticipantIndex(room.participants as IParticipant[]);
+    const existingIndex = findParticipantIndex(room.participants);
 
-      if (existingIndex === -1) {
-        const isHost = room.hostName.toLowerCase() === trimmedName.toLowerCase();
-        room.participants.push({
-          name: trimmedName,
-          userId,
-          isHost,
-          role: isHost ? 'host' : 'member',
-          joinedAt: new Date(),
-          device,
-        });
-        await room.save();
-      } else if (userId && !room.participants[existingIndex].userId) {
-        room.participants[existingIndex].userId = userId;
-        await room.save();
-      }
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-
-      const existingIndex = findParticipantIndex(room.participants);
-
-      if (existingIndex === -1) {
-        const isHost = room.hostName.toLowerCase() === trimmedName.toLowerCase();
-        room.participants.push({
-          name: trimmedName,
-          userId,
-          isHost,
-          role: isHost ? 'host' : 'member',
-          joinedAt: new Date(),
-          device,
-        });
-        room.updatedAt = new Date();
-        schedulePersist();
-      } else if (userId && !room.participants[existingIndex].userId) {
-        room.participants[existingIndex].userId = userId;
-        room.updatedAt = new Date();
-        schedulePersist();
-      }
-      return room;
+    if (existingIndex === -1) {
+      const isHost = room.hostName.toLowerCase() === trimmedName.toLowerCase();
+      room.participants.push({
+        name: trimmedName,
+        userId,
+        isHost,
+        role: isHost ? 'host' : 'member',
+        joinedAt: new Date(),
+        device,
+      });
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+    } else if (userId && !room.participants[existingIndex].userId) {
+      room.participants[existingIndex].userId = userId;
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
     }
+    return room;
   }
 
   /**
@@ -255,31 +168,18 @@ export class RoomService {
     targetName: string,
     newRole: 'cohost' | 'member'
   ): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
-      const target = room.participants.find(
-        (p) => p.name.toLowerCase() === targetName.trim().toLowerCase()
-      );
-      if (target && !target.isHost) {
-        target.role = newRole;
-        await room.save();
-      }
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-      const target = room.participants.find(
-        (p) => p.name.toLowerCase() === targetName.trim().toLowerCase()
-      );
-      if (target && !target.isHost) {
-        target.role = newRole;
-        room.updatedAt = new Date();
-        schedulePersist();
-      }
-      return room;
+    const cleanId = cleanIdOf(roomId);
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
+    const target = room.participants.find(
+      (p) => p.name.toLowerCase() === targetName.trim().toLowerCase()
+    );
+    if (target && !target.isHost) {
+      target.role = newRole;
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
     }
+    return room;
   }
 
   /**
@@ -290,7 +190,7 @@ export class RoomService {
     newName: string,
     target: { userId?: string; oldName?: string }
   ): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
+    const cleanId = cleanIdOf(roomId);
     const cleanNewName = newName.trim();
     if (!cleanNewName) return null;
 
@@ -300,28 +200,16 @@ export class RoomService {
       return false;
     };
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
-      const participant = room.participants.find(matches);
-      if (participant) {
-        participant.name = cleanNewName;
-        if (participant.isHost) room.hostName = cleanNewName;
-        await room.save();
-      }
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-      const participant = room.participants.find(matches);
-      if (participant) {
-        participant.name = cleanNewName;
-        if (participant.isHost) room.hostName = cleanNewName;
-        room.updatedAt = new Date();
-        schedulePersist();
-      }
-      return room;
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
+    const participant = room.participants.find(matches);
+    if (participant) {
+      participant.name = cleanNewName;
+      if (participant.isHost) room.hostName = cleanNewName;
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
     }
+    return room;
   }
 
   /**
@@ -333,7 +221,7 @@ export class RoomService {
     kickedBy: string,
     ban = false
   ): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
+    const cleanId = cleanIdOf(roomId);
 
     const matches = (p: IParticipant): boolean => {
       if (target.userId && p.userId) return p.userId === target.userId;
@@ -348,32 +236,18 @@ export class RoomService {
       banned: ban,
     });
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
-      const targetIndex = room.participants.findIndex(matches);
-      if (targetIndex !== -1 && !room.participants[targetIndex].isHost) {
-        const removed = room.participants[targetIndex];
-        room.participants = room.participants.filter((_, i) => i !== targetIndex);
-        if (!room.kickedUsers) room.kickedUsers = [];
-        room.kickedUsers.push(record(removed));
-        await room.save();
-      }
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-      const targetIndex = room.participants.findIndex(matches);
-      if (targetIndex !== -1 && !room.participants[targetIndex].isHost) {
-        const removed = room.participants[targetIndex];
-        room.participants = room.participants.filter((_, i) => i !== targetIndex);
-        if (!room.kickedUsers) room.kickedUsers = [];
-        room.kickedUsers.push(record(removed));
-        room.updatedAt = new Date();
-        schedulePersist();
-      }
-      return room;
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
+    const targetIndex = room.participants.findIndex(matches);
+    if (targetIndex !== -1 && !room.participants[targetIndex].isHost) {
+      const removed = room.participants[targetIndex];
+      room.participants = room.participants.filter((_, i) => i !== targetIndex);
+      if (!room.kickedUsers) room.kickedUsers = [];
+      room.kickedUsers.push(record(removed));
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
     }
+    return room;
   }
 
   /**
@@ -383,7 +257,7 @@ export class RoomService {
     roomId: string,
     target: { name?: string; userId?: string }
   ): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
+    const cleanId = cleanIdOf(roomId);
 
     const matches = (k: IKickedParticipant): boolean => {
       if (target.userId && k.userId) return k.userId === target.userId;
@@ -391,20 +265,12 @@ export class RoomService {
       return false;
     };
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
-      room.kickedUsers = (room.kickedUsers || []).filter((k) => !matches(k));
-      await room.save();
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-      room.kickedUsers = (room.kickedUsers || []).filter((k) => !matches(k));
-      room.updatedAt = new Date();
-      schedulePersist();
-      return room;
-    }
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
+    room.kickedUsers = (room.kickedUsers || []).filter((k) => !matches(k));
+    room.updatedAt = new Date();
+    await roomRepository.save(room);
+    return room;
   }
 
   // ── Join requests (manual approval / waiting list) ────────────────────────
@@ -416,7 +282,7 @@ export class RoomService {
     roomId: string,
     req: { socketId: string; userId?: string; name: string; device?: string }
   ): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
+    const cleanId = cleanIdOf(roomId);
 
     const build = (existing: IJoinRequest[]): IJoinRequest[] | null => {
       const dup = existing.some(
@@ -435,26 +301,15 @@ export class RoomService {
       ];
     };
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
-      const next = build(room.joinRequests || []);
-      if (next) {
-        room.joinRequests = next;
-        await room.save();
-      }
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-      const next = build(room.joinRequests || []);
-      if (next) {
-        room.joinRequests = next;
-        room.updatedAt = new Date();
-        schedulePersist();
-      }
-      return room;
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
+    const next = build(room.joinRequests || []);
+    if (next) {
+      room.joinRequests = next;
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
     }
+    return room;
   }
 
   /**
@@ -464,7 +319,7 @@ export class RoomService {
     roomId: string,
     target: { userId?: string; name?: string }
   ): Promise<{ room: IRoom | null; request: IJoinRequest | null }> {
-    const cleanId = roomId.toUpperCase().trim();
+    const cleanId = cleanIdOf(roomId);
 
     const matches = (j: IJoinRequest): boolean => {
       if (target.userId && j.userId) return j.userId === target.userId;
@@ -472,27 +327,16 @@ export class RoomService {
       return false;
     };
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return { room: null, request: null };
-      const request = (room.joinRequests || []).find(matches) || null;
-      if (!request) return { room, request: null };
-      room.joinRequests = (room.joinRequests || []).filter((j) => !matches(j));
-      await room.save();
-      await this.joinRoom(cleanId, request.name, request.device, request.userId);
-      const updated = await RoomModel.findOne({ roomId: cleanId });
-      return { room: updated, request };
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return { room: null, request: null };
-      const request = (room.joinRequests || []).find(matches) || null;
-      if (!request) return { room, request: null };
-      room.joinRequests = (room.joinRequests || []).filter((j) => !matches(j));
-      room.updatedAt = new Date();
-      await this.joinRoom(cleanId, request.name, request.device, request.userId);
-      schedulePersist();
-      return { room, request };
-    }
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return { room: null, request: null };
+    const request = (room.joinRequests || []).find(matches) || null;
+    if (!request) return { room, request: null };
+    room.joinRequests = (room.joinRequests || []).filter((j) => !matches(j));
+    room.updatedAt = new Date();
+    await roomRepository.save(room);
+    await this.joinRoom(cleanId, request.name, request.device, request.userId);
+    const updated = await roomRepository.findById(cleanId);
+    return { room: updated, request };
   }
 
   /**
@@ -503,7 +347,7 @@ export class RoomService {
     target: { userId?: string; name?: string },
     opts: { ban?: boolean; rejectedBy?: string } = {}
   ): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
+    const cleanId = cleanIdOf(roomId);
 
     const matches = (j: IJoinRequest): boolean => {
       if (target.userId && j.userId) return j.userId === target.userId;
@@ -511,44 +355,24 @@ export class RoomService {
       return false;
     };
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
-      const request = (room.joinRequests || []).find(matches);
-      if (!request) return room;
-      room.joinRequests = (room.joinRequests || []).filter((j) => !matches(j));
-      if (opts.ban) {
-        if (!room.kickedUsers) room.kickedUsers = [];
-        room.kickedUsers.push({
-          name: request.name,
-          userId: request.userId,
-          kickedAt: new Date(),
-          kickedBy: opts.rejectedBy || 'Afitrión',
-          banned: true,
-        });
-      }
-      await room.save();
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-      const request = (room.joinRequests || []).find(matches);
-      if (!request) return room;
-      room.joinRequests = (room.joinRequests || []).filter((j) => !matches(j));
-      if (opts.ban) {
-        if (!room.kickedUsers) room.kickedUsers = [];
-        room.kickedUsers.push({
-          name: request.name,
-          userId: request.userId,
-          kickedAt: new Date(),
-          kickedBy: opts.rejectedBy || 'Afitrión',
-          banned: true,
-        });
-      }
-      room.updatedAt = new Date();
-      schedulePersist();
-      return room;
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
+    const request = (room.joinRequests || []).find(matches);
+    if (!request) return room;
+    room.joinRequests = (room.joinRequests || []).filter((j) => !matches(j));
+    if (opts.ban) {
+      if (!room.kickedUsers) room.kickedUsers = [];
+      room.kickedUsers.push({
+        name: request.name,
+        userId: request.userId,
+        kickedAt: new Date(),
+        kickedBy: opts.rejectedBy || 'Afitrión',
+        banned: true,
+      });
     }
+    room.updatedAt = new Date();
+    await roomRepository.save(room);
+    return room;
   }
 
   /**
@@ -558,21 +382,13 @@ export class RoomService {
     roomId: string,
     settings: Partial<IRoom['settings']>
   ): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
-      room.settings = { ...room.settings, ...settings } as IRoom['settings'];
-      await room.save();
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-      room.settings = { ...(room.settings || {}), ...settings } as any;
-      room.updatedAt = new Date();
-      schedulePersist();
-      return room;
-    }
+    const cleanId = cleanIdOf(roomId);
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
+    room.settings = { ...(room.settings || {}), ...settings } as IRoom['settings'];
+    room.updatedAt = new Date();
+    await roomRepository.save(room);
+    return room;
   }
 
   /**
@@ -588,13 +404,8 @@ export class RoomService {
       return !Number.isNaN(parsed) && parsed <= now;
     };
 
-    if (isMongoConnected) {
-      const rooms = await RoomModel.find({
-        'settings.timerEndsAt': { $exists: true, $ne: null },
-      }).lean();
-      return (rooms as unknown as IRoom[]).filter(isExpired);
-    }
-    return [...inMemoryRooms.values()].filter(isExpired);
+    const candidates = await roomRepository.findTimerCandidates();
+    return candidates.filter(isExpired);
   }
 
   /**
@@ -605,53 +416,31 @@ export class RoomService {
     userName: string,
     userId?: string
   ): Promise<{ room: IRoom | null; newHostName: string | null }> {
-    const cleanId = roomId.toUpperCase().trim();
-    let room: IRoom | null = null;
-    let newHostName: string | null = null;
+    const cleanId = cleanIdOf(roomId);
 
     const matches = (p: IParticipant): boolean => {
       if (userId && p.userId) return p.userId === userId;
       return p.name.toLowerCase() === userName.toLowerCase();
     };
 
-    if (isMongoConnected) {
-      const dbRoom = await RoomModel.findOne({ roomId: cleanId });
-      if (!dbRoom) return { room: null, newHostName: null };
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return { room: null, newHostName: null };
 
-      const wasHost = dbRoom.participants.some((p) => matches(p) && p.isHost);
+    let newHostName: string | null = null;
+    const wasHost = room.participants.some((p) => matches(p) && p.isHost);
 
-      dbRoom.participants = dbRoom.participants.filter((p) => !matches(p));
+    room.participants = room.participants.filter((p) => !matches(p));
 
-      if (wasHost && dbRoom.participants.length > 0) {
-        dbRoom.participants[0].isHost = true;
-        dbRoom.participants[0].role = 'host';
-        dbRoom.hostName = dbRoom.participants[0].name;
-        newHostName = dbRoom.participants[0].name;
-        console.log(`👑 Rol de Affitrión transferido a: ${newHostName} en la sala ${cleanId}`);
-      }
-
-      await dbRoom.save();
-      room = dbRoom;
-    } else {
-      const memRoom = inMemoryRooms.get(cleanId);
-      if (!memRoom) return { room: null, newHostName: null };
-
-      const wasHost = memRoom.participants.some((p) => matches(p) && p.isHost);
-
-      memRoom.participants = memRoom.participants.filter((p) => !matches(p));
-
-      if (wasHost && memRoom.participants.length > 0) {
-        memRoom.participants[0].isHost = true;
-        memRoom.participants[0].role = 'host';
-        memRoom.hostName = memRoom.participants[0].name;
-        newHostName = memRoom.participants[0].name;
-        console.log(`👑 Rol de Affitrión transferido a: ${newHostName} en la sala ${cleanId}`);
-      }
-
-      memRoom.updatedAt = new Date();
-      schedulePersist();
-      room = memRoom;
+    if (wasHost && room.participants.length > 0) {
+      room.participants[0].isHost = true;
+      room.participants[0].role = 'host';
+      room.hostName = room.participants[0].name;
+      newHostName = room.participants[0].name;
+      console.log(`👑 Rol de Affitrión transferido a: ${newHostName} en la sala ${cleanId}`);
     }
+
+    room.updatedAt = new Date();
+    await roomRepository.save(room);
 
     return { room, newHostName };
   }
@@ -662,27 +451,14 @@ export class RoomService {
    *   (used when the host deliberately closes/deletes the room vs auto-cleanup).
    */
   public static async deleteRoom(roomId: string, forceDeleteVideo = false): Promise<boolean> {
-    const cleanId = roomId.toUpperCase().trim();
-    let videoFile: string | undefined;
-    let isTemp = true;
-    let sourceType: string | undefined;
+    const cleanId = cleanIdOf(roomId);
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return false;
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return false;
-      videoFile = room.video?.fileName;
-      sourceType = room.video?.sourceType;
-      isTemp = room.isTemporary !== false;
-      await RoomModel.deleteOne({ roomId: cleanId });
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return false;
-      videoFile = room.video?.fileName;
-      sourceType = room.video?.sourceType;
-      isTemp = room.isTemporary !== false;
-      inMemoryRooms.delete(cleanId);
-      schedulePersist();
-    }
+    const videoFile = room.video?.fileName;
+    const sourceType = room.video?.sourceType;
+    const isTemp = room.isTemporary !== false;
+    await roomRepository.delete(cleanId);
 
     // Delete the physical video file if:
     //  1. forceDeleteVideo was requested (host explicitly destroyed the room), or
@@ -703,33 +479,19 @@ export class RoomService {
    * Update or replace the video of a room.
    */
   public static async updateRoomVideo(roomId: string, video: IVideoMetadata): Promise<IRoom | null> {
-    const cleanId = roomId.toUpperCase().trim();
+    const cleanId = cleanIdOf(roomId);
 
-    if (isMongoConnected) {
-      const room = await RoomModel.findOne({ roomId: cleanId });
-      if (!room) return null;
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return null;
 
-      if (room.video && room.video.fileName !== video.fileName) {
-        this.removeOldVideoFile(room.video.fileName);
-      }
-
-      room.video = video;
-      room.status = 'active';
-      await room.save();
-      return room;
-    } else {
-      const room = inMemoryRooms.get(cleanId);
-      if (!room) return null;
-
-      if (room.video && room.video.fileName !== video.fileName) {
-        this.removeOldVideoFile(room.video.fileName);
-      }
-
-      room.video = video;
-      room.status = 'active';
-      room.updatedAt = new Date();
-      schedulePersist();
-      return room;
+    if (room.video && room.video.fileName !== video.fileName) {
+      this.removeOldVideoFile(room.video.fileName);
     }
+
+    room.video = video;
+    room.status = 'active';
+    room.updatedAt = new Date();
+    await roomRepository.save(room);
+    return room;
   }
 }

@@ -1,0 +1,48 @@
+/* ==========================================================================
+   Watch Party — Design Tokens (variables CSS)
+   Movido verbatim desde src/index.css — CERO cambios visuales.
+   ========================================================================== */
+
+:root {
+  --color-bg-main: #080c14;
+  --color-bg-card: rgba(18, 24, 40, 0.8);
+  --color-bg-card-solid: #111827;
+  --color-bg-input: #0f1624;
+  --color-bg-hover: #1a2540;
+  --color-primary: #6366f1;
+  --color-primary-dark: #4f46e5;
+  --color-primary-glow: rgba(99, 102, 241, 0.3);
+  --color-accent: #ec4899;
+  --color-accent-glow: rgba(236, 72, 153, 0.25);
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-text-main: #f1f5f9;
+  --color-text-muted: #64748b;
+  --color-border: rgba(255, 255, 255, 0.07);
+  --color-border-focus: rgba(99, 102, 241, 0.55);
+
+  --font-family:
+    "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --trans-fast: 0.16s ease;
+  --trans-med: 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Sidebar width on desktop */
+  --sidebar-w: 350px;
+
+  /* Aliases para hex antes hardcodeados (mismo valor, cero cambio visual) */
+  --color-primary-light: #818cf8;
+  --color-muted-light: #94a3b8;
+}
+
+/* Movido desde bloque BottomSheet de index.css */
+:root {
+  --sheet-bg: rgba(13, 19, 33, 0.98);
+  --sheet-radius: 1.25rem;
+  --sheet-backdrop: rgba(0, 0, 0, 0.78);
+  --sheet-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}

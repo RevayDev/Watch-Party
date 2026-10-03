@@ -1,93 +1,25 @@
 /* ==========================================================================
    Watch Party — Design System v2 (BEM Architecture)
    Premium responsive design for mobile & desktop
+   NOTA: este archivo es un AGREGADOR (@import) + estilos por bloque.
+   Tokens → styles/variables.css | Base → styles/globals.css |
+   Keyframes → styles/animations.css — CERO cambios visuales.
    ========================================================================== */
 
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap");
 
-/* ── Design Tokens ──────────────────────────────────────────────────────── */
-:root {
-  --color-bg-main: #080c14;
-  --color-bg-card: rgba(18, 24, 40, 0.8);
-  --color-bg-card-solid: #111827;
-  --color-bg-input: #0f1624;
-  --color-bg-hover: #1a2540;
-  --color-primary: #6366f1;
-  --color-primary-dark: #4f46e5;
-  --color-primary-glow: rgba(99, 102, 241, 0.3);
-  --color-accent: #ec4899;
-  --color-accent-glow: rgba(236, 72, 153, 0.25);
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-text-main: #f1f5f9;
-  --color-text-muted: #64748b;
-  --color-border: rgba(255, 255, 255, 0.07);
-  --color-border-focus: rgba(99, 102, 241, 0.55);
+/* Agregador: tokens/base/animaciones viven en src/styles/ */
+@import "./styles/variables.css";
+@import "./styles/globals.css";
+@import "./styles/animations.css";
 
-  --font-family:
-    "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
-  --trans-fast: 0.16s ease;
-  --trans-med: 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+/* Design Tokens → src/styles/variables.css */
 
-  /* Sidebar width on desktop */
-  --sidebar-w: 350px;
-}
-
-/* ── Reset ──────────────────────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  font-family: var(--font-family);
-  background-color: var(--color-bg-main);
-  background-image:
-    radial-gradient(
-      ellipse at 0% 0%,
-      rgba(99, 102, 241, 0.12) 0%,
-      transparent 55%
-    ),
-    radial-gradient(
-      ellipse at 100% 95%,
-      rgba(236, 72, 153, 0.09) 0%,
-      transparent 55%
-    );
-  background-attachment: fixed;
-  color: var(--color-text-main);
-  min-height: 100dvh;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-}
-
-/* ── Base Layout ────────────────────────────────────────────────────────── */
-.app {
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
-}
+/* Base global → src/styles/globals.css */
 
 /* spin utility */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
+/* keyframes → src/styles/animations.css */
+/* .animate-spin → src/styles/animations.css */
 
 /* ── Loading Screen ─────────────────────────────────────────────────────── */
 .room-loading {
@@ -224,7 +156,7 @@ body {
 }
 .header__room-pill-code {
   font-weight: 700;
-  color: #818cf8;
+  color: var(--color-primary-light);
   letter-spacing: 0.06em;
   font-size: 0.82rem;
 }
@@ -232,7 +164,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: var(--color-muted-light);
 }
 
 /* Host Pill */
@@ -257,7 +189,7 @@ body {
   gap: 0.3rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #94a3b8;
+  color: var(--color-muted-light);
   padding: 0.28rem 0.55rem;
   border-radius: 9999px;
   font-family: inherit;
@@ -341,15 +273,7 @@ button.header__users-pill:hover {
   background: rgba(239, 68, 68, 0.14);
   animation: timerPulse 1s ease-in-out infinite;
 }
-@keyframes timerPulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 /* ⚙ Settings gear */
 .header__settings-btn {
@@ -385,30 +309,12 @@ button.header__users-pill:hover {
   animation: shareMenuIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes shareMenuIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+/* keyframes → src/styles/animations.css */
 .header-share-menu--closing {
   animation: shareMenuOut 0.18s ease forwards;
   pointer-events: none;
 }
-@keyframes shareMenuOut {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.97);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 .header-share-menu__row {
   display: flex;
@@ -436,13 +342,13 @@ button.header__users-pill:hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  color: var(--color-muted-light);
 }
 
 .header-share-menu__value {
   font-size: 0.88rem;
   font-weight: 700;
-  color: #818cf8;
+  color: var(--color-primary-light);
   letter-spacing: 0.08em;
   white-space: nowrap;
   overflow: hidden;
@@ -761,7 +667,7 @@ button.header__users-pill:hover {
 
 .home-hero-desc {
   font-size: 1.1rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   margin-bottom: 2rem;
   line-height: 1.6;
   max-width: 540px;
@@ -963,7 +869,7 @@ div[id] {
 
 .home-reconnect-card__subtitle {
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
 }
 
 .home-reconnect-card__subtitle strong {
@@ -981,7 +887,7 @@ div[id] {
 .home-reconnect-card__dismiss-btn {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #94a3b8;
+  color: var(--color-muted-light);
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -1056,7 +962,7 @@ div[id] {
 
 .home-recent-card__hint {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
 }
 
 .home-recent-list {
@@ -1174,7 +1080,7 @@ div[id] {
 
 .home-recent-item__meta {
   font-size: 0.74rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1215,14 +1121,14 @@ div[id] {
 
 .home-recent-item__enter-btn:focus-visible,
 .home-recent-item__remove-btn:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid var(--color-primary-light);
   outline-offset: 2px;
 }
 
 .home-recent-item__remove-btn {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #94a3b8;
+  color: var(--color-muted-light);
   width: 26px;
   height: 26px;
   padding: 0;
@@ -1265,7 +1171,7 @@ div[id] {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   background: rgba(148, 163, 184, 0.08);
   border: 1px solid rgba(148, 163, 184, 0.18);
   margin-bottom: 0.2rem;
@@ -1282,7 +1188,7 @@ div[id] {
   margin: 0;
   font-size: 0.76rem;
   line-height: 1.5;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   max-width: 320px;
 }
 
@@ -1373,7 +1279,7 @@ div[id] {
 
 .home-quick-join__title {
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   font-weight: 500;
 }
 
@@ -1491,7 +1397,7 @@ div[id] {
 }
 
 .text-primary-color {
-  color: #818cf8;
+  color: var(--color-primary-light);
 }
 
 /* ── Generic Home Section ── */
@@ -1537,7 +1443,7 @@ div[id] {
 
 .home-section__subtitle {
   font-size: 1.05rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   line-height: 1.6;
 }
 
@@ -1601,7 +1507,7 @@ div[id] {
 
 .home-feature-desc {
   font-size: 0.92rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   line-height: 1.6;
 }
 
@@ -1657,7 +1563,7 @@ div[id] {
 
 .home-tech-card__role {
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
 }
 
 @media (max-width: 560px) {
@@ -1742,7 +1648,7 @@ div[id] {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   background: rgba(255, 255, 255, 0.035);
   padding: 0.85rem 1.15rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.09);
@@ -1753,7 +1659,7 @@ div[id] {
   padding: 0.9rem 1.15rem;
   font-size: 0.9rem;
   line-height: 1.55;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   vertical-align: top;
 }
@@ -1817,7 +1723,7 @@ div[id] {
   .home-roadmap-card__desc {
     font-size: 0.85rem;
     line-height: 1.55;
-    color: #94a3b8;
+    color: var(--color-muted-light);
     margin: 0;
   }
 }
@@ -1866,7 +1772,7 @@ div[id] {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #818cf8;
+  color: var(--color-primary-light);
   white-space: nowrap;
 }
 
@@ -1947,7 +1853,7 @@ div[id] {
 }
 
 .home-timeline__body:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid var(--color-primary-light);
   outline-offset: 2px;
 }
 
@@ -1995,7 +1901,7 @@ div[id] {
   overflow: hidden;
   font-size: 0.82rem;
   line-height: 1.55;
-  color: #94a3b8;
+  color: var(--color-muted-light);
 }
 
 .home-timeline__more {
@@ -2158,7 +2064,7 @@ div[id] {
   margin: 0;
   font-size: 0.92rem;
   line-height: 1.65;
-  color: #94a3b8;
+  color: var(--color-muted-light);
 }
 
 /* ── How It Works Steps ── */
@@ -2199,7 +2105,7 @@ div[id] {
 
 .home-step-desc {
   font-size: 0.92rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   line-height: 1.6;
 }
 
@@ -2239,7 +2145,7 @@ div[id] {
 }
 
 .home-faq-icon {
-  color: #818cf8;
+  color: var(--color-primary-light);
   flex-shrink: 0;
   font-size: 1.35rem;
   font-weight: 400;
@@ -2256,7 +2162,7 @@ div[id] {
   padding-top: 0.85rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   font-size: 0.92rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   line-height: 1.65;
 }
 
@@ -2345,7 +2251,7 @@ div[id] {
 }
 
 .home-donate-card:focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 2px solid var(--color-primary-light);
   outline-offset: 2px;
 }
 
@@ -2397,7 +2303,7 @@ div[id] {
 .home-donate-card__desc {
   font-size: 0.88rem;
   line-height: 1.6;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   margin-bottom: 0.75rem;
 }
 
@@ -2412,7 +2318,7 @@ div[id] {
 }
 
 .home-donate-card--pending .home-donate-card__cta {
-  color: #94a3b8;
+  color: var(--color-muted-light);
 }
 
 .home-donate__note {
@@ -2497,7 +2403,7 @@ div[id] {
 
 .home-footer__tagline {
   font-size: 0.88rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   max-width: 340px;
   line-height: 1.55;
   margin: 0;
@@ -2533,7 +2439,7 @@ div[id] {
 .home-footer__link {
   display: block;
   font-size: 0.87rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   text-decoration: none;
 }
 
@@ -2668,16 +2574,7 @@ div[id] {
 /* ==========================================================================
    Block: Modal content hooks (chrome now owned by BottomSheet: `.sheet`)
    ========================================================================== */
-@keyframes modalCardIn {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+/* keyframes → src/styles/animations.css */
 .modal-card__header {
   display: flex;
   align-items: center;
@@ -2702,7 +2599,7 @@ div[id] {
 }
 
 .host-exit-modal__desc {
-  color: #94a3b8;
+  color: var(--color-muted-light);
   font-size: 0.86rem;
   margin: 0.4rem 0 1.25rem;
   line-height: 1.5;
@@ -2736,7 +2633,7 @@ div[id] {
 }
 
 .host-exit-modal__opt-btn--transfer .host-exit-modal__btn-icon {
-  color: #818cf8;
+  color: var(--color-primary-light);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -2774,7 +2671,7 @@ div[id] {
 
 .host-exit-modal__btn-text span {
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   line-height: 1.4;
 }
 
@@ -3044,26 +2941,8 @@ div[id] {
   max-width: calc(100vw - 2rem) !important;
 }
 
-@keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-@keyframes slideOutRight {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-}
+/* keyframes → src/styles/animations.css */
+/* keyframes → src/styles/animations.css */
 .meet-drawer--closing {
   animation: slideOutRight 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
   pointer-events: none;
@@ -3170,7 +3049,7 @@ div[id] {
 .meet-circle-btn--active {
   background: rgba(99, 102, 241, 0.22);
   border-color: rgba(99, 102, 241, 0.55);
-  color: #818cf8;
+  color: var(--color-primary-light);
 }
 
 /* Leave call — same design as mic/camera buttons (translucent tint + border) */
@@ -3229,30 +3108,12 @@ div[id] {
   animation: emojiPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   z-index: 200;
 }
-@keyframes emojiPopIn {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
-}
+/* keyframes → src/styles/animations.css */
 .meet-emoji-popup--closing {
   animation: emojiPopOut 0.2s ease forwards;
   pointer-events: none;
 }
-@keyframes emojiPopOut {
-  from {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px) scale(0.9);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 /* ── Error Banner ── */
 .meet-error-banner {
@@ -3311,30 +3172,12 @@ div[id] {
   z-index: 200;
 }
 
-@keyframes moreMenuPopIn {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
-}
+/* keyframes → src/styles/animations.css */
 .meet-more-dropdown--closing {
   animation: moreMenuPopOut 0.2s ease forwards;
   pointer-events: none;
 }
-@keyframes moreMenuPopOut {
-  from {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px) scale(0.95);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 .meet-more-item {
   display: flex;
@@ -3355,7 +3198,7 @@ div[id] {
   background: rgba(255, 255, 255, 0.08);
 }
 .meet-more-item--active {
-  color: #818cf8;
+  color: var(--color-primary-light);
 }
 .meet-more-item--danger {
   color: #ea4335;
@@ -3578,42 +3421,7 @@ div[id] {
 }
 
 /* YouTube-style: gentle pop-in, smooth float up with soft horizontal sway, long fade out */
-@keyframes floatUpAndFade {
-  0% {
-    opacity: 0;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) * 0.3))
-      translateY(16px) scale(0.3);
-  }
-  12% {
-    opacity: 1;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) * 0.5))
-      translateY(0px) scale(1.15);
-  }
-  22% {
-    transform: translateX(calc(-50% + var(--x-offset, 0px) * 0.7))
-      translateY(-24px) scale(1.05);
-  }
-  45% {
-    opacity: 1;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) * 0.9))
-      translateY(-90px) scale(1);
-  }
-  70% {
-    opacity: 0.85;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) * 1.05))
-      translateY(-160px) scale(0.95);
-  }
-  88% {
-    opacity: 0.4;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) * 1.15))
-      translateY(-215px) scale(0.9);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) * 1.25))
-      translateY(-255px) scale(0.85);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 @media (prefers-reduced-motion: reduce) {
   .floating-reaction {
@@ -3810,7 +3618,7 @@ div[id] {
 .meet-action-btn--active {
   background: rgba(99, 102, 241, 0.2);
   border-color: #6366f1;
-  color: #818cf8;
+  color: var(--color-primary-light);
 }
 .meet-action-btn--off {
   background: rgba(239, 68, 68, 0.15);
@@ -4100,7 +3908,7 @@ div[id] {
   font-size: 0.68rem;
   padding: 0.12rem 0.45rem;
   background: rgba(99, 102, 241, 0.2);
-  color: #818cf8;
+  color: var(--color-primary-light);
   border: 1px solid rgba(99, 102, 241, 0.35);
   border-radius: 4px;
   font-weight: 700;
@@ -4179,7 +3987,7 @@ div[id] {
 
 .drawer-chat__system-pill {
   background: rgba(255, 255, 255, 0.06);
-  color: #94a3b8;
+  color: var(--color-muted-light);
   border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.76rem;
   font-weight: 500;
@@ -4191,7 +3999,7 @@ div[id] {
 }
 
 .meet-toast--chat {
-  border-left: 3px solid #818cf8;
+  border-left: 3px solid var(--color-primary-light);
 }
 
 .meet-toast--chat:hover {
@@ -4200,7 +4008,7 @@ div[id] {
 
 .drawer-chat__author {
   font-weight: 700;
-  color: #818cf8;
+  color: var(--color-primary-light);
   font-size: 0.76rem;
   letter-spacing: 0.02em;
 }
@@ -4304,7 +4112,7 @@ div[id] {
    Block: Home Hero Title Accent
    ========================================================================== */
 .home-hero-title--accent {
-  background: linear-gradient(135deg, #818cf8 0%, #ec4899 100%);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, #ec4899 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -4347,16 +4155,7 @@ div[id] {
   white-space: nowrap;
 }
 
-@keyframes toastSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 .meet-toast--join .meet-toast__avatar {
   background: #1e8e3e;
@@ -4703,11 +4502,11 @@ div[id] {
 }
 
 .part-header__icon {
-  color: #818cf8;
+  color: var(--color-primary-light);
 }
 
 .part-count {
-  color: #818cf8;
+  color: var(--color-primary-light);
   font-weight: 800;
 }
 
@@ -4934,7 +4733,7 @@ div[id] {
 
 .part-name-tag {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   font-weight: 500;
   flex: 0 0 auto;
   white-space: nowrap;
@@ -5215,16 +5014,7 @@ div[id] {
   animation: fadeInRight 0.2s ease;
 }
 
-@keyframes fadeInRight {
-  from {
-    opacity: 0;
-    transform: translateX(15px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
+/* keyframes → src/styles/animations.css */
 .part-detail-card--closing {
   animation: fadeOutRight 0.2s ease forwards;
   pointer-events: none;
@@ -5248,7 +5038,7 @@ div[id] {
 
 .part-rename-modal p {
   margin: 0.35rem 0 0.9rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   font-size: 0.8rem;
   line-height: 1.45;
 }
@@ -5271,16 +5061,7 @@ div[id] {
   margin: 0;
   justify-content: center;
 }
-@keyframes fadeOutRight {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(15px);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 .part-detail-header {
   display: flex;
@@ -5792,7 +5573,7 @@ div[id] {
   padding: 0.65rem 0.75rem;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   background: transparent;
   border: none;
   border-radius: 0.5rem;
@@ -5840,7 +5621,7 @@ div[id] {
 
 .dropzone-box__subtitle {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--color-muted-light);
   line-height: 1.4;
   max-width: 320px;
 }
@@ -5925,55 +5706,14 @@ div[id] {
   }
 }
 
-@keyframes sheetSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(32px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes sheetFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
+/* keyframes → src/styles/animations.css */
+/* keyframes → src/styles/animations.css */
 
 /* ── Exit keyframes (reused by BottomSheet `.sheet--closing`) ── */
-@keyframes overlayOut {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-@keyframes modalCardOut {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(10px) scale(0.97);
-  }
-}
+/* keyframes → src/styles/animations.css */
+/* keyframes → src/styles/animations.css */
 
-@keyframes sheetSlideDown {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(48px);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 @media (max-width: 600px) {
   /* Tabs: both labels must fit side by side on narrow screens */
@@ -6014,7 +5754,7 @@ div[id] {
   button.header__users-pill:hover {
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.1);
-    color: #94a3b8;
+    color: var(--color-muted-light);
   }
   /* When the room has a name, the brand yields the space on phones */
   .header--has-name .header__brand {
@@ -6094,14 +5834,7 @@ div[id] {
   animation: waitingBarSlide 1.4s ease-in-out infinite;
 }
 
-@keyframes waitingBarSlide {
-  0% {
-    transform: translateX(-110%);
-  }
-  100% {
-    transform: translateX(280%);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 /* Nombre / descripción de la sala en la espera */
 .waiting-card__room {
@@ -6157,17 +5890,7 @@ div[id] {
   animation: waitingPulse 1.8s ease-in-out infinite;
 }
 
-@keyframes waitingPulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(0.9);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 .waiting-card__head h2 {
   margin: 0;
@@ -6368,28 +6091,10 @@ div[id] {
 }
 
 /* Entra estirándose desde la derecha */
-@keyframes notifSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(calc(100% + 20px)) scaleX(0.65);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scaleX(1);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 /* Sale contraéndose de vuelta hacia la derecha (donde vino) */
-@keyframes notifSlideOut {
-  from {
-    opacity: 1;
-    transform: translateX(0) scaleX(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(calc(100% + 20px)) scaleX(0.65);
-  }
-}
+/* keyframes → src/styles/animations.css */
 
 .notif-toast__icon {
   display: inline-flex;
@@ -6640,12 +6345,7 @@ div[id] {
    with their own `desktopClassName` (drawer / side-panel UIs).
    Entry/exit reuse the sheet/modal keyframes defined above.
    ========================================================================== */
-:root {
-  --sheet-bg: rgba(13, 19, 33, 0.98);
-  --sheet-radius: 1.25rem;
-  --sheet-backdrop: rgba(0, 0, 0, 0.78);
-  --sheet-ease: cubic-bezier(0.32, 0.72, 0, 1);
-}
+/* Design Tokens → src/styles/variables.css */
 
 .sheet-root {
   position: fixed;

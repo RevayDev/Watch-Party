@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send } from 'lucide-react';
-import { ChatMessage } from '../types/room';
+import { ChatMessage } from '../../types/room';
 
 interface ChatProps {
   messages: ChatMessage[];
@@ -94,3 +94,5 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, currentUser
     </div>
   );
 };
+
+export default Chat;

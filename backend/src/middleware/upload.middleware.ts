@@ -26,8 +26,11 @@ const storage = multer.diskStorage({
 });
 
 // Allow popular video formats (mp4, webm, mkv, mov)
+// NOTE: invalid files are rejected with `cb(null, false)` (instead of an Error)
+// so the request reaches the controller, which responds 400 (not 500).
+// The reason is exposed via `req.fileValidationError`.
 const fileFilter = (
-  _req: any,
+  req: any,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
@@ -42,7 +45,9 @@ const fileFilter = (
   if (allowedMimeTypes.includes(file.mimetype) || file.mimetype.startsWith('video/')) {
     cb(null, true);
   } else {
-    cb(new Error('Formato no soportado. Por favor sube un archivo de video válido (.mp4, .webm, .mkv, .mov).'));
+    req.fileValidationError =
+      'Formato no soportado. Por favor sube un archivo de video válido (.mp4, .webm, .mkv, .mov).';
+    cb(null, false);
   }
 };
 

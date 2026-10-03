@@ -1,30 +1,32 @@
-# Documentación del Proyecto (Watch-Party)
+# Estado del Proyecto (Watch-Party) — real, post-reorganización
 
-## 1. Estado Actual (Commit / Snapshot)
-- **Frontend**: React 18, Vite 6, TypeScript 5, Tailwind/BEM custom CSS (`index.css`).
-- **Backend**: Node.js, Express, Socket.io (gestión de salas, WebRTC signaling, chat, sincronización de video y control de acceso de invitados).
-- **Sistema Global de Hojas / Modales (`BottomSheet`)**:
-  - Implementado mediante `BottomSheet.tsx` y el hook Pointer Events `useSheetDrag.ts`.
-  - Soporta arrastre táctil con resistencia (rubber-band) y umbrales de cierre por velocidad o distancia, anclaje inferior en móviles (`max-width: 768px`) y modales centrados en escritorio.
-  - Gestión automática de presencia, apilamiento (Stack para tecla Escape), bloqueo de scroll corporal (`scroll-lock` seguro) y trampa de foco (`focus trap`).
+## 1. Stack y arquitectura real
+- **Frontend**: React 18 + Vite 6 + TypeScript 5, CSS propio con metodología BEM (`src/styles/` + `src/index.css` como agregador). Sin Tailwind, sin store global (solo `NotificationProvider`).
+  - `src/features/{room,participants,player,chat,waiting,home}` — `Room.tsx` es composición sobre `hooks/useRoomSocket.ts`; `Participants`, `VideoPlayer` y `Home` divididos por responsabilidad.
+  - `src/shared/` — `BottomSheet`, botones, `useSheetDrag` (absorbe el antiguo `useSwipeDown`), `utils` (`getInitials`, `getAvatarColor`, `formatRelativeTime`), `constants` (claves de storage, eventos).
+  - `src/services/` — `api.ts` (REST), `socket.ts` (singleton Socket.IO), `notifications.tsx` (toasts + confirm), `recentRooms.ts`.
+  - Tests vitest: `frontend/tests/` (recentRooms, api, shared-utils, auth).
+- **Backend**: Node + Express + Socket.IO + Mongoose, arquitectura hexagonal.
+  - `domain/` (entidades, `playback-policy` con `resolveRoomTime`, `auth-policy`, `settings-policy`), `ports/`, `application/` (use-cases), `adapters/` (repos mongo/memoria + routing), `sockets/handlers/` por dominio, `services/proxy.service.ts`, `routes/proxy.routes.ts`.
+  - Tests vitest: `backend/tests/` (playback, room.service memoria, validaciones, settings, auth, name-collision, disconnect-grace, rest-security, socket-guards).
+- **Verificación**: `npx tsc --noEmit` + `npm run build` + `npm run test` en ambos paquetes (117 backend + 63 frontend en verde).
 
-## 2. Mejoras Recientes (Solicitadas)
-1. **Aceptación y Solicitudes en Teléfono**:
-   - Reestructuración completa de las tarjetas en el panel de participantes.
-   - El nombre, estado y botones de acción (Aceptar, Rechazar, Banear) se distribuyen verticalmente de forma limpia y fluida para evitar recortes horizontales o amontonamientos.
-   - Tamaños táctiles cómodos y alineación moderna respetando la paleta de colores existente (`rgba(13, 19, 33, 0.98)`, bordes sutiles, radios de 12px/16px).
-2. **Panel de Participantes**:
-   - Uniformidad total con el sistema visual general (fondos semitransparentes con `backdrop-filter: blur`, radios consistentes, tipografía Outfit).
-   - Espaciado optimizado en pantallas móviles.
-3. **Eliminación del botón X**:
-   - Eliminados por completo los botones de cierre "X" en la cabecera de Participantes, Ficha de Detalle de Usuario y Notificaciones Toast (el cierre se realiza mediante gestos de arrastre, toque fuera del backdrop o tecla Escape).
-4. **Notificaciones**:
-   - Mantenimiento del comportamiento funcional y visual actual.
-   - Reubicación de la barra indicadora de tipo de notificación: ahora se encuentra en la **parte inferior** (borde inferior de 3px) y utiliza el color exacto correspondiente (`#34d399` para éxito, `#f87171` para error, `#fbbf24` para advertencia y `#60a5fa` para información).
-5. **Responsive**:
-   - Adaptación fluida y estructurada para teléfonos móviles y tablets, sin depender de recortes simples.
+## 2. Seguridad (autorización real, no solo UI)
+- `hostSecret` (32 hex, generado al crear) se guarda en sesión y viaja en payloads socket (`hostSecret`) y headers REST (`x-host-secret`, + `x-user-id`/`x-user-name`).
+- Guards por estado del servidor (`domain/auth-policy.ts`): moderación (mute/cam/kick/ban/roles/approve/reject) exige host o cohost; settings/close-room exigen host; renombrar a otros exige moderador (auto-rename libre). Denegado → `action-denied` al emisor.
+- REST: subida/video-url/borrado → 403 sin host; `join` → 403 baneado, 409 nombre en uso.
+- Settings inválidos/desconocidos → 400 REST con mensaje; por socket → `settings-error` y no se aplica nada.
+- Límite conocido: `userId` lo genera el navegador (suplantable entre cómplices); el secreto cubre al host original.
 
-## 3. Próximos Pasos (Lo que hace falta)
-- **Testing Automatizado**: Incorporar pruebas unitarias y de integración para los hooks de arrastre y componentes principales.
-- **Optimización de Bundle**: Evaluar división de chunks (Code Splitting con Dynamic Imports) para reducir el tamaño del paquete principal (`index-BR29v2Mp.js`).
-- **PWA (Progressive Web App)**: Añadir Service Worker para soporte offline básico y notificaciones push nativas en dispositivos móviles.
+## 3. Comportamientos sensibles implementados
+- **Consenso de playback**: heartbeat 5s por miembro; al (re)entrar se adopta la mediana del grupo mayoritario (±3s), empate → más antiguo en sala, sin reportes → último snapshot.
+- **Gracia de desconexión**: 20s antes de eliminar/transferir host; rejoin con mismo `userId` conserva rol; `leave-room` inmediato.
+- **Colisión de nombres**: rechazo `name-taken` (join y rename) salvo misma identidad.
+- **Toasts**: fondo oscuro común + línea inferior por tipo (3px), X visible siempre (22px PC / 18px móvil), auto-dismiss 5s.
+- **Botones**: verde encendido/aceptar, rojo apagado/rechazar/salir, índigo activo/presionado (mismo lenguaje en Chat, Participantes y Solicitudes).
+
+## 4. Pendiente / riesgos aceptados
+- Sin ESLint; bundle principal >500 kB (code-splitting hls pendiente); sin PWA.
+- `CLIENT_URL` documentado pero sin uso como allowlist CORS (CORS `*`); sin rate-limit.
+- Refresh que supera la gracia de 20s re-entra como miembro (el host transferido no revierte).
+- `PATCH /:roomId/settings` acepta `{settings:{…}}` u objeto directo (flexible a propósito).

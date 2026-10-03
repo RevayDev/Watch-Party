@@ -4,6 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RoomService } from '../services/room.service.js';
 import { IVideoMetadata } from '../types/room.types.js';
+import { findBannedEntry, isNameTaken } from '../domain/room.entity.js';
+import { AuthClaim, requireHost } from '../domain/auth-policy.js';
+import { sanitizeRoomSettings } from '../domain/settings-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +14,31 @@ const uploadsDir = path.join(__dirname, '../../uploads');
 
 const PROBE_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+/**
+ * Claim de autorización desde los headers del contrato REST:
+ * `x-host-secret`, `x-user-id`, `x-user-name` (misma regla que sockets).
+ */
+function claimFromHeaders(req: Request): AuthClaim {
+  const pick = (name: string): string | undefined => {
+    const raw = req.headers?.[name];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    return trimmed ? trimmed : undefined;
+  };
+  return {
+    hostSecret: pick('x-host-secret'),
+    requesterUserId: pick('x-user-id'),
+    requesterName: pick('x-user-name'),
+  };
+}
+
+/** userId del cuerpo (join) con fallback al header del contrato. */
+function requestUserId(req: Request): string | undefined {
+  const body = (req.body ?? {}) as { userId?: unknown };
+  const fromBody = typeof body.userId === 'string' && body.userId.trim() ? body.userId.trim() : undefined;
+  return fromBody ?? claimFromHeaders(req).requesterUserId;
+}
 
 /**
  * Verify an external video URL is alive before saving it to the room.
@@ -183,10 +211,26 @@ export class RoomController {
 
       const cleanId = roomId.toUpperCase().trim();
       const trimmedName = userName.trim();
+      const userId = requestUserId(req);
 
       const existing = await RoomService.getRoomById(cleanId);
       if (!existing) {
         res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      // ── Ban check (H4: espejo del chequeo del socket `join-room`) ──
+      const bannedEntry = findBannedEntry(existing, userId, trimmedName);
+      if (bannedEntry) {
+        res.status(403).json({ error: 'Has sido baneado de esta sala y no puedes volver a entrar.' });
+        return;
+      }
+
+      // ── Colisión de nombres (H8): el nombre lo usa otra identidad ──
+      if (isNameTaken(existing.participants || [], userId, trimmedName)) {
+        res.status(409).json({
+          error: `El nombre "${trimmedName}" ya está en uso por otro participante. Elige otro nombre.`,
+        });
         return;
       }
 
@@ -195,9 +239,11 @@ export class RoomController {
       // host/co-host approves. Adding them here would bypass the approval gate.
       const requireApproval = existing.settings?.requireApproval === true;
       const isHostName = existing.hostName.toLowerCase() === trimmedName.toLowerCase();
-      const alreadyParticipant = (existing.participants || []).some(
-        (p) => p.name.toLowerCase() === trimmedName.toLowerCase()
-      );
+      // Identidad estable: el rejoin con el mismo userId nunca pasa por la puerta.
+      const alreadyParticipant = (existing.participants || []).some((p) => {
+        if (userId && p.userId) return p.userId === userId;
+        return !p.userId && p.name.toLowerCase() === trimmedName.toLowerCase();
+      });
 
       if (requireApproval && !isHostName && !alreadyParticipant) {
         res.json({
@@ -210,7 +256,7 @@ export class RoomController {
         return;
       }
 
-      const room = await RoomService.joinRoom(cleanId, trimmedName);
+      const room = await RoomService.joinRoom(cleanId, trimmedName, 'Web Browser', userId);
       if (!room) {
         res.status(404).json({ error: 'Room not found' });
         return;
@@ -232,6 +278,13 @@ export class RoomController {
       const { roomId } = req.params;
       const file = req.file;
 
+      // Rechazo del fileFilter (tipo de archivo no soportado) → 400
+      const validationError = (req as unknown as { fileValidationError?: string }).fileValidationError;
+      if (validationError) {
+        res.status(400).json({ error: validationError });
+        return;
+      }
+
       if (!file) {
         res.status(400).json({ error: 'No se envió ningún archivo de video válido' });
         return;
@@ -240,6 +293,14 @@ export class RoomController {
       const room = await RoomService.getRoomById(roomId);
       if (!room) {
         res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      // Solo el host (secreto válido o rol host del servidor). Se limpia el
+      // archivo ya subido por multer para no dejar huérfanos en disco.
+      if (!requireHost(room, claimFromHeaders(req))) {
+        RoomService.removeOldVideoFile(file.filename);
+        res.status(403).json({ error: 'Solo el anfitrión puede subir el video de la sala.' });
         return;
       }
 
@@ -282,6 +343,12 @@ export class RoomController {
       const room = await RoomService.getRoomById(roomId);
       if (!room) {
         res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      // Solo el host (secreto válido o rol host del servidor).
+      if (!requireHost(room, claimFromHeaders(req))) {
+        res.status(403).json({ error: 'Solo el anfitrión puede configurar el video de la sala.' });
         return;
       }
 
@@ -331,13 +398,25 @@ export class RoomController {
   }
 
   /**
-   * Delete room and cleanup all associated files on disk
+   * Delete room and cleanup all associated files on disk.
+   * Solo el host (secreto válido o rol host del servidor).
    */
   public static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { roomId } = req.params;
       if (!roomId) {
         res.status(400).json({ error: 'roomId is required' });
+        return;
+      }
+
+      const room = await RoomService.getRoomById(roomId);
+      if (!room) {
+        res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      if (!requireHost(room, claimFromHeaders(req))) {
+        res.status(403).json({ error: 'Solo el anfitrión puede eliminar la sala.' });
         return;
       }
 
@@ -348,6 +427,45 @@ export class RoomController {
       }
 
       res.json({ message: 'Sala y archivos de video eliminados exitosamente', roomId });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Update room settings (estrictos + atómicos).
+   * Solo el host. Payload inválido → 400 con mensaje claro, sin aplicar nada.
+   * Acepta `{ settings: {...} }` o el objeto de ajustes directamente.
+   */
+  public static async updateSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { roomId } = req.params;
+      if (!roomId) {
+        res.status(400).json({ error: 'roomId is required' });
+        return;
+      }
+
+      const room = await RoomService.getRoomById(roomId);
+      if (!room) {
+        res.status(404).json({ error: 'Room not found' });
+        return;
+      }
+
+      if (!requireHost(room, claimFromHeaders(req))) {
+        res.status(403).json({ error: 'Solo el anfitrión puede cambiar los ajustes de la sala.' });
+        return;
+      }
+
+      const body = (req.body ?? {}) as { settings?: unknown };
+      const input = body.settings !== undefined ? body.settings : req.body;
+      const { settings, errors } = sanitizeRoomSettings(input);
+      if (errors.length > 0) {
+        res.status(400).json({ error: `Ajustes inválidos: ${errors.join(' ')}` });
+        return;
+      }
+
+      const updated = await RoomService.updateSettings(roomId, settings);
+      res.json({ message: 'Ajustes actualizados correctamente', settings: updated?.settings || settings });
     } catch (error) {
       next(error);
     }

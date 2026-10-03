@@ -8,28 +8,36 @@ Plataforma web en tiempo real para reproducir videos de forma sincronizada con a
 
 ```text
 Watch Party/
-├── backend/            # API REST + WebSocket Server
+├── backend/            # API REST + WebSocket Server (arquitectura hexagonal)
 │   ├── src/
-│   │   ├── config/     # Conexión a base de datos (MongoDB)
-│   │   ├── controllers/# Controladores HTTP
-│   │   ├── models/     # Esquemas Mongoose (Room, Video, Participants)
-│   │   ├── routes/     # Endpoints de Express
-│   │   ├── services/   # Lógica de negocio y generación de Room IDs
-│   │   ├── types/      # Tipos e interfaces TypeScript
-│   │   ├── app.ts      # Configuración de Express y middlewares
-│   │   └── server.ts   # Inicialización de HTTP + Socket.IO
+│   │   ├── domain/       # Entidades y reglas puras (auth, settings, playback-consensus)
+│   │   ├── ports/        # Interfaces (RoomRepository, EventBus)
+│   │   ├── application/  # Casos de uso (approve-join, sync-playback, moderate-user…)
+│   │   ├── adapters/     # Repositorios mongo/memoria + routing
+│   │   ├── sockets/      # Estado + handlers por dominio (join, sync, chat, moderation…)
+│   │   ├── controllers/  # Controladores HTTP
+│   │   ├── services/     # RoomService + proxy.service
+│   │   ├── routes/       # Endpoints de Express (+ proxy.routes)
+│   │   ├── models/       # Esquemas Mongoose
+│   │   ├── middleware/   # upload (multer) + error handler
+│   │   ├── types/        # Tipos e interfaces TypeScript
+│   │   ├── tests/        # Tests vitest (117)
+│   │   ├── app.ts        # Configuración de Express y middlewares
+│   │   └── server.ts     # Inicialización de HTTP + Socket.IO
 │   └── uploads/        # Directorio de almacenamiento temporal de videos
 │
-├── frontend/           # Aplicación React + Vite + TypeScript
+├── frontend/           # Aplicación React + Vite + TypeScript (por features)
 │   ├── src/
-│   │   ├── components/ # Componentes modulares con metodología BEM
-│   │   ├── pages/      # Home, CreateRoom, Room
-│   │   ├── services/   # Cliente API para comunicación HTTP
+│   │   ├── features/   # room/ participants/ player/ chat/ waiting/ home/
+│   │   ├── shared/     # BottomSheet, botones, hooks, utils, constants
+│   │   ├── styles/     # variables.css, globals.css, animations.css
+│   │   ├── services/   # Cliente API + socket + notificaciones + recientes
 │   │   ├── types/      # Tipos compartidos
+│   │   ├── tests/      # Tests vitest (63)
 │   │   ├── App.tsx     # Enrutamiento de vistas y estado
-│   │   └── index.css   # Sistema de diseño y clases BEM
+│   │   └── index.css   # Agregador del sistema de diseño BEM
 │
-└── docs/               # Documentación y plan del proyecto
+└── docs/               # PROJECT_LEARNING_GUIDE.md, REFACTORING_PLAN.md, status.md
 ```
 
 ---
@@ -57,6 +65,26 @@ El frontend abrirá en: `http://localhost:5173`
 
 ---
 
+## ✅ Verificación (TypeScript + tests + build)
+
+En `backend/` y en `frontend/`:
+```bash
+npx tsc --noEmit   # tipos
+npm run test       # vitest (117 backend + 63 frontend)
+npm run build      # build de producción
+```
+
+---
+
+## 🔐 Autorización (resumen)
+
+- Al crear la sala se genera un `hostSecret` que el frontend guarda y envía en acciones privilegiadas (payloads socket y headers REST `x-host-secret`).
+- Moderación (mute/cam/kick/ban/roles/aprobar) exige host o cohost **según el estado del servidor**; ajustes y cierre exigen host; renombrar a otros exige moderador.
+- Sin permiso el servidor responde `action-denied` (socket) o `403` (REST) sin aplicar cambios.
+- Settings inválidos → `400` con mensaje (REST) o evento `settings-error` (socket).
+
+---
+
 ## 🌐 Guía de Despliegue en Producción
 
 ### 1. Base de Datos (MongoDB Atlas)
@@ -81,7 +109,7 @@ El backend requiere un entorno con soporte para WebSockets activos continuos (co
 5. Configura las variables de entorno en el panel:
    - `PORT`: `4000` (o el asignado por el hosting)
    - `MONGODB_URI`: Tu cadena de conexión de MongoDB Atlas.
-   - `CLIENT_URL`: La URL de tu frontend en Vercel (ej. `https://tu-app.vercel.app`).
+   - `CLIENT_URL`: La URL de tu frontend en Vercel (ej. `https://tu-app.vercel.app`). Nota: hoy no se usa como allowlist (CORS abierto); pendiente restringirlo.
 
 ---
 
@@ -91,6 +119,7 @@ El backend requiere un entorno con soporte para WebSockets activos continuos (co
 3. Framework Preset: **Vite** (detectado automáticamente).
 4. En **Environment Variables**, agrega:
    - `VITE_API_URL`: La URL pública de tu backend desplegado (ej. `https://tu-backend.onrender.com`).
+   - `VITE_SOCKET_URL`: (opcional) URL de Socket.IO si difiere de la API.
 5. Haz clic en **Deploy**.
 
 ---

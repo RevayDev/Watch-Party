@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import Hls from 'hls.js';
-import { IVideoMetadata, ReactionItem } from '../types/room';
-import { BottomSheet } from './BottomSheet';
+import { IVideoMetadata, ReactionItem } from '../../types/room';
+import { BottomSheet } from '../../shared/components/BottomSheet';
+import { VideoUploadPicker } from './VideoUploadPicker';
 
 interface VideoPlayerProps {
   roomId: string;
@@ -369,95 +370,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     onUploadVideo(file);
   };
 
-  // ── Shared picker UI (used by the empty state and the "Change video" modal) ──
-  const renderPickerTabs = () => (
-    <div className="dropzone-tabs">
-      <button
-        type="button"
-        className={`dropzone-tab-btn ${activeTab === 'upload' ? 'dropzone-tab-btn--active' : ''}`}
-        onClick={() => setActiveTab('upload')}
-      >
-        <span>Subir Archivo</span>
-      </button>
-      <button
-        type="button"
-        className={`dropzone-tab-btn ${activeTab === 'url' ? 'dropzone-tab-btn--active' : ''}`}
-        onClick={() => setActiveTab('url')}
-      >
-        <span>Enlace Web / HLS</span>
-      </button>
-    </div>
-  );
-
-  const renderUploadZone = () => (
-    <div
-      className={`dropzone-box ${isDragOver ? 'dropzone-box--active' : ''}`}
-      onClick={triggerFileInput}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <div className="dropzone-box__title">Sube un archivo multimedia</div>
-      <div className="dropzone-box__subtitle">
-        Arrastra tu archivo aquí o haz clic (.mp4, .mkv, .webm)
-      </div>
-      <button
-        type="button"
-        className="btn btn--primary"
-        style={{ marginTop: '0.25rem', padding: '0.5rem 1.25rem', fontSize: '0.84rem' }}
-      >
-        Seleccionar de mi PC
-      </button>
-    </div>
-  );
-
-  const renderUrlForm = () => (
-    <form onSubmit={handleUrlSubmit} className="dropzone-url-card">
-      <div className="dropzone-input-group">
-        <label>Enlace del video o transmisión:</label>
-        <input
-          type="url"
-          required
-          placeholder="https://... playlist.m3u8 o Google Drive"
-          className="dropzone-input"
-          value={urlInput}
-          onChange={(e) => setUrlInput(e.target.value)}
-        />
-      </div>
-      <div className="dropzone-input-group">
-        <label>Título del archivo (opcional):</label>
-        <input
-          type="text"
-          placeholder="Ej: Nuestro viaje de verano"
-          className="dropzone-input"
-          value={titleInput}
-          onChange={(e) => setTitleInput(e.target.value)}
-        />
-      </div>
-
-      <div className="dropzone-supported-hints">
-        <span>✓ Compatible con transmisiones HLS (.m3u8, Yandex, etc.)</span>
-        <span>✓ Compatible con enlaces públicos de Google Drive</span>
-        <span>✓ Compatible con URLs directas (.mp4, .webm)</span>
-      </div>
-
-      <button
-        type="submit"
-        disabled={isSubmittingUrl || !urlInput.trim()}
-        className="btn btn--primary"
-        style={{ marginTop: '0.4rem', padding: '0.65rem', justifyContent: 'center' }}
-      >
-        {isSubmittingUrl ? (
-          <>
-            <Loader2 size={16} className="animate-spin" />
-            <span>Cargando enlace...</span>
-          </>
-        ) : (
-          'Transmitir Enlace en la Sala'
-        )}
-      </button>
-    </form>
-  );
+  const pickerProps = {
+    activeTab,
+    setActiveTab,
+    urlInput,
+    titleInput,
+    setUrlInput,
+    setTitleInput,
+    isSubmittingUrl,
+    onUrlSubmit: handleUrlSubmit,
+    isDragOver,
+    onDragOver: handleDragOver,
+    onDragLeave: handleDragLeave,
+    onDrop: handleDrop,
+    onTriggerFile: triggerFileInput,
+  };
 
   // 1. Upload in progress state (Visible to Host and all Room Members)
   if (uploadProgress !== null) {
@@ -470,7 +397,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.25rem' }}>
                 {isHost ? 'Subiendo video a la sala...' : 'El Anfitrión está subiendo el video...'}
               </h3>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted-light)' }}>
                 {uploadProgress}% transferido
               </p>
             </div>
@@ -518,9 +445,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 label="Subir video o pegar enlace"
               >
                 <div className="dropzone-container">
-                  {/* Tab selector: Archivo Local vs Enlace Web / HLS / Drive */}
-                  {renderPickerTabs()}
-                  {activeTab === 'upload' ? renderUploadZone() : renderUrlForm()}
+                  <VideoUploadPicker {...pickerProps} />
                 </div>
               </BottomSheet>
               {!showEmptyPicker && (
@@ -537,7 +462,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <div className="dropzone-container" style={{ textAlign: 'center', alignItems: 'center' }}>
               <div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>Aún no hay video en la sala</h3>
-                <p style={{ fontSize: '0.84rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+                <p style={{ fontSize: '0.84rem', color: 'var(--color-muted-light)', marginTop: '0.35rem' }}>
                   Esperando a que el Anfitrión suba un archivo o configure un enlace para comenzar.
                 </p>
               </div>
@@ -692,8 +617,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <h3 style={{ margin: 0, fontSize: '1.02rem', color: '#f8fafc' }}>Cambiar video de la sala</h3>
             </div>
             <div className="dropzone-container" style={{ border: 'none', padding: 0 }}>
-              {renderPickerTabs()}
-              {activeTab === 'upload' ? renderUploadZone() : renderUrlForm()}
+              <VideoUploadPicker {...pickerProps} />
             </div>
             <div className="room-settings__actions">
               <button
@@ -709,3 +633,5 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     </div>
   );
 };
+
+export default VideoPlayer;

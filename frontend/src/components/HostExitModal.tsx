@@ -1,5 +1,5 @@
 import React from 'react';
-import { BottomSheet } from './BottomSheet';
+import { BottomSheet } from '../shared/components/BottomSheet';
 
 interface HostExitModalProps {
   isOpen: boolean;

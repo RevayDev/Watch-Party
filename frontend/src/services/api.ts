@@ -1,4 +1,5 @@
 import { IRoomData, IVideoMetadata } from '../types/room';
+import { buildRestAuthHeaders } from '../shared/utils';
 
 // In production, VITE_API_URL can be set to the backend URL (e.g., https://my-watchparty-backend.onrender.com)
 // In local development or when proxying, it defaults to empty string or /api
@@ -109,6 +110,10 @@ export class ApiService {
       });
 
       xhr.open('POST', `${API_BASE_URL}/rooms/${roomId}/video`);
+      const authHeaders = buildRestAuthHeaders(roomId);
+      for (const [key, value] of Object.entries(authHeaders)) {
+        xhr.setRequestHeader(key, value);
+      }
       xhr.send(formData);
     });
   }
@@ -125,6 +130,7 @@ export class ApiService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...buildRestAuthHeaders(roomId),
       },
       body: JSON.stringify({ url, title }),
     });

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Home } from './pages/Home';
-import { CreateRoom } from './pages/CreateRoom';
-import { Room } from './pages/Room';
+import { Home } from './features/home/Home';
+import { Room } from './features/room/Room';
 import { ApiService } from './services/api';
 import { saveRecentRoom, removeRecentRoom } from './services/recentRooms';
 import { NotificationProvider, notify } from './services/notifications';
+import { STORAGE_KEYS } from './shared/constants';
+import { saveHostSession } from './shared/utils';
 
-type ViewState = 'home' | 'create' | 'room';
+type ViewState = 'home' | 'room';
 
 export const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('home');
@@ -29,9 +30,9 @@ export const App: React.FC = () => {
     setCurrentRoomId(null);
   };
 
-  const handleRoomCreated = (roomId: string, hostName: string, _hostSecret: string) => {
-    // Persist host session
-    localStorage.setItem('watchparty_host_session', JSON.stringify({ roomId, hostName }));
+  const handleRoomCreated = (roomId: string, hostName: string, hostSecret: string) => {
+    // Persist host session (incluye hostSecret para los endpoints/emits privilegiados)
+    saveHostSession(roomId, hostName, hostSecret);
     saveRecentRoom(roomId, hostName, 'host');
     setCurrentRoomId(roomId);
     setCurrentUserName(hostName);
@@ -45,12 +46,13 @@ export const App: React.FC = () => {
     try {
       await ApiService.getRoom(roomId);
     } catch {
-      localStorage.removeItem('watchparty_host_session');
+      localStorage.removeItem(STORAGE_KEYS.HOST_SESSION);
       removeRecentRoom(roomId);
       notify('error', `La sala ${roomId} ya no existe o fue eliminada. Crea una nueva sala.`, 'Sala no disponible');
       return;
     }
-    localStorage.setItem('watchparty_host_session', JSON.stringify({ roomId, hostName }));
+    // (preserva el hostSecret ya guardado para esa sala, si existe)
+    saveHostSession(roomId, hostName);
     saveRecentRoom(roomId, hostName, 'host');
     setCurrentRoomId(roomId);
     setCurrentUserName(hostName);
@@ -82,13 +84,6 @@ export const App: React.FC = () => {
           onJoinRoom={handleJoinRoom}
           onRoomCreated={handleRoomCreated}
           onReconnectHost={handleReconnectHost}
-        />
-      )}
-
-      {view === 'create' && (
-        <CreateRoom
-          onBack={handleBackToHome}
-          onRoomCreated={handleRoomCreated}
         />
       )}
 

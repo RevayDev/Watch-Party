@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react';
-import { BottomSheet } from '../components/BottomSheet';
+import { BottomSheet } from '../shared/components/BottomSheet';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
