@@ -788,9 +788,14 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
 
   const handleSyncAction = useCallback(
     (action: 'play' | 'pause' | 'seek', currentTime: number) => {
-      socket.emit('sync-video', { roomId, action, currentTime });
+      socket.emit('sync-video', {
+        roomId,
+        action,
+        currentTime,
+        ...buildSocketAuth(roomId, myName),
+      });
     },
-    [roomId, socket]
+    [roomId, socket, myName]
   );
 
   const handleSendMessage = (text: string) => {

@@ -5,6 +5,7 @@ import { clearAllPendingGraces, hasPendingGrace } from '../src/sockets/disconnec
 import { registerJoinApprovalHandlers } from '../src/sockets/handlers/join-approval.handler.js';
 import { registerModerationHandlers } from '../src/sockets/handlers/moderation.handler.js';
 import { registerSettingsHandlers } from '../src/sockets/handlers/settings.handler.js';
+import { registerSyncPlaybackHandlers } from '../src/sockets/handlers/sync-playback.handler.js';
 import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
 
 const created: string[] = [];
@@ -379,5 +380,32 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
     const stored = await RoomService.getRoomById(room.roomId);
     expect(stored?.joinRequests?.some((j) => j.userId === 'u-w')).toBe(true);
     expect(stored?.participants.some((p) => p.userId === 'u-w')).toBe(false);
+  });
+
+  it('sync-video: miembro no puede controlar play/pause/seek (action-denied)', async () => {
+    const { roomId } = await makeRoomWithMembers();
+    const { io } = makeIo();
+    const sock = makeSocket('s-mem');
+    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isHost: false, userId: 'u-mem' });
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'sync-video', { roomId, action: 'play', currentTime: 10 });
+
+    const denied = lastEmitted(sock.emitted, 'action-denied');
+    expect(denied).toHaveLength(1);
+    expect(denied[0]).toMatchObject({ event: 'sync-video' });
+  });
+
+  it('sync-video: host o cohost sí pueden emitir play/pause/seek', async () => {
+    const { roomId } = await makeRoomWithMembers();
+    const { io } = makeIo();
+    const sock = makeSocket('s-co');
+    activeUsers.set('s-co', { socketId: 's-co', roomId, userName: 'Cohost', isHost: false, userId: 'u-co' });
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'sync-video', { roomId, action: 'play', currentTime: 15 });
+
+    expect(lastEmitted(sock.emitted, 'action-denied')).toHaveLength(0);
+    expect(sock.toEmitted.some((e) => e.event === 'sync-video')).toBe(true);
   });
 });

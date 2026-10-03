@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { Server as SocketIOServer } from 'socket.io';
 import { createApp } from './app.js';
 import { connectDatabase } from './config/database.js';
+import { isOriginAllowed } from './config/cors.js';
 import { setupSocketHandlers } from './sockets/room.socket.js';
 
 dotenv.config();
@@ -18,11 +19,18 @@ async function startServer() {
   const app = createApp();
   const server = http.createServer(app);
 
-  // 3. Initialize Socket.IO with CORS enabled for LAN devices
+  // 3. Initialize Socket.IO with consistent CORS policy
   const io = new SocketIOServer(server, {
     cors: {
-      origin: '*',
+      origin: (origin, callback) => {
+        if (isOriginAllowed(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error(`Socket.IO CORS: Origen no permitido (${origin})`));
+        }
+      },
       methods: ['GET', 'POST'],
+      credentials: true,
     },
   });
 

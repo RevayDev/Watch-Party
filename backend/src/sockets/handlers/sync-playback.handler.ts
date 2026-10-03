@@ -2,17 +2,30 @@ import { Server, Socket } from 'socket.io';
 import { IVideoMetadata } from '../../types/room.types.js';
 import { RecordHeartbeatUseCase, SyncPlaybackUseCase } from '../../application/sync-playback.usecase.js';
 import { roomPlayback } from '../../domain/playback-policy.js';
+import { RoomService } from '../../services/room.service.js';
+import { requireModerator } from '../../domain/auth-policy.js';
 import { activeUsers } from '../socket-state.js';
+import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
+
+const PLAYBACK_DENIED = 'Solo el anfitrión o un co-anfitrión puede modificar la reproducción de la sala.';
 
 /** Handler de sincronización / playback. Nombres de eventos y payloads idénticos al original. */
 export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
   // 5. Video Playback Synchronization (play, pause, seek with latency compensation)
   socket.on(
     'sync-video',
-    (data: { roomId: string; action: 'play' | 'pause' | 'seek'; currentTime: number }) => {
+    async (
+      data: { roomId: string; action: 'play' | 'pause' | 'seek'; currentTime: number } & PrivilegedPayload
+    ) => {
       const { roomId, action, currentTime } = data;
       if (!roomId) return;
       const cleanRoomId = roomId.toUpperCase().trim();
+
+      const room = await RoomService.getRoomById(cleanRoomId);
+      if (!requireModerator(room, resolveSocketClaim(socket, data))) {
+        denySocket(socket, 'sync-video', PLAYBACK_DENIED);
+        return;
+      }
 
       // ── Update in-memory playback state (vía caso de uso) ──────────────────
       const payload = SyncPlaybackUseCase.execute({ roomId: cleanRoomId, action, currentTime });

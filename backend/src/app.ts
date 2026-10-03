@@ -2,6 +2,7 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { corsOptions } from './config/cors.js';
 import roomRoutes from './routes/room.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
@@ -16,7 +17,7 @@ export function createApp(): Express {
   app.set('trust proxy', 1);
 
   // Basic Middlewares
-  app.use(cors());
+  app.use(cors(corsOptions));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
