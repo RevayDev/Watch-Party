@@ -382,7 +382,7 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
     expect(stored?.participants.some((p) => p.userId === 'u-w')).toBe(false);
   });
 
-  it('sync-video: miembro no puede controlar play/pause/seek (action-denied)', async () => {
+  it('sync-video: cualquier participante puede sincronizar play/pause/seek', async () => {
     const { roomId } = await makeRoomWithMembers();
     const { io } = makeIo();
     const sock = makeSocket('s-mem');
@@ -392,8 +392,8 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
     await fire(sock.handlers, 'sync-video', { roomId, action: 'play', currentTime: 10 });
 
     const denied = lastEmitted(sock.emitted, 'action-denied');
-    expect(denied).toHaveLength(1);
-    expect(denied[0]).toMatchObject({ event: 'sync-video' });
+    expect(denied).toHaveLength(0);
+    expect(sock.toEmitted.some((e) => e.event === 'sync-video')).toBe(true);
   });
 
   it('sync-video: host o cohost sí pueden emitir play/pause/seek', async () => {

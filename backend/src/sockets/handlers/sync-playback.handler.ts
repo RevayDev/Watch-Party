@@ -3,11 +3,8 @@ import { IVideoMetadata } from '../../types/room.types.js';
 import { RecordHeartbeatUseCase, SyncPlaybackUseCase } from '../../application/sync-playback.usecase.js';
 import { roomPlayback } from '../../domain/playback-policy.js';
 import { RoomService } from '../../services/room.service.js';
-import { requireModerator } from '../../domain/auth-policy.js';
 import { activeUsers } from '../socket-state.js';
-import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
-
-const PLAYBACK_DENIED = 'Solo el anfitrión o un co-anfitrión puede modificar la reproducción de la sala.';
+import { PrivilegedPayload } from '../socket-auth.js';
 
 /** Handler de sincronización / playback. Nombres de eventos y payloads idénticos al original. */
 export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
@@ -22,10 +19,7 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       const cleanRoomId = roomId.toUpperCase().trim();
 
       const room = await RoomService.getRoomById(cleanRoomId);
-      if (!requireModerator(room, resolveSocketClaim(socket, data))) {
-        denySocket(socket, 'sync-video', PLAYBACK_DENIED);
-        return;
-      }
+      if (!room) return;
 
       // ── Update in-memory playback state (vía caso de uso) ──────────────────
       const payload = SyncPlaybackUseCase.execute({ roomId: cleanRoomId, action, currentTime });

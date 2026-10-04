@@ -152,9 +152,12 @@ export class RoomController {
         return;
       }
 
+      const userId = requestUserId(req);
+
       const { room, hostSecret } = await RoomService.createRoom({
         hostName,
         isTemporary: isTemporary !== undefined ? Boolean(isTemporary) : true,
+        userId,
       });
 
       res.status(201).json({

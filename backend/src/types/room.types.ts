@@ -67,9 +67,11 @@ export interface IRoom {
 export interface CreateRoomDTO {
   hostName: string;
   isTemporary?: boolean;
+  userId?: string;
 }
 
 export interface JoinRoomDTO {
   userName: string;
+  userId?: string;
 }
 

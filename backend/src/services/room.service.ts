@@ -81,6 +81,7 @@ export class RoomService {
       participants: [
         {
           name: dto.hostName.trim(),
+          userId: dto.userId,
           isHost: true,
           role: 'host',
           joinedAt: now,

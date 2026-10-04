@@ -40,7 +40,14 @@ export function findRequesterParticipant(
 ): IParticipant | undefined {
   const participants = room?.participants || [];
   if (claim.requesterUserId) {
-    return participants.find((p) => p.userId === claim.requesterUserId);
+    const byId = participants.find((p) => p.userId === claim.requesterUserId);
+    if (byId) return byId;
+    if (claim.requesterName) {
+      const lower = claim.requesterName.trim().toLowerCase();
+      if (!lower) return undefined;
+      return participants.find((p) => p.name.toLowerCase() === lower && !p.userId);
+    }
+    return undefined;
   }
   if (claim.requesterName) {
     const lower = claim.requesterName.trim().toLowerCase();
@@ -63,9 +70,14 @@ export function isAuthorized(
   if (!room) return false;
   if (claim.hostSecret && room.hostSecret && claim.hostSecret === room.hostSecret) return true;
   const requester = findRequesterParticipant(room, claim);
-  if (!requester) return false;
-  if (required === 'host') return isHostParticipant(requester);
-  return isModeratorParticipant(requester);
+  if (requester) {
+    if (required === 'host') return isHostParticipant(requester);
+    return isModeratorParticipant(requester);
+  }
+  if (claim.requesterName && room.hostName.toLowerCase() === claim.requesterName.trim().toLowerCase()) {
+    return true;
+  }
+  return false;
 }
 
 /** Alias expresivos para los handlers (H5/H6). */
