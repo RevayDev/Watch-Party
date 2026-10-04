@@ -57,10 +57,16 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
     >
       <div className="meet-drawer__body">
         {sideTabView === 'chat' && (
-          <Chat messages={messages} onSendMessage={handleSendMessage} currentUserName={myName} />
+          <Chat
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            currentUserName={myName}
+            onClose={() => setActiveSideTab(null)}
+          />
         )}
         {sideTabView === 'participants' && (
           <Participants
+            onClose={() => setActiveSideTab(null)}
             participants={roomData.participants}
             currentUserName={myName}
             currentUserId={userId}

@@ -73,6 +73,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   // Ref mirror of pending request count (for "new request" toasts)
   const joinRequestsLenRef = useRef(0);
   const [showHostExitModal, setShowHostExitModal] = useState(false);
+  const [showMemberExitModal, setShowMemberExitModal] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -118,16 +119,25 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
 
   // Auto-hide toolbar and header on inactivity (like YouTube / Netflix / Google Meet)
   const [isBarVisible, setIsBarVisible] = useState(true);
+  // When true, the header + bottom bar are ALWAYS visible (user chose "Mostrar interfaz")
+  // When false, they auto-hide and only the bottom bar reappears on touch/move
+  const [uiPinned, setUiPinned] = useState(true);
+  const uiPinnedRef = useRef(true);
+  uiPinnedRef.current = uiPinned;
   const hideBarTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetBarTimer = useCallback(() => {
-    // Only auto-hide in landscape mode or full desktop when inactive; NEVER hide in portrait mobile
-    const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
-    if (isMobilePortrait) {
+    // If UI is pinned, always keep everything visible and never auto-hide
+    if (uiPinnedRef.current) {
       setIsBarVisible(true);
+      if (hideBarTimeoutRef.current) {
+        clearTimeout(hideBarTimeoutRef.current);
+        hideBarTimeoutRef.current = null;
+      }
       return;
     }
 
+    // UI is NOT pinned → show bottom bar on activity, auto-hide after 4.5s
     setIsBarVisible(true);
     if (hideBarTimeoutRef.current) {
       clearTimeout(hideBarTimeoutRef.current);
@@ -161,15 +171,15 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     };
   }, [resetBarTimer]);
 
-  // If user opens menu or emoji picker, keep bar visible
+  // If user opens menu, emoji picker, or side tab (chat/participants), keep bar visible
   useEffect(() => {
-    if (showMoreMenu || showEmojiPicker) {
+    if (showMoreMenu || showEmojiPicker || activeSideTab !== null) {
       setIsBarVisible(true);
       if (hideBarTimeoutRef.current) clearTimeout(hideBarTimeoutRef.current);
     } else {
       resetBarTimer();
     }
-  }, [showMoreMenu, showEmojiPicker, resetBarTimer]);
+  }, [showMoreMenu, showEmojiPicker, activeSideTab, resetBarTimer]);
 
   // Close more menu when clicking outside
   useEffect(() => {
@@ -733,13 +743,33 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     );
   };
 
+  const toggleBarsVisibility = useCallback(() => {
+    setUiPinned((prev) => {
+      const next = !prev;
+      uiPinnedRef.current = next;
+      if (next) {
+        // Pinning: show bars immediately and cancel any pending hide timer
+        setIsBarVisible(true);
+        if (hideBarTimeoutRef.current) {
+          clearTimeout(hideBarTimeoutRef.current);
+          hideBarTimeoutRef.current = null;
+        }
+      } else {
+        // Unpinning: hide bars now and let auto-hide manage from here
+        setIsBarVisible(false);
+      }
+      return next;
+    });
+  }, []);
+
   const handleLeaveClick = () => {
     if (isHost) setShowHostExitModal(true);
-    else handleLeaveOnlyMe();
+    else setShowMemberExitModal(true);
   };
 
   const handleLeaveOnlyMe = () => {
     setShowHostExitModal(false);
+    setShowMemberExitModal(false);
     // Host session + recent room are KEPT so the room can be recovered from Home
     socket.emit('leave-room', { roomId, userName: myName, userId });
     disconnectSocket();
@@ -829,6 +859,8 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     isHost,
     showHostExitModal,
     setShowHostExitModal,
+    showMemberExitModal,
+    setShowMemberExitModal,
     messages,
     reactions,
     uploadProgress,
@@ -851,6 +883,8 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     emojiSheetRef,
     sideTabView,
     isBarVisible,
+    uiPinned,
+    toggleBarsVisibility,
     socket,
     localStream,
     remotePeers,

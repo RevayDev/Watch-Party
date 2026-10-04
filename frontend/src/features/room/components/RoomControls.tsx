@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile } from 'lucide-react';
+import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff } from 'lucide-react';
 import { Reactions } from '../../../components/Reactions';
 
 /**
@@ -27,6 +27,8 @@ interface RoomControlsProps {
   moreMenuRef: React.Ref<HTMLDivElement>;
   handleLeaveClick: () => void;
   isBarVisible: boolean;
+  uiPinned?: boolean;
+  toggleBarsVisibility: () => void;
 }
 
 export const RoomControls: React.FC<RoomControlsProps> = ({
@@ -51,6 +53,8 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   moreMenuRef,
   handleLeaveClick,
   isBarVisible,
+  uiPinned = true,
+  toggleBarsVisibility,
 }) => {
   return (
     <footer className={`meet-bottom-bar ${!isBarVisible ? 'meet-bottom-bar--hidden' : ''}`}>
@@ -164,6 +168,13 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
             >
               {isRightPanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
               <span>{isRightPanelCollapsed ? 'Mostrar cámaras' : 'Ocultar cámaras'}</span>
+            </button>
+            <button
+              className={`meet-more-item ${!uiPinned ? 'meet-more-item--active' : ''}`}
+              onClick={() => { toggleBarsVisibility(); setShowMoreMenu(false); }}
+            >
+              {uiPinned ? <EyeOff size={16} /> : <Eye size={16} />}
+              <span>{uiPinned ? 'Ocultar interfaz' : 'Mostrar interfaz'}</span>
             </button>
             <div className="meet-more-separator" />
             <button

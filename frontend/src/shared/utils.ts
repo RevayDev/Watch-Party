@@ -96,6 +96,23 @@ export function getStoredUserId(): string | undefined {
   }
 }
 
+/** Obtiene o genera y guarda un userId persistente para este navegador. */
+export function getOrCreateUserId(): string {
+  try {
+    let id = localStorage.getItem(STORAGE_KEYS.USER_ID);
+    if (!id) {
+      id =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `u-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      localStorage.setItem(STORAGE_KEYS.USER_ID, id);
+    }
+    return id;
+  } catch {
+    return `u-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
 /** Último nombre usado (o undefined si no existe). */
 export function getStoredUserName(): string | undefined {
   try {
@@ -112,25 +129,26 @@ export interface SocketAuth {
 }
 
 /** Credenciales para emits socket privilegiados (solo campos con valor). */
-export function buildSocketAuth(roomId: string, requesterName: string): SocketAuth {
+export function buildSocketAuth(roomId: string, requesterName?: string): SocketAuth {
   const auth: SocketAuth = {};
   const hostSecret = getStoredHostSecret(roomId);
   if (hostSecret) auth.hostSecret = hostSecret;
   const userId = getStoredUserId();
   if (userId) auth.requesterUserId = userId;
-  if (requesterName?.trim()) auth.requesterName = requesterName;
+  const name = requesterName?.trim() || getStoredUserName();
+  if (name) auth.requesterName = name;
   return auth;
 }
 
 /** Headers REST para endpoints privilegiados (solo los que tienen valor). */
-export function buildRestAuthHeaders(roomId: string): Record<string, string> {
+export function buildRestAuthHeaders(roomId: string, requesterName?: string): Record<string, string> {
   const headers: Record<string, string> = {};
   const hostSecret = getStoredHostSecret(roomId);
   if (hostSecret) headers['x-host-secret'] = hostSecret;
   const userId = getStoredUserId();
   if (userId) headers['x-user-id'] = userId;
-  const userName = getStoredUserName();
-  if (userName) headers['x-user-name'] = userName;
+  const name = requesterName?.trim() || getStoredUserName();
+  if (name) headers['x-user-name'] = name;
   return headers;
 }
 
@@ -144,10 +162,14 @@ export function saveHostSession(roomId: string, hostName: string, hostSecret?: s
     if (!secret) {
       secret = getStoredHostSecret(roomId);
     }
-    localStorage.setItem(
-      STORAGE_KEYS.HOST_SESSION,
-      JSON.stringify(secret ? { roomId, hostName, hostSecret: secret } : { roomId, hostName })
-    );
+    const sessionObj: { roomId: string; hostName: string; hostSecret?: string } = {
+      roomId,
+      hostName,
+    };
+    if (secret) {
+      sessionObj.hostSecret = secret;
+    }
+    localStorage.setItem(STORAGE_KEYS.HOST_SESSION, JSON.stringify(sessionObj));
   } catch {
     // storage unavailable → se ignora (igual que el resto de persistencia)
   }

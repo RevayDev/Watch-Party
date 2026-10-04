@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../../types/room';
 import { BottomSheet } from '../../shared/components/BottomSheet';
@@ -525,6 +525,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               title="Cambiar video: subir archivo o pegar enlace"
               type="button"
             >
+              <RefreshCw size={13} className="player-change-btn__icon" />
               <span>Cambiar</span>
             </button>
           )}
@@ -540,6 +541,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           type="button"
           style={{ opacity: showControls ? 1 : 0, pointerEvents: showControls ? 'auto' : 'none' }}
         >
+          <RefreshCw size={13} className="player-change-btn__icon" />
           <span>Cambiar</span>
         </button>
       )}

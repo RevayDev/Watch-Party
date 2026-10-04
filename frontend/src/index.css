@@ -74,31 +74,17 @@
     background 0.3s ease;
 }
 
-/* Navbar y Barra inferior: Fijos y siempre visibles en PC y teléfonos verticales */
+/* Navbar y Barra inferior: se ocultan suavemente cuando se activa la clase --hidden */
 .header--hidden {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  transform: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-100%) !important;
 }
 
 .meet-bottom-bar--hidden {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  transform: none !important;
-}
-
-/* Solo en teléfonos en modo horizontal (Landscape / cine) se ocultan suavemente para maximizar la pantalla */
-@media (max-height: 520px) and (orientation: landscape) {
-  .header--hidden {
-    opacity: 0 !important;
-    pointer-events: none !important;
-    transform: translateY(-100%) !important;
-  }
-  .meet-bottom-bar--hidden {
-    opacity: 0 !important;
-    pointer-events: none !important;
-    transform: translateY(100%) !important;
-  }
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(100%) !important;
 }
 
 .header__brand {
@@ -2795,15 +2781,16 @@ div[id] {
   margin-top: 0.65rem;
 }
 .room-settings__timer-chip {
-  padding: 0.5rem 0.25rem;
+  padding: 0.4rem 0.15rem;
   border-radius: 0.55rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #cbd5e1;
   font-family: inherit;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
   transition:
     background 0.15s ease,
     border-color 0.15s ease,
@@ -2844,6 +2831,27 @@ div[id] {
   background: #000000;
   overflow: hidden;
   position: relative;
+}
+
+.meet-layout--bars-hidden .header {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-100%) !important;
+  position: absolute !important;
+}
+
+.meet-layout--bars-hidden .meet-bottom-bar {
+  position: absolute !important;
+  bottom: 0.75rem !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+}
+
+.meet-layout--bars-hidden .meet-bottom-bar--hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateX(-50%) translateY(120%) !important;
 }
 
 .meet-stage {
@@ -2955,20 +2963,67 @@ div[id] {
   flex-direction: column;
 }
 
+.drawer-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.drawer-close-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.drawer-close-btn:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.drawer-close-btn:focus-visible {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 2px;
+}
+
+/* La X para cerrar drawers (chat y participantes) se muestra en escritorio y en modo horizontal,
+   pero se oculta en teléfonos en vertical (portrait) donde el cierre es por swipe / drag / backdrop */
+@media (max-width: 1024px) and (orientation: portrait) {
+  .drawer-close-btn {
+    display: none !important;
+  }
+}
+
 /* ── Google Meet Floating Circular Bottom Bar ── */
 .meet-bottom-bar {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem 1rem;
+  flex-wrap: nowrap;
+  gap: 0.65rem;
+  padding: 0.5rem 1.15rem;
+  margin: 0.25rem auto 1rem;
   background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9999px;
   flex-shrink: 0;
   z-index: 50;
+  width: fit-content;
+  max-width: calc(100vw - 2rem);
   transition:
     opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.3s ease;
 }
 
 /* ── Meet Icon Buttons (Mic, Cámara, Reacciones, etc.) — solo icono ── */
@@ -3149,6 +3204,14 @@ div[id] {
   .meet-btn--mobile-only {
     display: inline-flex !important;
   }
+  /* En teléfono la barra conserva su píldora de fondo */
+  .meet-bottom-bar {
+    background: rgba(13, 17, 34, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 10px 30px rgba(6, 8, 20, 0.45);
+  }
 }
 
 /* ── More Menu (⋯ dropdown) ── */
@@ -3302,21 +3365,55 @@ div[id] {
 .player-change-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  color: #fff;
+  gap: 0.4rem;
+  background: rgba(99, 102, 241, 0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(129, 140, 248, 0.38);
+  color: #f1f5f9;
   font-size: 0.78rem;
   font-weight: 600;
-  padding: 0.3rem 0.65rem;
+  padding: 0.32rem 0.75rem;
   border-radius: 9999px;
   cursor: pointer;
   font-family: inherit;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
+
 .player-change-btn:hover {
-  background: var(--color-primary-dark);
-  border-color: var(--color-primary-dark);
+  background: rgba(99, 102, 241, 0.32);
+  border-color: rgba(165, 180, 252, 0.65);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.28);
+  transform: translateY(-1px);
+}
+
+.player-change-btn:active {
+  transform: translateY(0) scale(0.96);
+  background: rgba(99, 102, 241, 0.42);
+}
+
+.player-change-btn:focus-visible {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 2px;
+}
+
+.player-change-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.player-change-btn__icon {
+  flex-shrink: 0;
+  color: #a5b4fc;
+  transition: transform 0.35s ease;
+}
+
+.player-change-btn:hover .player-change-btn__icon {
+  transform: rotate(180deg);
+  color: #ffffff;
 }
 
 /* Mobile-only floating "Cambiar" button (top bar auto-hides on touch devices).
@@ -3334,28 +3431,36 @@ div[id] {
     z-index: 11;
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    background: var(--color-primary);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 1px solid var(--color-primary);
-    color: #fff;
+    gap: 0.4rem;
+    background: rgba(15, 23, 42, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(129, 140, 248, 0.38);
+    color: #f1f5f9;
     font-size: 0.78rem;
     font-weight: 600;
     font-family: inherit;
-    padding: 0.3rem 0.65rem;
+    padding: 0.32rem 0.75rem;
     border-radius: 9999px;
     cursor: pointer;
-    transition:
-      background 0.15s ease,
-      transform 0.15s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .player-change-fab:hover {
-    background: var(--color-primary-dark);
+    background: rgba(99, 102, 241, 0.32);
+    border-color: rgba(165, 180, 252, 0.65);
+    color: #ffffff;
   }
   .player-change-fab:active {
     transform: scale(0.95);
-    background: var(--color-primary-dark);
+    background: rgba(99, 102, 241, 0.45);
+  }
+  .player-change-fab:focus-visible {
+    outline: 2px solid var(--color-primary-light);
+    outline-offset: 2px;
+  }
+  .player-change-fab .player-change-btn__icon {
+    color: #a5b4fc;
   }
   /* Avoid double button when the auto-hiding top bar is visible */
   .player-container__topbar .player-change-btn {
@@ -4306,39 +4411,47 @@ div[id] {
 }
 
 /* ==========================================================================
-   Landscape Mobile (Phones in horizontal mode: max-height: 520px and orientation: landscape)
-   Matches the exact reference: Video on the left + 2-col camera grid on right + floating auto-hide controls
+   Landscape Mobile (Phones in horizontal mode: max-height: 550px and orientation: landscape)
+   Adaptación cinematográfica: video predominante, interfaz limpia y controlable
    ========================================================================== */
-@media (max-height: 520px) and (orientation: landscape) {
+@media (max-height: 550px) and (orientation: landscape) {
+  /* En teléfonos horizontal, los botones móviles (incluyendo ⋯) deben ser visibles */
+  .meet-btn--hide-mobile {
+    display: none !important;
+  }
+  .meet-btn--mobile-only {
+    display: inline-flex !important;
+  }
+
+  .meet-layout {
+    height: 100dvh !important;
+    width: 100vw !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+  }
+
   .header {
-    min-height: 38px;
-    padding: 0.3rem 0.75rem;
-  }
-  .header__brand-text {
-    font-size: 0.85rem;
-  }
-  .header__room-pill {
-    padding: 0.18rem 0.45rem;
-    font-size: 0.72rem;
-  }
-  .header__host-pill,
-  .header__users-pill {
-    padding: 0.18rem 0.45rem;
-    font-size: 0.7rem;
+    margin: 0.65rem 1.5rem 0.4rem !important;
+    padding: 0.35rem 0.9rem !important;
+    min-height: 42px !important;
+    font-size: 0.82rem !important;
+    max-width: calc(100vw - 3rem) !important;
   }
 
   .meet-stage {
     display: grid !important;
-    grid-template-columns: 1.35fr 1fr !important;
-    flex-direction: unset !important;
-    gap: 0.5rem !important;
-    padding: 0.25rem 0.6rem 0 !important;
+    grid-template-columns: 1fr 180px !important;
+    gap: 0.6rem !important;
+    padding: 0 1.5rem 0.4rem !important;
     overflow: hidden !important;
-    height: 100% !important;
+    flex: 1 !important;
+    min-height: 0 !important;
   }
 
   .meet-stage--cams-collapsed {
     grid-template-columns: 1fr !important;
+    padding: 0 1.5rem 0.4rem !important;
   }
 
   .meet-stage__video-wrapper {
@@ -4346,13 +4459,20 @@ div[id] {
     height: 100% !important;
     min-height: 0 !important;
     border-radius: var(--radius-md) !important;
+    background: #000 !important;
   }
 
   .player-container {
     flex: 1 !important;
     height: 100% !important;
     width: 100% !important;
-    aspect-ratio: auto !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .player-container__video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
   }
 
   .meet-stage__cams-strip {
@@ -4360,11 +4480,12 @@ div[id] {
     overflow-y: auto !important;
     overflow-x: hidden !important;
     padding-right: 2px !important;
+    gap: 0.35rem !important;
   }
 
   .cam-grid {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 0.35rem !important;
     height: auto !important;
     overflow-y: visible !important;
@@ -4372,35 +4493,53 @@ div[id] {
 
   .cam-tile {
     aspect-ratio: 16 / 10 !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
+    min-height: 70px !important;
   }
   .cam-tile__name-pill {
     font-size: 0.65rem !important;
     padding: 0.1rem 0.35rem !important;
-    bottom: 4px !important;
-    left: 4px !important;
+    bottom: 3px !important;
+    left: 3px !important;
   }
   .cam-tile__avatar-circle {
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 0.85rem !important;
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 0.8rem !important;
   }
 
-  /* Floating Bottom Bar in Landscape */
+  /* Bottom Bar in Landscape: cápsula centrada perfectamente en la pantalla */
   .meet-bottom-bar {
+    position: relative !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    margin: 0 0 0.4rem !important;
+    padding: 0.35rem 0.85rem !important;
+    gap: 0.5rem !important;
+    background: rgba(13, 17, 34, 0.88) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border-radius: 9999px !important;
+    box-shadow: 0 10px 30px rgba(6, 8, 20, 0.45) !important;
+    z-index: 50 !important;
+    width: fit-content !important;
+  }
+
+  .meet-layout--bars-hidden .meet-bottom-bar {
     position: absolute !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    background: linear-gradient(
-      to top,
-      rgba(0, 0, 0, 0.85) 0%,
-      rgba(0, 0, 0, 0.4) 60%,
-      transparent 100%
-    ) !important;
-    border-top: none !important;
-    padding: 0.25rem 0.5rem calc(0.3rem + env(safe-area-inset-bottom, 0px)) !important;
-    gap: 0.6rem !important;
+    bottom: 0.4rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    margin: 0 !important;
+    background: rgba(13, 17, 34, 0.88) !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  }
+
+  .meet-layout--bars-hidden .meet-bottom-bar--hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateX(-50%) translateY(120%) !important;
   }
 
   .meet-circle-btn {
@@ -4422,6 +4561,118 @@ div[id] {
   .meet-toasts {
     bottom: 50px !important;
     right: 0.5rem !important;
+  }
+
+  /* ── Modales y BottomSheet en Horizontal ── */
+  .sheet__dock {
+    align-items: center !important;
+    padding: 0.4rem !important;
+  }
+
+  .sheet {
+    width: min(520px, 94vw) !important;
+    max-height: 94dvh !important;
+    border-radius: var(--radius-lg) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    padding: 0.75rem 1rem !important;
+    margin: auto !important;
+  }
+
+  .sheet .sheet-handle {
+    display: none !important;
+  }
+
+  /* Chat adaptado para pantalla horizontal */
+  .drawer-chat {
+    max-height: 85dvh !important;
+  }
+
+  .drawer-chat__messages {
+    padding: 0.4rem 0.5rem !important;
+    gap: 0.25rem !important;
+  }
+
+  .drawer-chat__msg {
+    font-size: 0.8rem !important;
+    padding: 0.35rem 0.55rem 0.25rem !important;
+  }
+
+  .drawer-chat__input-bar {
+    padding: 0.35rem 0.5rem !important;
+  }
+
+  .drawer-chat__input {
+    padding: 0.45rem 0.75rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* Participantes adaptados para horizontal */
+  .part-layout {
+    max-height: 85dvh !important;
+    flex-direction: row !important;
+  }
+
+  .part-header {
+    padding: 0.45rem 0.75rem !important;
+  }
+
+  .part-header__title h2 {
+    font-size: 0.95rem !important;
+  }
+
+  .part-tabs {
+    padding: 0.25rem 0.5rem !important;
+    gap: 0.25rem !important;
+  }
+
+  .part-tab {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.76rem !important;
+  }
+
+  .part-search-wrap {
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  .part-search-input {
+    padding: 0.4rem 0.65rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  .part-list {
+    padding: 0 0.5rem !important;
+  }
+
+  .part-item {
+    padding: 0.35rem 0.5rem !important;
+  }
+
+  .part-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .part-name {
+    font-size: 0.78rem !important;
+  }
+
+  .part-footer {
+    padding: 0.35rem 0.5rem !important;
+  }
+
+  .part-footer__btn {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Drawer inline en horizontal */
+  .meet-drawer {
+    top: 0.35rem !important;
+    right: 0.5rem !important;
+    bottom: 0.35rem !important;
+    width: 320px !important;
+    max-height: calc(100dvh - 0.7rem) !important;
   }
 }
 
@@ -4537,6 +4788,7 @@ div[id] {
 
 /* Top Navigation Tabs */
 .part-tabs {
+  margin-top: 0.5rem ;
   display: flex;
   gap: 0.4rem;
   padding: 0 1.25rem 0.75rem;
@@ -4570,23 +4822,6 @@ div[id] {
   background: var(--color-primary);
   color: #ffffff;
   border-color: var(--color-primary);
-}
-
-.part-badge {
-  font-size: 0.68rem;
-  padding: 0.05rem 0.35rem;
-  border-radius: 9999px;
-  font-weight: 700;
-}
-
-.part-badge--blue {
-  background: rgba(99, 102, 241, 0.28);
-  color: #c7d2fe;
-}
-
-.part-tab--active .part-badge--blue {
-  background: #ffffff;
-  color: var(--color-primary-dark);
 }
 
 /* Search input */
@@ -5281,6 +5516,7 @@ div[id] {
 
 /* Information section */
 .part-info-section {
+  margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -6072,22 +6308,66 @@ div[id] {
 }
 
 .notif-toast {
+  position: relative;
+  overflow: hidden;
   pointer-events: auto;
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  padding: 0.7rem 0.75rem;
+  padding: 0.75rem 0.8rem 0.9rem 0.8rem;
   background: rgba(13, 19, 33, 0.97);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   backdrop-filter: blur(12px);
   transform-origin: right center;
   animation: notifSlideIn 0.25s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .notif-toast--leaving {
   animation: notifSlideOut 0.25s ease forwards;
   pointer-events: none;
+}
+
+/* ── Notification countdown progress bar ── */
+.notif-toast__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  width: 100%;
+  transform-origin: left center;
+  animation-name: notifCountdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  pointer-events: none;
+}
+
+.notif-toast__progress--success {
+  background: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+}
+.notif-toast__progress--error {
+  background: #f87171;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+}
+.notif-toast__progress--warning {
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+.notif-toast__progress--info {
+  background: #60a5fa;
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.4);
+}
+
+@keyframes notifCountdown {
+  0% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+  }
 }
 
 /* Entra estirándose desde la derecha */
@@ -6137,23 +6417,6 @@ div[id] {
   word-break: break-word;
   overflow-wrap: anywhere;
   white-space: normal;
-}
-
-.notif-toast--success {
-  border-left: none;
-  border-bottom: 3px solid #34d399;
-}
-.notif-toast--error {
-  border-left: none;
-  border-bottom: 3px solid #f87171;
-}
-.notif-toast--warning {
-  border-left: none;
-  border-bottom: 3px solid #fbbf24;
-}
-.notif-toast--info {
-  border-left: none;
-  border-bottom: 3px solid #60a5fa;
 }
 
 .notif-toast__close {
@@ -6264,11 +6527,11 @@ div[id] {
    Configuración en dos columnas
 ───────────────────────────────────── */
 
-/* Panel compacto que se adapta al contenido (una columna, sin espacios vacíos) */
+/* Panel compacto en dos columnas (una a cada lado), adaptado al contenido */
 .room-settings__columns {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
   align-items: start;
 }
 
@@ -6281,7 +6544,8 @@ div[id] {
 
 /* Evita que el modal quede demasiado ancho */
 .modal-card--settings {
-  width: min(560px, calc(100vw - 40px));
+  width: min(640px, calc(100vw - 40px));
+  max-width: min(640px, calc(100vw - 40px));
   max-height: 92vh;
   overflow-y: auto;
   overflow-wrap: anywhere;
@@ -6455,7 +6719,7 @@ div[id] {
 }
 
 .sheet.modal-card--settings {
-  max-height: 92dvh;
+  max-height: 120dvh;
 }
 
 /* Desktop: centered modal */
@@ -6497,7 +6761,8 @@ div[id] {
   }
 
   .sheet.modal-card--settings {
-    width: min(1500px, calc(100vw - 40px));
+    width: min(640px, calc(100vw - 40px));
+    max-width: min(640px, calc(100vw - 40px));
     max-height: 95vh;
   }
 }

@@ -1,5 +1,5 @@
 import { IRoomData, IVideoMetadata } from '../types/room';
-import { buildRestAuthHeaders } from '../shared/utils';
+import { buildRestAuthHeaders, getStoredUserId } from '../shared/utils';
 
 // In production, VITE_API_URL can be set to the backend URL (e.g., https://my-watchparty-backend.onrender.com)
 // In local development or when proxying, it defaults to empty string or /api
@@ -17,12 +17,20 @@ export class ApiService {
     hostName: string,
     isTemporary: boolean = true
   ): Promise<{ roomId: string; hostSecret: string; hostName: string; isTemporary?: boolean }> {
+    const userId = getStoredUserId();
+    const body: { hostName: string; isTemporary: boolean; userId?: string } = {
+      hostName,
+      isTemporary,
+    };
+    if (userId) body.userId = userId;
+
     const response = await fetch(`${API_BASE_URL}/rooms`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(userId ? { 'x-user-id': userId, 'x-user-name': hostName.trim() } : {}),
       },
-      body: JSON.stringify({ hostName, isTemporary }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -51,12 +59,17 @@ export class ApiService {
    * Join an existing room with user name.
    */
   static async joinRoom(roomId: string, userName: string): Promise<IRoomData> {
+    const userId = getStoredUserId();
+    const body: { userName: string; userId?: string } = { userName };
+    if (userId) body.userId = userId;
+
     const response = await fetch(`${API_BASE_URL}/rooms/${roomId}/join`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...buildRestAuthHeaders(roomId, userName),
       },
-      body: JSON.stringify({ userName }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

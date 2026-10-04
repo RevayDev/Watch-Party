@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { BottomSheet } from '../../shared/components/BottomSheet';
 import { TimelineEvent } from './homeData';
@@ -27,6 +27,24 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
   error,
   onSubmit,
 }) => {
+  const hostInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => {
+        hostInputRef.current?.focus();
+        hostInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    setTimeout(() => {
+      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  };
+
   return (
     <BottomSheet
       open={open}
@@ -39,8 +57,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
       </div>
 
       <p className="host-exit-modal__desc">
-        Tú serás el anfitrión (Host) y tendrás el control inicial de la
-        sincronización del video y los controles de reproducción.
+        Tú serás el anfitrión (Host) de la sala y podrás compartir el enlace con tus amigos.
       </p>
 
       {error && (
@@ -68,11 +85,13 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             Tu nombre como Anfitrión
           </label>
           <input
+            ref={hostInputRef}
             type="text"
             className="form-group__input"
             placeholder="Ej. Roberto"
             value={hostName}
             onChange={(e) => setHostName(e.target.value)}
+            onFocus={handleInputFocus}
             disabled={loading}
             autoFocus
             required
@@ -190,6 +209,24 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
   setIsUrlInvite,
   onSubmit,
 }) => {
+  const userInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => {
+        userInputRef.current?.focus();
+        userInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    setTimeout(() => {
+      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  };
+
   return (
     <BottomSheet
       open={open}
@@ -241,11 +278,13 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
             Tu nombre de usuario
           </label>
           <input
+            ref={userInputRef}
             type="text"
             className="form-group__input"
             placeholder="Ej. Roberto"
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
+            onFocus={handleInputFocus}
             autoFocus
             required
           />
@@ -265,6 +304,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
               placeholder="Ej. 8FK29X"
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value)}
+              onFocus={handleInputFocus}
               maxLength={8}
               style={{
                 textTransform: 'uppercase',

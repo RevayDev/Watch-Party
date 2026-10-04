@@ -96,7 +96,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const notifyFn = useCallback(
     (type: ToastType, message: string, title?: string, onClick?: () => void) => {
       const id = Math.random().toString(36).substring(2, 9);
-      setToasts((prev) => [...prev.slice(-3), { id, type, title, message, onClick }]);
+      setToasts((prev) => {
+        const next = [...prev, { id, type, title, message, onClick }];
+        if (next.length > 3) {
+          const removed = next.slice(0, next.length - 3);
+          removed.forEach((t) => {
+            const timers = timersRef.current.get(t.id);
+            if (timers?.mark) clearTimeout(timers.mark);
+            if (timers?.remove) clearTimeout(timers.remove);
+            timersRef.current.delete(t.id);
+          });
+          return next.slice(-3);
+        }
+        return next;
+      });
       const markTimer = setTimeout(() => {
         setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
         const removeTimer = setTimeout(() => removeToast(id), TOAST_EXIT_MS);
@@ -177,6 +190,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             >
               <X size={14} />
             </button>
+            <div
+              className={`notif-toast__progress notif-toast__progress--${toast.type}`}
+              style={{ animationDuration: `${TOAST_DURATION}ms` }}
+            />
           </div>
         ))}
       </div>

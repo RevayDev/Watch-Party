@@ -4,6 +4,7 @@ import { RoomHeader } from '../../components/RoomHeader';
 import { VideoPlayer } from '../player/VideoPlayer';
 import { CameraGrid } from '../../components/CameraGrid';
 import { HostExitModal } from '../../components/HostExitModal';
+import { MemberExitModal } from '../../components/MemberExitModal';
 import { RoomSettingsModal } from '../../components/RoomSettingsModal';
 import { WaitingApproval } from '../waiting/WaitingApproval';
 import { useRoomSocket } from './hooks/useRoomSocket';
@@ -24,6 +25,8 @@ export interface RoomProps {
  */
 export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsHost, onLeave }) => {
   const r = useRoomSocket({ roomId, userName, initialIsHost, onLeave });
+
+
 
   // ── Render states ─────────────────────────────────────────────────────────
 
@@ -81,7 +84,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
   }
 
   return (
-    <div className={`meet-layout ${!r.isBarVisible ? 'meet-layout--bars-hidden' : ''}`}>
+    <div className={`meet-layout ${!r.uiPinned ? 'meet-layout--bars-hidden' : ''}`}>
       {/* ── Top Header (Google Meet style) ── */}
       <RoomHeader
         roomId={r.roomData.roomId}
@@ -94,7 +97,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         onOpenParticipants={() => r.setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
         participantsActive={r.sideTabView === 'participants'}
         onLeaveClick={r.handleLeaveClick}
-        className={!r.isBarVisible ? 'header--hidden' : ''}
+        className={!r.uiPinned ? 'header--hidden' : ''}
       />
 
       {/* ── Main Stage Area: Left Video + Right Vertical Cameras Strip ── */}
@@ -178,6 +181,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         moreMenuRef={r.moreMenuRef}
         handleLeaveClick={r.handleLeaveClick}
         isBarVisible={r.isBarVisible}
+        uiPinned={r.uiPinned}
+        toggleBarsVisibility={r.toggleBarsVisibility}
       />
 
       {r.mediaError && <div className="meet-error-banner">⚠️ {r.mediaError}</div>}
@@ -189,6 +194,12 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         onClose={() => r.setShowHostExitModal(false)}
         onLeaveOnlyMe={r.handleLeaveOnlyMe}
         onDeleteRoomForAll={r.handleDeleteRoomForAll}
+      />
+
+      <MemberExitModal
+        isOpen={r.showMemberExitModal}
+        onClose={() => r.setShowMemberExitModal(false)}
+        onConfirmLeave={r.handleLeaveOnlyMe}
       />
 
       {/* ⚙ Room settings: name, info, save-mode (temporary/stored), approval and auto-close timer */}
