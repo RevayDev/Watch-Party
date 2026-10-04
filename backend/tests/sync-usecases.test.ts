@@ -119,6 +119,16 @@ describe('SyncPlaybackUseCase: snapshot y payload', () => {
     });
   });
 
+  it('seek conserva el estado de reproducción anterior (no lo clobbera)', () => {
+    const roomId = freshRoom('SP');
+    SyncPlaybackUseCase.execute({ roomId, action: 'play', currentTime: 10 });
+    SyncPlaybackUseCase.execute({ roomId, action: 'seek', currentTime: 20 });
+    const ref = ResolveSyncTimeUseCase.execute(roomId, []);
+    expect(ref).not.toBeNull();
+    expect(ref!.currentTime).toBeCloseTo(20, 0);
+    expect(ref!.isPlaying).toBe(true);
+  });
+
   it('el consenso de heartbeats tiene prioridad sobre el snapshot', () => {    const roomId = freshRoom('SP');
     SyncPlaybackUseCase.execute({ roomId, action: 'pause', currentTime: 5 });
     const stamp = new Date().toISOString();

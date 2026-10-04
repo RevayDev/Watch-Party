@@ -233,14 +233,11 @@ describe('SyncPlaybackUseCase / RecordHeartbeatUseCase', () => {
     expect(roomPlayback.get(ROOM)).toMatchObject({ currentTime: 12.5, isPlaying: true });
   });
 
-  it('HALLAZGO-documentado: seek sobrescribe el snapshot como pausado (isPlaying=false)', () => {
-    // Comportamiento actual verbatim del handler original: un seek durante
-    // reproducción deja el snapshot en pausa hasta el próximo heartbeat.
-    // Ver HALLAZGO H2 en el reporte. Si se corrige (preservar estado previo),
-    // este test debe actualizarse.
+  it('seek conserva el estado previo del snapshot (no lo marca pausado)', () => {
+    // Corregido 2026-10-04: SyncPlaybackUseCase preserva isPlaying en seek.
     SyncPlaybackUseCase.execute({ roomId: ROOM, action: 'play', currentTime: 50 });
     SyncPlaybackUseCase.execute({ roomId: ROOM, action: 'seek', currentTime: 60 });
-    expect(roomPlayback.get(ROOM)).toMatchObject({ currentTime: 60, isPlaying: false });
+    expect(roomPlayback.get(ROOM)).toMatchObject({ currentTime: 60, isPlaying: true });
   });
 
   it('heartbeat válido de un miembro se registra y alimenta el consenso', () => {

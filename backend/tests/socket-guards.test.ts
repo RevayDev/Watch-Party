@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
 import { RoomService } from '../src/services/room.service.js';
 import { activeUsers } from '../src/sockets/socket-state.js';
 import { clearAllPendingGraces, hasPendingGrace } from '../src/sockets/disconnect-grace.js';
