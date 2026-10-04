@@ -28,16 +28,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('CORS estricto: allowlist reducida a CLIENT_URL + 5173 (sin 3000/4000)', () => {
-  it('en desarrollo la allowlist es EXACTAMENTE CLIENT_URL + localhost/127.0.0.1:5173', () => {
+describe('CORS estricto: allowlist reducida (sin 3000/4000)', () => {
+  it('en desarrollo la allowlist es CLIENT_URL + loopback 5173/4173', () => {
     process.env.NODE_ENV = 'development';
     process.env.CLIENT_URL = 'https://mi-app.vercel.app';
     const allowed = getAllowedOrigins() as string[];
-    expect(allowed).toHaveLength(3);
+    expect(allowed).toHaveLength(5);
     expect(allowed).toEqual([
       'https://mi-app.vercel.app',
       'http://localhost:5173',
       'http://127.0.0.1:5173',
+      'http://localhost:4173',
+      'http://127.0.0.1:4173',
     ]);
   });
 
