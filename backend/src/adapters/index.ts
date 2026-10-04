@@ -21,8 +21,7 @@ export class SocketEventBus implements EventBus {
   }
 
   broadcastExcept(roomId: string, exceptSocketId: string, event: string, payload?: unknown): void {
-    void exceptSocketId;
-    this.io.to(roomId).emit(event, payload);
+    this.io.to(roomId).except(exceptSocketId).emit(event, payload);
   }
 }
 

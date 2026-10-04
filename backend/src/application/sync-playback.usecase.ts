@@ -4,13 +4,18 @@ import {
   setPlaybackSnapshot,
 } from '../domain/playback-policy.js';
 
+const VALID_ACTIONS = new Set(['play', 'pause', 'seek']);
+
 /** Caso de uso: sincronizar playback (play/pause/seek). Delgado: actualiza el snapshot y devuelve el payload a emitir. */
 export class SyncPlaybackUseCase {
   static execute(input: { roomId: string; action: 'play' | 'pause' | 'seek'; currentTime: number }): {
     action: 'play' | 'pause' | 'seek';
     currentTime: number;
     sentAt: number;
-  } {
+  } | null {
+    if (!input || !input.roomId) return null;
+    if (!VALID_ACTIONS.has(input.action)) return null;
+    if (!Number.isFinite(input.currentTime) || input.currentTime < 0) return null;
     const cleanRoomId = input.roomId.toUpperCase().trim();
     setPlaybackSnapshot(cleanRoomId, input.currentTime, input.action === 'play');
     return { action: input.action, currentTime: input.currentTime, sentAt: Date.now() };

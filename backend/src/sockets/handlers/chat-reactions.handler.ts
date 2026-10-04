@@ -3,9 +3,10 @@ import { Server, Socket } from 'socket.io';
 /** Handler de chat y reacciones. Nombres de eventos y payloads idénticos al original. */
 export function registerChatReactionsHandlers(io: Server, socket: Socket): void {
   // 7. Chat Message
-  socket.on('send-message', (data: { roomId: string; text: string; userName: string }) => {
+  socket.on('send-message', (data: { roomId: string; text: string; userName: string } | undefined) => {
+    if (!data) return;
     const { roomId, text, userName } = data;
-    if (!roomId || !text.trim()) return;
+    if (!roomId || typeof text !== 'string' || !text.trim()) return;
     const cleanRoomId = roomId.toUpperCase().trim();
 
     const messagePayload = {
@@ -19,9 +20,10 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
   });
 
   // 8. Reaction (Emoji float animation)
-  socket.on('send-reaction', (data: { roomId: string; emoji: string; userName: string }) => {
+  socket.on('send-reaction', (data: { roomId: string; emoji: string; userName: string } | undefined) => {
+    if (!data) return;
     const { roomId, emoji, userName } = data;
-    if (!roomId || !emoji) return;
+    if (!roomId || typeof emoji !== 'string' || !emoji) return;
     const cleanRoomId = roomId.toUpperCase().trim();
 
     const reactionPayload = {

@@ -23,6 +23,7 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
 
       // ── Update in-memory playback state (vía caso de uso) ──────────────────
       const payload = SyncPlaybackUseCase.execute({ roomId: cleanRoomId, action, currentTime });
+      if (!payload) return;
 
       socket.to(cleanRoomId).emit('sync-video', {
         action: payload.action,

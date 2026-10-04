@@ -11,7 +11,8 @@ export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
       offer: unknown;
       callerName: string;
       callerIsHost: boolean;
-    }) => {
+    } | undefined) => {
+      if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
       io.to(data.targetSocketId).emit('webrtc-offer', {
         senderSocketId: socket.id,
         offer: data.offer,
@@ -21,14 +22,16 @@ export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  socket.on('webrtc-answer', (data: { targetSocketId: string; answer: unknown }) => {
+  socket.on('webrtc-answer', (data: { targetSocketId: string; answer: unknown } | undefined) => {
+    if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
     io.to(data.targetSocketId).emit('webrtc-answer', {
       senderSocketId: socket.id,
       answer: data.answer,
     });
   });
 
-  socket.on('webrtc-ice-candidate', (data: { targetSocketId: string; candidate: unknown }) => {
+  socket.on('webrtc-ice-candidate', (data: { targetSocketId: string; candidate: unknown } | undefined) => {
+    if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
     io.to(data.targetSocketId).emit('webrtc-ice-candidate', {
       senderSocketId: socket.id,
       candidate: data.candidate,

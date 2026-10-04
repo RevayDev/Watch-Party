@@ -1,7 +1,7 @@
 /**
  * Puerto mínimo de bus de eventos (hexagonal).
  * Abstrae Socket.IO para que los casos de uso no dependan del transporte.
- * El adaptador real vive en src/adapters/socket-event-bus.ts y delega en `io`.
+ * El adaptador real (`SocketEventBus`) vive en `src/adapters/index.ts` y delega en `io`.
  */
 export interface EventBus {
   /** Emite a todos los sockets unidos a una sala. */

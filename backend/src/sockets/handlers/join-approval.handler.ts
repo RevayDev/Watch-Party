@@ -21,7 +21,8 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
   socket.on(
     'join-room',
     async (data: { roomId: string; userName: string; isHost?: boolean; userId?: string }) => {
-      const { roomId, userName, isHost = false, userId } = data;
+      const { roomId, userName, isHost: _clientIsHost = false, userId } = data;
+      void _clientIsHost; // ignorado a propósito: el host se valida en el servidor
       if (!roomId || !userName) return;
 
       const cleanRoomId = roomId.toUpperCase().trim();
@@ -72,8 +73,9 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         return !p.userId && p.name.toLowerCase() === cleanName.toLowerCase();
       });
 
+      // El host se reconoce por estado del servidor (nombre o registro),
+      // NUNCA por el flag `isHost` que envía el cliente.
       const isActuallyHost =
-        isHost ||
         (existingRoom && existingRoom.hostName.toLowerCase() === cleanName.toLowerCase()) ||
         Boolean(participantMatch?.isHost);
 
