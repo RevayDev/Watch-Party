@@ -258,16 +258,21 @@ build verde (`frontend npm run build`, `backend npx tsc --noEmit`), sin `alert/c
 
 ---
 
-## Resuelto 2026-10-04 (auditoría 3 subagentes + integración)
+## Resuelto 2026-10-04 (auditorï¿½a 3 subagentes + integraciï¿½n)
 
-- QA fijó baseline: backend 117 tests, frontend 63 tests; nuevos witnesses it.fails para B1/B2.
-- Corregido: join-room ya NO confía en el flag isHost del cliente (solo nombre registrado o participante persistido).
+- QA fijï¿½ baseline: backend 117 tests, frontend 63 tests; nuevos witnesses it.fails para B1/B2.
+- Corregido: join-room ya NO confï¿½a en el flag isHost del cliente (solo nombre registrado o participante persistido).
 - Corregido B1: send-message/send-reaction descartan payload undefined/no-string sin lanzar.
-- Corregido B2: relay webrtc-* exige 	argetSocketId string no vacío.
+- Corregido B2: relay webrtc-* exige 	argetSocketId string no vacï¿½o.
 - Corregido B3: SyncPlaybackUseCase devuelve 
-ull con acción inválida o tiempo no finito/negativo; el handler no emite ni envenena el snapshot.
-- Corregido SocketEventBus.broadcastExcept (ahora sí excluye) + comentario stale en ports/event-bus.ts.
-- Tests it.fails convertidos en asserts normales + test nuevo de entradas inválidas de sync.
+ull con acciï¿½n invï¿½lida o tiempo no finito/negativo; el handler no emite ni envenena el snapshot.
+- Corregido SocketEventBus.broadcastExcept (ahora sï¿½ excluye) + comentario stale en ports/event-bus.ts.
+- Tests it.fails convertidos en asserts normales + test nuevo de entradas invï¿½lidas de sync.
 - Backend: 12 ficheros, 151/151 tests en verde; 	sc limpio en ambos paquetes.
-- Pendiente con decisión del dueño: playback solo-host (pregunta abierta 1), EventBus cablear vs eliminar, Button.tsx sin uso, ESLint, jsdom/TL, XHR-mock, Example.png 2.84 MB.
+- Pendiente con decisiï¿½n del dueï¿½o: playback solo-host (pregunta abierta 1), EventBus cablear vs eliminar, Button.tsx sin uso, ESLint, jsdom/TL, XHR-mock, Example.png 2.84 MB.
+
+
+- 2026-10-04 (2): ESLint 9 + `npm run lint` en ambos paquetes (0 errores); `useRoomSocket` cubierto con 8 tests renderHook+socket mock (contrato pineado); `catch (_)` -> `catch`; warnings restantes = `any` legacy aceptados.
+
+- 2026-10-04 (3): CORS allowlist (`CLIENT_URL` + dev) cableada en Express y Socket.IO; rate-limit REST (global/join/delete) + throttle socket (chat/reacciones/heartbeat) con dedup <500ms; `getIsMongoConnected()` en todos los usos; anÃ³nimos sin userId frente a nombre registrado -> name-taken/409; `EventBus` y `Button.tsx` eliminados (0 refs verificadas); jsdom acotado por pragma + setup jest-dom; XHR `uploadVideo` con 7 tests; `useRoomSocket` con 13 tests. Backend 176/176, frontend 94/94.
 
