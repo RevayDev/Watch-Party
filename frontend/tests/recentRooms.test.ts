@@ -8,7 +8,7 @@ import {
 } from '../src/services/recentRooms';
 
 function installStorage(initial: Record<string, string> = {}) {
-  let store = new Map<string, string>(Object.entries(initial));
+  const store = new Map<string, string>(Object.entries(initial));
   const api = {
     getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
     setItem: (k: string, v: string) => {

@@ -3,8 +3,8 @@ import { ApiService } from '../src/services/api';
 
 /**
  * Tests puros de ApiService con `fetch` mockeado (sin jsdom ni red).
- * `uploadVideo` usa XMLHttpRequest y queda fuera de alcance: se documenta
- * como gap (requeriría mock de XHR o jsdom).
+ * `uploadVideo` usa XMLHttpRequest y se cubre aparte en `uploadVideo.test.ts`
+ * con mock manual de XHR.
  */
 function mockFetchOnce(payload: unknown, ok = true, status = 200) {
   const json = vi.fn(async () => payload);

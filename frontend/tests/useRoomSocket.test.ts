@@ -1,0 +1,336 @@
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import type { Socket } from 'socket.io-client';
+import { ApiService } from '../src/services/api';
+import { getSocket, disconnectSocket } from '../src/services/socket';
+import { useRoomSocket } from '../src/features/room/hooks/useRoomSocket';
+import type { IRoomData } from '../src/types/room';
+
+// useWebRTC se mockea con referencias ESTABLES: si cada render devolviera
+// funciones nuevas, el efecto gigante del hook se re-suscribiría en bucle.
+const { webRTCStubs } = vi.hoisted(() => ({
+  webRTCStubs: {
+    localStream: null,
+    remotePeers: [],
+    peerMediaStates: {},
+    isMicOn: false,
+    isCameraOn: false,
+    mediaError: null,
+    toggleMic: vi.fn(),
+    toggleCamera: vi.fn(),
+    enableMedia: vi.fn(),
+  },
+}));
+
+vi.mock('../src/services/socket', () => ({
+  getSocket: vi.fn(),
+  disconnectSocket: vi.fn(),
+}));
+
+vi.mock('../src/hooks/useWebRTC', () => ({
+  useWebRTC: () => webRTCStubs,
+}));
+
+type SocketHandler = (data?: unknown) => void;
+
+interface MockSocket {
+  id: string;
+  connected: boolean;
+  on: Mock<(event: string, cb: SocketHandler) => void>;
+  off: Mock<(event: string, cb?: SocketHandler) => void>;
+  emit: Mock<(event: string, payload?: unknown) => void>;
+  _fire: (event: string, data?: unknown) => void;
+}
+
+function createMockSocket(connected: boolean): MockSocket {
+  const listeners = new Map<string, SocketHandler[]>();
+  return {
+    id: 'mock-socket-id',
+    connected,
+    on: vi.fn((event: string, cb: SocketHandler) => {
+      const arr = listeners.get(event) ?? [];
+      arr.push(cb);
+      listeners.set(event, arr);
+    }),
+    off: vi.fn((event: string, cb?: SocketHandler) => {
+      if (cb === undefined) {
+        listeners.delete(event);
+      } else {
+        listeners.set(
+          event,
+          (listeners.get(event) ?? []).filter((h) => h !== cb)
+        );
+      }
+    }),
+    emit: vi.fn((_event: string, _payload?: unknown) => undefined),
+    _fire: (event: string, data?: unknown) => {
+      for (const cb of listeners.get(event) ?? []) cb(data);
+    },
+  };
+}
+
+const mockRoom: IRoomData = {
+  roomId: 'ABC123',
+  hostName: 'Ana',
+  status: 'active',
+  participants: [],
+  createdAt: new Date().toISOString(),
+};
+
+function setup(connected: boolean) {
+  const mockSocket = createMockSocket(connected);
+  vi.mocked(getSocket).mockReturnValue(mockSocket as unknown as Socket);
+  vi.spyOn(ApiService, 'getRoom').mockResolvedValue(mockRoom);
+  const onLeave = vi.fn();
+  const hook = renderHook(() =>
+    useRoomSocket({ roomId: 'ABC123', userName: 'Beto', initialIsHost: false, onLeave })
+  );
+  return { ...hook, mockSocket, onLeave };
+}
+
+// 'connect' se registra tras el `await getRoom`, así que esperar por él
+// garantiza que loadRoom terminó y todas las suscripciones existen.
+async function waitForSubscribed(mockSocket: MockSocket) {
+  await waitFor(() => {
+    expect(mockSocket.on).toHaveBeenCalledWith('room-state', expect.any(Function));
+    expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
+  });
+}
+
+describe('useRoomSocket (eventos socket críticos)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('registra los listeners socket críticos al montar', async () => {
+    const { mockSocket } = setup(false);
+    await waitForSubscribed(mockSocket);
+    for (const event of [
+      'room-state',
+      'chat-message',
+      'join-approved',
+      'user-joined',
+      'user-left',
+      'video-changed',
+      'sync-video',
+    ]) {
+      expect(mockSocket.on).toHaveBeenCalledWith(event, expect.any(Function));
+    }
+  });
+
+  it('limpia todos los listeners (socket.off) al desmontar', async () => {
+    const { mockSocket, unmount } = setup(false);
+    await waitForSubscribed(mockSocket);
+    unmount();
+    const onEvents = mockSocket.on.mock.calls.map(([event]) => event);
+    expect(onEvents.length).toBeGreaterThan(0);
+    for (const event of onEvents) {
+      expect(mockSocket.off).toHaveBeenCalledWith(event, expect.any(Function));
+    }
+  });
+
+  it('emite join-room automáticamente si el socket ya está conectado', async () => {
+    const { mockSocket } = setup(true);
+    await waitFor(() => {
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        'join-room',
+        expect.objectContaining({ roomId: 'ABC123', userName: 'Beto' })
+      );
+    });
+  });
+
+  it('emite join-room cuando el socket se conecta (evento connect)', async () => {
+    const { mockSocket } = setup(false);
+    await waitForSubscribed(mockSocket);
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('join-room', expect.anything());
+    act(() => {
+      mockSocket._fire('connect');
+    });
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'join-room',
+      expect.objectContaining({ roomId: 'ABC123', userName: 'Beto' })
+    );
+  });
+
+  it('room-state setea roomData y marca joined', async () => {
+    const { mockSocket, result, onLeave } = setup(false);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    expect(result.current.joined).toBe(false);
+    const video = {
+      originalName: 'noche.mp4',
+      fileName: 'abc.mp4',
+      mimeType: 'video/mp4',
+      sizeBytes: 1000,
+    };
+    act(() => {
+      mockSocket._fire('room-state', { video, participants: [], joinRequests: [] });
+    });
+    expect(result.current.joined).toBe(true);
+    expect(result.current.roomData?.video).toMatchObject({ originalName: 'noche.mp4' });
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('chat-message agrega el mensaje e incrementa unread si el tab no es chat', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      mockSocket._fire('chat-message', { id: 'm1', user: 'Ana', text: 'Hola!', timestamp: '12:00' });
+    });
+    expect(result.current.messages).toContainEqual(
+      expect.objectContaining({ user: 'Ana', text: 'Hola!' })
+    );
+    expect(result.current.unreadCount).toBe(1);
+  });
+
+  it('chat-message no incrementa unread si el tab chat está abierto', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      result.current.setActiveSideTab('chat');
+    });
+    act(() => {
+      mockSocket._fire('chat-message', { id: 'm2', user: 'Ana', text: 'Hola de nuevo', timestamp: '12:01' });
+    });
+    expect(result.current.messages).toContainEqual(expect.objectContaining({ id: 'm2' }));
+    expect(result.current.unreadCount).toBe(0);
+  });
+
+  it('join-approved re-emite join-room', async () => {
+    const { mockSocket, onLeave } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      mockSocket._fire('connect');
+    });
+    expect(mockSocket.emit).toHaveBeenCalledTimes(1);
+    act(() => {
+      mockSocket._fire('join-approved');
+    });
+    expect(mockSocket.emit).toHaveBeenCalledTimes(2);
+    expect(mockSocket.emit).toHaveBeenNthCalledWith(
+      2,
+      'join-room',
+      expect.objectContaining({ roomId: 'ABC123', userName: 'Beto' })
+    );
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('join-pending marca awaitingApproval y bloquea joined', async () => {
+    const { mockSocket, result, onLeave } = setup(false);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    act(() => {
+      mockSocket._fire('room-state', { video: null, participants: [], joinRequests: [] });
+    });
+    expect(result.current.joined).toBe(true);
+    expect(result.current.awaitingApproval).toBe(false);
+    act(() => {
+      mockSocket._fire('join-pending');
+    });
+    expect(result.current.awaitingApproval).toBe(true);
+    expect(result.current.joined).toBe(false);
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('join-rejected limpia, notifica y sale (onLeave)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { mockSocket, result, onLeave } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      mockSocket._fire('join-pending');
+    });
+    expect(result.current.awaitingApproval).toBe(true);
+    localStorage.setItem(
+      'watchparty_host_session',
+      JSON.stringify({ roomId: 'ABC123', hostName: 'Beto', hostSecret: 's3cr3t' })
+    );
+    localStorage.setItem(
+      'watchparty_recent_rooms',
+      JSON.stringify([{ roomId: 'ABC123', hostName: 'Beto', role: 'guest', lastJoined: Date.now() }])
+    );
+    act(() => {
+      mockSocket._fire('join-rejected', { reason: 'rejected', message: 'Sala llena' });
+    });
+    expect(result.current.awaitingApproval).toBe(false);
+    expect(result.current.joined).toBe(false);
+    expect(logSpy).toHaveBeenCalledWith('[notify:warning]', 'Sala llena');
+    expect(disconnectSocket).toHaveBeenCalledTimes(1);
+    expect(onLeave).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('watchparty_host_session')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('watchparty_recent_rooms') ?? '[]')).toEqual([]);
+  });
+
+  it("join-rejected con reason 'name-taken' sigue el mismo flujo de error", async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { mockSocket, result, onLeave } = setup(false);
+    await waitForSubscribed(mockSocket);
+    localStorage.setItem(
+      'watchparty_host_session',
+      JSON.stringify({ roomId: 'ABC123', hostName: 'Beto' })
+    );
+    act(() => {
+      mockSocket._fire('join-rejected', { reason: 'name-taken' });
+    });
+    expect(result.current.awaitingApproval).toBe(false);
+    expect(result.current.joined).toBe(false);
+    expect(logSpy).toHaveBeenCalledWith('[notify:warning]', expect.stringContaining('ya está en uso'));
+    expect(disconnectSocket).toHaveBeenCalledTimes(1);
+    expect(onLeave).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('watchparty_host_session')).toBeNull();
+  });
+
+  it('user-kicked propio notifica y sale (onLeave)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { mockSocket, onLeave } = setup(false);
+    await waitForSubscribed(mockSocket);
+    localStorage.setItem(
+      'watchparty_host_session',
+      JSON.stringify({ roomId: 'ABC123', hostName: 'Beto' })
+    );
+    localStorage.setItem(
+      'watchparty_recent_rooms',
+      JSON.stringify([{ roomId: 'ABC123', hostName: 'Beto', role: 'guest', lastJoined: Date.now() }])
+    );
+    act(() => {
+      mockSocket._fire('user-kicked', {
+        targetUserName: 'Beto',
+        kickedBy: 'Ana',
+        banned: false,
+        participants: [],
+        kickedUsers: [],
+      });
+    });
+    expect(logSpy).toHaveBeenCalledWith('[notify:error]', expect.stringContaining('expulsado'));
+    expect(disconnectSocket).toHaveBeenCalledTimes(1);
+    expect(onLeave).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('watchparty_host_session')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('watchparty_recent_rooms') ?? '[]')).toEqual([]);
+  });
+
+  it('room-closed limpia y sale (onLeave)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { mockSocket, onLeave } = setup(false);
+    await waitForSubscribed(mockSocket);
+    localStorage.setItem(
+      'watchparty_host_session',
+      JSON.stringify({ roomId: 'ABC123', hostName: 'Beto' })
+    );
+    localStorage.setItem(
+      'watchparty_recent_rooms',
+      JSON.stringify([{ roomId: 'ABC123', hostName: 'Beto', role: 'guest', lastJoined: Date.now() }])
+    );
+    act(() => {
+      mockSocket._fire('room-closed', { message: 'La sala fue cerrada por el anfitrión' });
+    });
+    expect(logSpy).toHaveBeenCalledWith('[notify:error]', 'La sala fue cerrada por el anfitrión');
+    expect(disconnectSocket).toHaveBeenCalledTimes(1);
+    expect(onLeave).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('watchparty_host_session')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('watchparty_recent_rooms') ?? '[]')).toEqual([]);
+  });
+});
