@@ -88,6 +88,11 @@ export function resolveIsHost(
  * - Sin userId (legacy): ocupado solo si el nombre pertenece a una identidad
  *   registrada (con userId). Dos anónimos con el mismo nombre se siguen
  *   tratando como la misma persona (comportamiento legacy preservado).
+ *
+ * Dónde se aplica: guarda previa en socket `join-room`
+ * (join-approval.handler.ts) y REST join (room.controller.ts), ANTES del merge
+ * de `RoomService.joinRoom`. Por eso el merge nunca puede suplantar a una
+ * identidad registrada: si el nombre tenía userId, el anónimo ya fue rechazado.
  */
 export function isNameTaken(
   participants: IParticipant[],

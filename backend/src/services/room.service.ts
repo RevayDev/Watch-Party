@@ -115,6 +115,20 @@ export class RoomService {
   /**
    * Join a room. Identity is the stable `userId` (falls back to name for legacy
    * participants that never claimed an id). This prevents duplicates after a rename.
+   *
+   * MERGE LEGACY DE ANÓNIMOS (se mantiene a propósito, no convertir en rechazo):
+   * dos conexiones sin `userId` con el mismo nombre se fusionan en UN solo
+   * participante (segunda rama de `findParticipantIndex`: mismo nombre +
+   * `!p.userId`, sin push). Es lo que permite que un refresh/reconexión sin
+   * identidad estable no duplique la lista. Es seguro porque (a) la guarda
+   * previa `isNameTaken` (socket join-room / REST join) ya rechazó al anónimo
+   * cuyo nombre pertenece a una identidad REGISTRADA (con userId), así que el
+   * merge solo ocurre entre anónimos entre sí; (b) si el segundo join trae
+   * `userId`, la entrada legacy lo adopta (claim) en vez de duplicarse; (c) el
+   * estado efímero no fuga: `activeUsers`/`activeMediaStates` van por socket.id
+   * (se borran en disconnect/leave) y `roomPositions` por socket.id (dropPosition
+   * + TTL de 12s); (d) la gracia de desconexión (20s) solo existe por userId, así
+   * que el anónimo conserva su eliminación inmediata original.
    */
   public static async joinRoom(
     roomId: string,

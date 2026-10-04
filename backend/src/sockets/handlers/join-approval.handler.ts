@@ -64,6 +64,10 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       }
 
       // Is this person ALREADY a participant? (identity = userId, name = legacy fallback)
+      // NOTA merge legacy: dos sockets sin userId y mismo nombre casan aquí y se
+      // fusionan (un solo participante en RoomService.joinRoom). No es colisión:
+      // `isNameTaken` arriba ya rechazó (name-taken) al anónimo que intentaba usar
+      // el nombre de una identidad registrada. Ver RoomService.joinRoom.
       const alreadyParticipant = (existingRoom?.participants || []).some((p) => {
         if (userId && p.userId) return p.userId === userId;
         return !p.userId && p.name.toLowerCase() === cleanName.toLowerCase();

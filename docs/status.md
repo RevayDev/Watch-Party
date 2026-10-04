@@ -9,7 +9,9 @@
 - **Backend**: Node + Express + Socket.IO + Mongoose, arquitectura hexagonal.
   - `domain/` (entidades, `playback-policy` con `resolveRoomTime`, `auth-policy`, `settings-policy`), `ports/`, `application/` (use-cases), `adapters/` (repos mongo/memoria + routing dinámico con `getIsMongoConnected()`), `sockets/handlers/` por dominio, `services/proxy.service.ts`, `routes/proxy.routes.ts`, `middleware/rate-limit.middleware.ts`, `config/cors.ts`.
   - Tests vitest: `backend/tests/` (playback, room.service memoria, validaciones, settings, auth, name-collision, disconnect-grace, rest-security, socket-guards con permisos de sync).
-- **Verificación**: `npx tsc --noEmit` + `npm run build` + `npm run test` en ambos paquetes (176 backend + 94 frontend en verde). ESLint 9 + `npm run lint` en ambos (0 errores; warnings de `any` legacy aceptados).
+- **Verificación**: `npx tsc --noEmit` + `npm run build` + `npm run test` en ambos paquetes (217 backend + 94 frontend en verde). ESLint 9 + `npm run lint` en ambos (0 errores; warnings de `any` legacy aceptados).
+- **CORS**: allowlist explícita (`CLIENT_URL` + `localhost:5173`/`127.0.0.1:5173` + LAN solo en no-producción por el dev móvil con `host: true`); `credentials: true` preservado por compatibilidad aunque hoy no hay cookies (auth por headers `x-host-secret`/`x-user-id`/`x-user-name` + `localStorage`).
+- **Anónimos**: dos conexiones sin `userId` y mismo nombre se fusionan (legacy, con tests); frente a nombre registrado rige `name-taken`/409.
 
 ## 2. Seguridad y Permisos
 - `hostSecret` (32 hex, generado al crear) se guarda en sesión y viaja en payloads socket (`hostSecret`) y headers REST (`x-host-secret`, + `x-user-id`/`x-user-name`).

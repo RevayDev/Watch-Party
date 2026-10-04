@@ -29,7 +29,8 @@ const storage = multer.diskStorage({
 // NOTE: invalid files are rejected with `cb(null, false)` (instead of an Error)
 // so the request reaches the controller, which responds 400 (not 500).
 // The reason is exposed via `req.fileValidationError`.
-const fileFilter = (
+// Exportado para cobertura vitest (validación de formatos); sin efectos en runtime.
+export const fileFilter = (
   req: any,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
