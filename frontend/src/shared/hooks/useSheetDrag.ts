@@ -274,7 +274,6 @@ export function useSheetDrag(options: SheetDragOptions): () => void {
       clearOffset();
     };
     // Re-attach whenever the sheet opens/closes; the panel only exists then.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.enabled]);
 
   return cancelFling;

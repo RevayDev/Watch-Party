@@ -678,7 +678,6 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       socket.off('settings-error', handleSettingsError);
       socket.off('action-denied', handleActionDenied);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, myName, initialIsHost, socket, onLeave, enableMedia, userId, clearRoomLocalData, isCameraOn, isMicOn, isHost]);
 
   // ── Actions ───────────────────────────────────────────────────────────────

@@ -88,7 +88,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     });
     dataChannels.current.forEach((dc) => {
       if (dc.readyState === 'open') {
-        try { dc.send(payload); } catch (_) {}
+        try { dc.send(payload); } catch {}
       }
     });
   }, [userName]);
@@ -104,7 +104,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
           isMicOn: isMicOnRef.current,
           userName,
         }));
-      } catch (_) {}
+      } catch {}
     };
     dc.onmessage = (ev) => {
       try {
@@ -112,7 +112,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
         if (data.type === 'media-state') {
           updatePeerMediaState(targetSocketId, data);
         }
-      } catch (_) {}
+      } catch {}
     };
     dc.onclose = () => {
       dataChannels.current.delete(targetSocketId);
@@ -126,7 +126,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     for (const c of queue) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(c));
-      } catch (_) {}
+      } catch {}
     }
     pendingCandidates.current.delete(socketId);
   };
@@ -139,7 +139,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       if (audioSender) {
         audioSender.replaceTrack(localAudioTrackRef.current).catch(() => {});
       } else {
-        try { pc.addTrack(localAudioTrackRef.current, localStreamRef.current || new MediaStream()); } catch (_) {}
+        try { pc.addTrack(localAudioTrackRef.current, localStreamRef.current || new MediaStream()); } catch {}
       }
     } else {
       if (audioSender) {
@@ -158,7 +158,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       if (videoSender) {
         videoSender.replaceTrack(localVideoTrackRef.current).catch(() => {});
       } else {
-        try { pc.addTrack(localVideoTrackRef.current, localStreamRef.current || new MediaStream()); } catch (_) {}
+        try { pc.addTrack(localVideoTrackRef.current, localStreamRef.current || new MediaStream()); } catch {}
       }
     } else {
       if (videoSender) {
@@ -184,7 +184,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
         return existing;
       }
       if (existing) {
-        try { existing.close(); } catch (_) {}
+        try { existing.close(); } catch {}
         peerConnections.current.delete(targetSocketId);
         dataChannels.current.delete(targetSocketId);
       }
@@ -197,7 +197,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       try {
         const dc = pc.createDataChannel('media-state');
         setupDataChannel(dc, targetSocketId);
-      } catch (_) {}
+      } catch {}
 
       pc.ondatachannel = (ev) => {
         setupDataChannel(ev.channel, targetSocketId);
@@ -495,7 +495,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       if (pc && pc.remoteDescription && pc.remoteDescription.type) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(d.candidate));
-        } catch (_) {}
+        } catch {}
       } else {
         const q = pendingCandidates.current.get(d.senderSocketId) || [];
         q.push(d.candidate);
@@ -550,7 +550,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       console.log(`[WebRTC] Peer disconnected: ${d.socketId}`);
       const pc = peerConnections.current.get(d.socketId);
       if (pc) {
-        try { pc.close(); } catch (_) {}
+        try { pc.close(); } catch {}
         peerConnections.current.delete(d.socketId);
       }
       dataChannels.current.delete(d.socketId);
@@ -593,13 +593,13 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   useEffect(() => {
     return () => {
       if (localAudioTrackRef.current) {
-        try { localAudioTrackRef.current.stop(); } catch (_) {}
+        try { localAudioTrackRef.current.stop(); } catch {}
       }
       if (localVideoTrackRef.current) {
-        try { localVideoTrackRef.current.stop(); } catch (_) {}
+        try { localVideoTrackRef.current.stop(); } catch {}
       }
       peerConnections.current.forEach((pc) => {
-        try { pc.close(); } catch (_) {}
+        try { pc.close(); } catch {}
       });
       dataChannels.current.clear();
       peerConnections.current.clear();

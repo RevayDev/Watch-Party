@@ -54,7 +54,7 @@ function useIsSpeaking(stream: MediaStream | null, isLocal: boolean, isMicOn: bo
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
-    } catch (_) {}
+    } catch {}
 
     return () => {
       cancelled = true;

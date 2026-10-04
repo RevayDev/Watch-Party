@@ -14,7 +14,7 @@ export function playJoinSound() {
     o1.start();
     o1.stop(ctx.currentTime + 0.55);
     setTimeout(() => ctx.close(), 700);
-  } catch (_) {}
+  } catch {}
 }
 
 export function playLeaveSound() {
@@ -32,7 +32,7 @@ export function playLeaveSound() {
     o1.start();
     o1.stop(ctx.currentTime + 0.55);
     setTimeout(() => ctx.close(), 700);
-  } catch (_) {}
+  } catch {}
 }
 
 export function playChatSound() {
@@ -51,5 +51,5 @@ export function playChatSound() {
     o1.start();
     o1.stop(ctx.currentTime + 0.35);
     setTimeout(() => ctx.close(), 500);
-  } catch (_) {}
+  } catch {}
 }
