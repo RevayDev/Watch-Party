@@ -260,15 +260,6 @@ export const Home: React.FC<HomeProps> = ({
               Demo gratuita
             </span>
           )}
-          <aside className="home-future-note" aria-label="Planes futuros">
-            <Lightbulb size={18} strokeWidth={2.2} aria-hidden="true" />
-            <p>
-              A futuro se agregarán <strong>planes de apoyo</strong> para
-              mantener el proyecto: servidor, almacenamiento y desarrollo de
-              nuevas funciones.
-            </p>
-          </aside>
-
           <h1 className="home-hero-title">
             Tus videos,&nbsp;
             <span className="home-hero-title--accent">
