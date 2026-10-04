@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { RoomService } from '../../services/room.service.js';
 import { sanitizeRoomSettings } from '../../domain/settings-policy.js';
 import { requireHost } from '../../domain/auth-policy.js';
+import { isDemoMode } from '../../config/demo-mode.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 
 /** Handler de ajustes de sala. Nombres de eventos y payloads idénticos al original. */
@@ -22,7 +23,7 @@ export function registerSettingsHandlers(io: Server, socket: Socket): void {
         return;
       }
 
-      const { settings: payload, errors } = sanitizeRoomSettings(settings);
+      const { settings: payload, errors } = sanitizeRoomSettings(settings, { demo: isDemoMode() });
       if (errors.length > 0) {
         socket.emit('settings-error', { message: errors.join(' ') });
         return;

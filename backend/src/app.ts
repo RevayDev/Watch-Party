@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { corsOptions } from './config/cors.js';
 import roomRoutes from './routes/room.routes.js';
+import demoRoutes from './routes/demo.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { globalLimiter } from './middleware/rate-limit.middleware.js';
@@ -37,6 +38,10 @@ export function createApp(): Express {
   // Paraguas anti-abuso (generoso; las rutas sensibles limitan más abajo).
   // Después del health check para no interferir con la monitorización.
   app.use('/api/rooms', globalLimiter);
+
+  // ── Demo gratuita: solo conteos de disponibilidad (sin códigos ni listas) ──
+  // Comparte el paraguas anti-abuso existente (mismo globalLimiter que rooms).
+  app.use('/api/demo', globalLimiter, demoRoutes);
 
   // Routes
   app.use('/api/rooms', roomRoutes);

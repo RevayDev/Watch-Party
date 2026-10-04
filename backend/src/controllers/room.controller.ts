@@ -3,10 +3,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RoomService } from '../services/room.service.js';
+import { DemoCapacityError } from '../services/room.service.js';
 import { IVideoMetadata } from '../types/room.types.js';
 import { findBannedEntry, isNameTaken } from '../domain/room.entity.js';
 import { AuthClaim, requireHost } from '../domain/auth-policy.js';
 import { sanitizeRoomSettings } from '../domain/settings-policy.js';
+import {
+  DEMO_MAX_USERS_PER_ROOM,
+  DEMO_ROOM_FULL_MESSAGE,
+  DEMO_UPLOAD_DISABLED_MESSAGE,
+  isDemoMode,
+} from '../config/demo-mode.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -169,6 +176,11 @@ export class RoomController {
         createdAt: room.createdAt,
       });
     } catch (error) {
+      // Cuota demo: 429 con el mensaje EXACTO del contrato (no 500).
+      if (error instanceof DemoCapacityError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
       next(error);
     }
   }
@@ -248,6 +260,18 @@ export class RoomController {
         return !p.userId && p.name.toLowerCase() === trimmedName.toLowerCase();
       });
 
+      // ── Cuota demo: sala llena (≥10 participantes) → 429, salvo rejoin/merge
+      // que no consumen cupo. Va antes de la puerta de aprobación: una sala
+      // llena tampoco acepta nuevas solicitudes en espera.
+      if (
+        isDemoMode() &&
+        !alreadyParticipant &&
+        (existing.participants || []).length >= DEMO_MAX_USERS_PER_ROOM
+      ) {
+        res.status(429).json({ error: DEMO_ROOM_FULL_MESSAGE });
+        return;
+      }
+
       if (requireApproval && !isHostName && !alreadyParticipant) {
         res.json({
           roomId: existing.roomId,
@@ -259,7 +283,18 @@ export class RoomController {
         return;
       }
 
-      const room = await RoomService.joinRoom(cleanId, trimmedName, 'Web Browser', userId);
+      let room;
+      try {
+        room = await RoomService.joinRoom(cleanId, trimmedName, 'Web Browser', userId);
+      } catch (error) {
+        // Carrera residual (dos joins paralelos): el servicio reserva el cupo
+        // bajo mutex; el perdedor recibe el 429 exacto en vez de un 500.
+        if (error instanceof DemoCapacityError) {
+          res.status(error.statusCode).json({ error: error.message });
+          return;
+        }
+        throw error;
+      }
       if (!room) {
         res.status(404).json({ error: 'Room not found' });
         return;
@@ -280,6 +315,18 @@ export class RoomController {
     try {
       const { roomId } = req.params;
       const file = req.file;
+
+      // Demo: subida de archivos deshabilitada (la demo reproduce por enlace
+      // Drive via `video-url`/proxy, intactos). Si multer ya escribió el
+      // archivo (esta guarda es el respaldo del middleware previo a multer),
+      // se borra el huérfano como en el resto de rechazos.
+      if (isDemoMode()) {
+        if (file) {
+          RoomService.removeOldVideoFile(file.filename);
+        }
+        res.status(403).json({ error: DEMO_UPLOAD_DISABLED_MESSAGE });
+        return;
+      }
 
       // Rechazo del fileFilter (tipo de archivo no soportado) → 400
       const validationError = (req as unknown as { fileValidationError?: string }).fileValidationError;
@@ -461,7 +508,7 @@ export class RoomController {
 
       const body = (req.body ?? {}) as { settings?: unknown };
       const input = body.settings !== undefined ? body.settings : req.body;
-      const { settings, errors } = sanitizeRoomSettings(input);
+      const { settings, errors } = sanitizeRoomSettings(input, { demo: isDemoMode() });
       if (errors.length > 0) {
         res.status(400).json({ error: `Ajustes inválidos: ${errors.join(' ')}` });
         return;

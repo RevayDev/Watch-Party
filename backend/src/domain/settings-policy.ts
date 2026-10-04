@@ -1,4 +1,5 @@
 import type { IRoomSettings } from '../types/room.types.js';
+import { DEMO_TIMER_MAX_MINUTES, DEMO_TIMER_MIN_MINUTES } from '../config/demo-mode.js';
 
 // Claves permitidas para `update-room-settings` (whitelist).
 const ALLOWED_KEYS = new Set<string>([
@@ -30,6 +31,17 @@ export interface SanitizedSettings {
   errors: string[];
 }
 
+/**
+ * Opciones de saneo. `demo=true` aplica la validación mínima de la demo al
+ * temporizador (minutos 1–480 y `timerEndsAt` futuro dentro de ese rango),
+ * porque el cliente no debe imponer tiempo arbitrario. Con `demo` ausente o
+ * false el comportamiento es el original. `now` solo existe para tests.
+ */
+export interface SanitizeOptions {
+  demo?: boolean;
+  now?: number;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -44,7 +56,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Los llamadores deben: si `errors.length > 0` → socket `settings-error` al
  * emisor / REST 400 con mensaje claro, sin mutar la sala.
  */
-export function sanitizeRoomSettings(input: unknown): SanitizedSettings {
+export function sanitizeRoomSettings(input: unknown, opts: SanitizeOptions = {}): SanitizedSettings {
   if (!isRecord(input)) {
     return { settings: {}, errors: ['Los ajustes deben ser un objeto.'] };
   }
@@ -102,6 +114,34 @@ export function sanitizeRoomSettings(input: unknown): SanitizedSettings {
       }
     } else {
       errors.push('"timerEndsAt" debe ser una fecha válida en formato ISO o null para desactivar.');
+    }
+  }
+
+  if (errors.length > 0) return { settings: {}, errors };
+
+  // ── Demo: el temporizador ya es de servidor (barrido cada 15s sobre el
+  // `timerEndsAt` persistido), pero el cliente podía imponer tiempo arbitrario.
+  // Validación mínima: minutos 1–480 y deadline futuro dentro de ese rango.
+  if (opts.demo) {
+    const now = opts.now ?? Date.now();
+    const maxEndsAt = now + DEMO_TIMER_MAX_MINUTES * 60_000;
+    const minutes = (out as Record<string, unknown>)['timerMinutes'];
+    if (minutes !== undefined && minutes !== null) {
+      const v = minutes as number;
+      if (v < DEMO_TIMER_MIN_MINUTES || v > DEMO_TIMER_MAX_MINUTES) {
+        errors.push(
+          `"timerMinutes" en la demo debe estar entre ${DEMO_TIMER_MIN_MINUTES} y ${DEMO_TIMER_MAX_MINUTES} minutos, o null para desactivar.`
+        );
+      }
+    }
+    const endsAt = (out as Record<string, unknown>)['timerEndsAt'];
+    if (endsAt !== undefined && endsAt !== null) {
+      const parsed = new Date(endsAt as string).getTime();
+      if (!(parsed > now) || parsed > maxEndsAt) {
+        errors.push(
+          `"timerEndsAt" en la demo debe ser una fecha futura dentro de las próximas ${DEMO_TIMER_MAX_MINUTES / 60} horas.`
+        );
+      }
     }
   }
 
