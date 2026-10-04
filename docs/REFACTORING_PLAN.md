@@ -255,3 +255,19 @@ build verde (`frontend npm run build`, `backend npx tsc --noEmit`), sin `alert/c
 4. Â¿PolÃ­tica de salas no-temporales: conservar video hasta DELETE explÃ­cito? (ya implementado,
    confirmar que es lo deseado)
 5. Â¿Host puede desactivar reacciones? (pendientes Â§3 lo propone: `disable-reactions`)
+
+---
+
+## Resuelto 2026-10-04 (auditoría 3 subagentes + integración)
+
+- QA fijó baseline: backend 117 tests, frontend 63 tests; nuevos witnesses it.fails para B1/B2.
+- Corregido: join-room ya NO confía en el flag isHost del cliente (solo nombre registrado o participante persistido).
+- Corregido B1: send-message/send-reaction descartan payload undefined/no-string sin lanzar.
+- Corregido B2: relay webrtc-* exige 	argetSocketId string no vacío.
+- Corregido B3: SyncPlaybackUseCase devuelve 
+ull con acción inválida o tiempo no finito/negativo; el handler no emite ni envenena el snapshot.
+- Corregido SocketEventBus.broadcastExcept (ahora sí excluye) + comentario stale en ports/event-bus.ts.
+- Tests it.fails convertidos en asserts normales + test nuevo de entradas inválidas de sync.
+- Backend: 12 ficheros, 151/151 tests en verde; 	sc limpio en ambos paquetes.
+- Pendiente con decisión del dueño: playback solo-host (pregunta abierta 1), EventBus cablear vs eliminar, Button.tsx sin uso, ESLint, jsdom/TL, XHR-mock, Example.png 2.84 MB.
+
