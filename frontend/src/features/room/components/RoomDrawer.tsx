@@ -46,6 +46,10 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   socket,
   roomId,
 }) => {
+  // Helper local: evita repetir buildSocketAuth(roomId, myName) en cada emit.
+  // Se evalúa en el momento del emit (lee localStorage entonces), igual que antes.
+  const auth = () => buildSocketAuth(roomId, myName);
+
   return (
     <BottomSheet
       open={!!activeSideTab}
@@ -85,39 +89,39 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onToggleMyMic={toggleMic}
             onToggleMyCamera={toggleCamera}
             onMuteUser={(targetUserName, targetSocketId) => {
-              socket.emit('moderate-mute-user', { roomId, targetUserName, targetSocketId, ...buildSocketAuth(roomId, myName) });
+              socket.emit('moderate-mute-user', { roomId, targetUserName, targetSocketId, ...auth() });
             }}
             onDisableCamUser={(targetUserName, targetSocketId) => {
-              socket.emit('moderate-disable-camera', { roomId, targetUserName, targetSocketId, ...buildSocketAuth(roomId, myName) });
+              socket.emit('moderate-disable-camera', { roomId, targetUserName, targetSocketId, ...auth() });
             }}
             onMuteAll={() => {
-              socket.emit('moderate-mute-all', { roomId, ...buildSocketAuth(roomId, myName) });
+              socket.emit('moderate-mute-all', { roomId, ...auth() });
             }}
             onDisableAllCameras={() => {
-              socket.emit('moderate-disable-all-cameras', { roomId, ...buildSocketAuth(roomId, myName) });
+              socket.emit('moderate-disable-all-cameras', { roomId, ...auth() });
             }}
             onKickUser={(targetUserName, targetUserId) => {
-              socket.emit('kick-user', { roomId, targetUserName, targetUserId, kickedBy: myName, ban: false, ...buildSocketAuth(roomId, myName) });
+              socket.emit('kick-user', { roomId, targetUserName, targetUserId, kickedBy: myName, ban: false, ...auth() });
             }}
             onBanUser={(targetUserName, targetUserId) => {
-              socket.emit('kick-user', { roomId, targetUserName, targetUserId, kickedBy: myName, ban: true, ...buildSocketAuth(roomId, myName) });
+              socket.emit('kick-user', { roomId, targetUserName, targetUserId, kickedBy: myName, ban: true, ...auth() });
             }}
             onUnbanUser={(targetUserName, targetUserId) => {
-              socket.emit('unban-user', { roomId, targetUserName, targetUserId, ...buildSocketAuth(roomId, myName) });
+              socket.emit('unban-user', { roomId, targetUserName, targetUserId, ...auth() });
             }}
             onToggleCoHost={(targetUserName, makeCoHost) => {
               socket.emit('set-role', {
                 roomId,
                 targetUserName,
                 role: makeCoHost ? 'cohost' : 'member',
-                ...buildSocketAuth(roomId, myName),
+                ...auth(),
               });
             }}
             onRenameUser={(oldName, newName, targetUserId) => {
-              socket.emit('rename-participant', { roomId, oldName, newName, targetUserId, ...buildSocketAuth(roomId, myName) });
+              socket.emit('rename-participant', { roomId, oldName, newName, targetUserId, ...auth() });
             }}
             onApproveJoin={(reqUserId, reqName) => {
-              socket.emit('approve-join', { roomId, userId: reqUserId, name: reqName, ...buildSocketAuth(roomId, myName) });
+              socket.emit('approve-join', { roomId, userId: reqUserId, name: reqName, ...auth() });
             }}
             onRejectJoin={(reqUserId, reqName, ban) => {
               socket.emit('reject-join', {
@@ -126,11 +130,11 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
                 name: reqName,
                 ban,
                 requestedBy: myName,
-                ...buildSocketAuth(roomId, myName),
+                ...auth(),
               });
             }}
             onUpdateSettings={(settings) => {
-              socket.emit('update-room-settings', { roomId, settings, ...buildSocketAuth(roomId, myName) });
+              socket.emit('update-room-settings', { roomId, settings, ...auth() });
             }}
           />
         )}
