@@ -32,6 +32,11 @@ import {
 } from './homeData';
 import { RecentRooms } from './RecentRooms';
 import { CreateRoomModal, JoinRoomModal, TimelineModal } from './HomeModals';
+import {
+  formatDemoAvailability,
+  isDemoMode,
+  type DemoAvailability,
+} from '../../shared/demo';
 
 interface HomeProps {
   initialRoomCode?: string | null;
@@ -65,6 +70,36 @@ export const Home: React.FC<HomeProps> = ({
   const [isTemporary, setIsTemporary] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
+
+  // Demo gratuita: tras VITE_DEMO_MODE (default true en `demo-free`).
+  // Con `false` todo lo demo (badge, contador, avisos) desaparece.
+  const demo = isDemoMode();
+  // Solo conteos (roomsUsed/roomsTotal/roomsAvailable). Si la lectura falla,
+  // queda en null y el contador se oculta sin romper el Home.
+  const [demoAvailability, setDemoAvailability] = useState<DemoAvailability | null>(null);
+
+  const refreshDemoAvailability = async () => {
+    try {
+      setDemoAvailability(await ApiService.getDemoAvailability());
+    } catch {
+      setDemoAvailability(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!demo) return;
+    let cancelled = false;
+    ApiService.getDemoAvailability()
+      .then((a) => {
+        if (!cancelled) setDemoAvailability(a);
+      })
+      .catch(() => {
+        if (!cancelled) setDemoAvailability(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [demo]);
 
   // Update roomCode and show modal if initialRoomCode changes
   useEffect(() => {
@@ -118,6 +153,10 @@ export const Home: React.FC<HomeProps> = ({
     setError('');
     setShowJoinModal(false);
     onJoinRoom(roomCode.trim().toUpperCase(), userName.trim());
+    // Demo: re-lee la disponibilidad tras unirse (si falla, se oculta solo).
+    if (demo) {
+      void refreshDemoAvailability();
+    }
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -135,6 +174,12 @@ export const Home: React.FC<HomeProps> = ({
         isTemporary,
       );
       setShowCreateModal(false);
+      // Demo: re-lee la disponibilidad tras crear (si falla, se oculta solo).
+      // Nota: el backend responde 429 con el texto EXACTO del límite cuando
+      // la demo llega a 5 salas; aquí se muestra `err.message` tal cual.
+      if (demo) {
+        void refreshDemoAvailability();
+      }
       onRoomCreated(data.roomId, data.hostName, data.hostSecret);
     } catch (err: any) {
       setCreateError(err.message || 'Error al conectar con el servidor.');
@@ -207,6 +252,14 @@ export const Home: React.FC<HomeProps> = ({
       <div className="home-hero-grid">
         {/* Left Column: Title, Subtitle, Reconnect banner & Action Buttons */}
         <div className="home-hero-left">
+          {demo && (
+            <span
+              className="home-section__badge home-demo-badge"
+              data-testid="demo-badge"
+            >
+              Demo gratuita
+            </span>
+          )}
           <aside className="home-future-note" aria-label="Planes futuros">
             <Lightbulb size={18} strokeWidth={2.2} aria-hidden="true" />
             <p>
@@ -269,6 +322,35 @@ export const Home: React.FC<HomeProps> = ({
               <span>Aprobación de entrada</span>
             </div>
           </div>
+
+          {/* Demo: contador de salas (solo conteos, sin códigos ni lista).
+              Si la lectura falla, no se renderiza nada (no rompe el Home). */}
+          {demo && demoAvailability && (
+            <p
+              className="home-demo-counter"
+              role="status"
+              data-testid="demo-availability"
+            >
+              {formatDemoAvailability(demoAvailability)}
+            </p>
+          )}
+
+          {/* Demo: los vídeos van por enlace externo (Drive); la subida de
+              archivos está deshabilitada. Entrada por código sin cambios. */}
+          {demo && (
+            <aside
+              className="home-future-note"
+              aria-label="Vídeos por enlace en la demo"
+              data-testid="demo-drive-notice"
+            >
+              <ExternalLink size={18} strokeWidth={2.2} aria-hidden="true" />
+              <p>
+                En esta demo los vídeos se comparten con un{' '}
+                <strong>enlace externo (por ejemplo, Google Drive)</strong>:
+                pega el enlace en la sala para reproducirlo juntos.
+              </p>
+            </aside>
+          )}
         </div>
 
         {/* Right Column: Reference Showcase Frame (Example.png) */}

@@ -3,6 +3,7 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../../types/room';
 import { BottomSheet } from '../../shared/components/BottomSheet';
+import { isDemoMode } from '../../shared/demo';
 import { VideoUploadPicker } from './VideoUploadPicker';
 
 interface VideoPlayerProps {
@@ -39,7 +40,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const hlsInstanceRef = useRef<Hls | null>(null);
   const lastLoadKeyRef = useRef<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
+  // Demo: la subida de archivos está deshabilitada → el picker arranca en el
+  // tab de enlace. Con VITE_DEMO_MODE=false arranca como hoy (subida).
+  const demo = isDemoMode();
+  const [activeTab, setActiveTab] = useState<'upload' | 'url'>(demo ? 'url' : 'upload');
   const [urlInput, setUrlInput] = useState('');
   const [titleInput, setTitleInput] = useState('');
   const [isSubmittingUrl, setIsSubmittingUrl] = useState(false);
@@ -355,7 +359,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const openChangePanel = (tab?: 'upload' | 'url') => {
     // Default to the tab matching what is currently loaded (link -> link tab, file -> upload tab)
-    const defaultTab: 'upload' | 'url' = video && video.sourceType !== 'file' ? 'url' : 'upload';
+    // Demo: siempre el tab de enlace (la subida está deshabilitada).
+    const defaultTab: 'upload' | 'url' = demo ? 'url' : video && video.sourceType !== 'file' ? 'url' : 'upload';
     setActiveTab(tab ?? defaultTab);
     setShowChangePanel(true);
   };
@@ -442,7 +447,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 onClose={closeEmptyPicker}
                 variant="inline"
                 desktopClassName="empty-picker-sheet"
-                label="Subir video o pegar enlace"
+                label={demo ? 'Pegar enlace de Google Drive' : 'Subir video o pegar enlace'}
               >
                 <div className="dropzone-container">
                   <VideoUploadPicker {...pickerProps} />
@@ -454,7 +459,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   className="btn btn--primary empty-picker-reopen"
                   onClick={() => setShowEmptyPicker(true)}
                 >
-                  <span>Subir video o pegar enlace</span>
+                  <span>{demo ? 'Pegar enlace de Google Drive' : 'Subir video o pegar enlace'}</span>
                 </button>
               )}
             </>

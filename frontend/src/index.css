@@ -1418,6 +1418,20 @@ div[id] {
   text-transform: uppercase;
 }
 
+/* Demo gratuita: badge del hero (reutiliza .home-section__badge) y contador
+   de salas (solo conteos). Oculto por defecto si no hay datos. */
+.home-demo-badge {
+  margin-bottom: 1rem;
+}
+
+.home-demo-counter {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-muted-light);
+  line-height: 1.5;
+}
+
 .home-section__title {
   font-size: clamp(1.8rem, 3.2vw, 2.5rem);
   font-weight: 800;

@@ -1,5 +1,6 @@
 import { IRoomData, IVideoMetadata } from '../types/room';
 import { buildRestAuthHeaders, getStoredUserId } from '../shared/utils';
+import type { DemoAvailability } from '../shared/demo';
 
 // In production, VITE_API_URL can be set to the backend URL (e.g., https://my-watchparty-backend.onrender.com)
 // In local development or when proxying, it defaults to empty string or /api
@@ -75,6 +76,21 @@ export class ApiService {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || 'Error al unirse a la sala');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Demo gratuita: solo conteos de salas (roomsUsed/roomsTotal/roomsAvailable).
+   * No expone códigos ni listas. Si falla, el llamador oculta el contador.
+   */
+  static async getDemoAvailability(): Promise<DemoAvailability> {
+    const response = await fetch(`${API_BASE_URL}/demo/availability`);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo consultar la disponibilidad de la demo');
     }
 
     return response.json();
