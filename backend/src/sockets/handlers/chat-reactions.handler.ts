@@ -1,4 +1,10 @@
 import { Server, Socket } from 'socket.io';
+import { checkSocketRateLimit } from '../socket-limits.js';
+
+// Anti-spam por socket (el excedente se ignora en silencio): ~8 mensajes y
+// ~20 reacciones por ventana de 10s. Sin librerías nuevas.
+const MESSAGE_LIMIT = { max: 8, windowMs: 10_000 };
+const REACTION_LIMIT = { max: 20, windowMs: 10_000 };
 
 /** Handler de chat y reacciones. Nombres de eventos y payloads idénticos al original. */
 export function registerChatReactionsHandlers(io: Server, socket: Socket): void {
@@ -7,6 +13,7 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
     if (!data) return;
     const { roomId, text, userName } = data;
     if (!roomId || typeof text !== 'string' || !text.trim()) return;
+    if (!checkSocketRateLimit(socket.id, 'send-message', MESSAGE_LIMIT.max, MESSAGE_LIMIT.windowMs)) return;
     const cleanRoomId = roomId.toUpperCase().trim();
 
     const messagePayload = {
@@ -24,6 +31,7 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
     if (!data) return;
     const { roomId, emoji, userName } = data;
     if (!roomId || typeof emoji !== 'string' || !emoji) return;
+    if (!checkSocketRateLimit(socket.id, 'send-reaction', REACTION_LIMIT.max, REACTION_LIMIT.windowMs)) return;
     const cleanRoomId = roomId.toUpperCase().trim();
 
     const reactionPayload = {

@@ -66,6 +66,14 @@ export function createRateLimiter(options: RateLimitOptions) {
 }
 
 // ── Limitadores específicos ────────────────────────────────────────────────
+// Global generoso: paraguas anti-abuso para toda la API (las rutas sensibles
+// tienen sus propios límites más estrictos debajo).
+export const globalLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 600,
+  message: 'Demasiadas solicitudes a la API, por favor inténtalo de nuevo más tarde.',
+});
+
 // Creación de salas: máximo 15 salas por minuto por IP
 export const createRoomLimiter = createRateLimiter({
   windowMs: 60 * 1000,
@@ -73,11 +81,25 @@ export const createRoomLimiter = createRateLimiter({
   message: 'Has alcanzado el límite de creación de salas por minuto.',
 });
 
+// Unirse a una sala: máximo 30 intentos por minuto por IP
+export const joinRoomLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Has alcanzado el límite de intentos de unión a salas por minuto.',
+});
+
 // Subida de video y fijar URL: máximo 10 por minuto por IP
 export const uploadVideoLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 10,
   message: 'Has alcanzado el límite de subida o cambio de video por minuto.',
+});
+
+// Eliminar una sala: máximo 20 intentos por minuto por IP
+export const deleteRoomLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: 'Has alcanzado el límite de eliminación de salas por minuto.',
 });
 
 // Proxy de streaming: máximo 120 peticiones por minuto por IP

@@ -20,9 +20,6 @@ export function getIsMongoConnected(): boolean {
   return mongoConnected && mongoose.connection.readyState === 1;
 }
 
-// Compatibilidad hacia atrás (getter / live binding)
-export const isMongoConnected = false;
-
 export async function connectDatabase(uri: string): Promise<void> {
   try {
     await mongoose.connect(uri, {

@@ -1,4 +1,5 @@
 import {
+  roomPlayback,
   roomPositions,
   resolveSyncedPlayback,
   setPlaybackSnapshot,
@@ -17,7 +18,11 @@ export class SyncPlaybackUseCase {
     if (!VALID_ACTIONS.has(input.action)) return null;
     if (!Number.isFinite(input.currentTime) || input.currentTime < 0) return null;
     const cleanRoomId = input.roomId.toUpperCase().trim();
-    setPlaybackSnapshot(cleanRoomId, input.currentTime, input.action === 'play');
+    // `seek` no cambia el estado de reproducción: conserva el anterior.
+    const prev = roomPlayback.get(cleanRoomId);
+    const isPlaying =
+      input.action === 'play' ? true : input.action === 'pause' ? false : (prev?.isPlaying ?? false);
+    setPlaybackSnapshot(cleanRoomId, input.currentTime, isPlaying);
     return { action: input.action, currentTime: input.currentTime, sentAt: Date.now() };
   }
 }

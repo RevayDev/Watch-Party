@@ -12,6 +12,7 @@ import {
   hasPendingGrace,
   schedulePendingGrace,
 } from '../disconnect-grace.js';
+import { clearSocketLimits } from '../socket-limits.js';
 
 const MODERATOR_ONLY = 'Solo el anfitrión o un co-anfitrión puede realizar esta acción.';
 
@@ -362,6 +363,8 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
   // Sin userId o pendiente: comportamiento inmediato original.
   // `user-left` solo se emite al eliminar de verdad.
   socket.on('disconnect', async () => {
+    // Estado efímero de rate-limit/throttle/dedup: se libera con el socket.
+    clearSocketLimits(socket.id);
     const user = activeUsers.get(socket.id);
     if (user) {
       activeUsers.delete(socket.id);

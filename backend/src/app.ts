@@ -6,6 +6,7 @@ import { corsOptions } from './config/cors.js';
 import roomRoutes from './routes/room.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { globalLimiter } from './middleware/rate-limit.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,6 +33,10 @@ export function createApp(): Express {
 
   // ── CORS Proxy for external video streaming (ver services/proxy.service.ts + routes/proxy.routes.ts) ──
   app.use('/api/proxy', proxyRoutes);
+
+  // Paraguas anti-abuso (generoso; las rutas sensibles limitan más abajo).
+  // Después del health check para no interferir con la monitorización.
+  app.use('/api/rooms', globalLimiter);
 
   // Routes
   app.use('/api/rooms', roomRoutes);

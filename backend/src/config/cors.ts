@@ -1,10 +1,28 @@
 import type { CorsOptions } from 'cors';
 
+let warnedMissingClientUrl = false;
+
+/**
+ * Avisa una sola vez si CLIENT_URL no está definido: en ese caso se conserva
+ * la apertura actual de desarrollo (localhost + LAN) en vez de una allowlist
+ * estricta. Sin efectos en el comportamiento, solo visibilidad en logs.
+ */
+function warnIfClientUrlMissingOnce(): void {
+  if (warnedMissingClientUrl) return;
+  if (!process.env.CLIENT_URL?.trim()) {
+    warnedMissingClientUrl = true;
+    console.warn(
+      '⚠️ CLIENT_URL no está definido: CORS conserva la apertura actual de desarrollo (localhost/LAN). Define CLIENT_URL en producción.'
+    );
+  }
+}
+
 /**
  * Obtiene la lista de orígenes permitidos según variables de entorno y entorno de ejecución.
  * Soporta CLIENT_URL, ALLOWED_ORIGINS (separados por coma) y orígenes de desarrollo/LAN.
  */
 export function getAllowedOrigins(): string[] | '*' {
+  warnIfClientUrlMissingOnce();
   const clientUrl = process.env.CLIENT_URL?.trim();
   const envOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
