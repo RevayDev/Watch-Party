@@ -9,6 +9,7 @@ import {
   Lightbulb,
   ExternalLink,
   ArrowRight,
+  Activity,
 } from 'lucide-react';
 import exampleImg from '../../Example.png';
 import { ApiService } from '../../services/api';
@@ -338,7 +339,8 @@ export const Home: React.FC<HomeProps> = ({
               role="status"
               data-testid="demo-availability"
             >
-              {formatDemoAvailability(demoAvailability)}
+              <Activity size={16} strokeWidth={2.4} aria-hidden="true" />
+              <span>{formatDemoAvailability(demoAvailability)}</span>
             </p>
           )}
         </div>
