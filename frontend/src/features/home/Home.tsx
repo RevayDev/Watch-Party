@@ -260,6 +260,22 @@ export const Home: React.FC<HomeProps> = ({
               Demo gratuita
             </span>
           )}
+          {/* Demo: los vídeos van por enlace externo (Drive); la subida de
+              archivos está deshabilitada. Entrada por código sin cambios. */}
+          {demo && (
+            <aside
+              className="home-future-note"
+              aria-label="Vídeos por enlace en la demo"
+              data-testid="demo-drive-notice"
+            >
+              <ExternalLink size={18} strokeWidth={2.2} aria-hidden="true" />
+              <p>
+                En esta demo los vídeos se comparten con un{' '}
+                <strong>enlace externo (por ejemplo, Google Drive)</strong>:
+                pega el enlace en la sala para reproducirlo juntos.
+              </p>
+            </aside>
+          )}
           <h1 className="home-hero-title">
             Tus videos,&nbsp;
             <span className="home-hero-title--accent">
@@ -324,23 +340,6 @@ export const Home: React.FC<HomeProps> = ({
             >
               {formatDemoAvailability(demoAvailability)}
             </p>
-          )}
-
-          {/* Demo: los vídeos van por enlace externo (Drive); la subida de
-              archivos está deshabilitada. Entrada por código sin cambios. */}
-          {demo && (
-            <aside
-              className="home-future-note"
-              aria-label="Vídeos por enlace en la demo"
-              data-testid="demo-drive-notice"
-            >
-              <ExternalLink size={18} strokeWidth={2.2} aria-hidden="true" />
-              <p>
-                En esta demo los vídeos se comparten con un{' '}
-                <strong>enlace externo (por ejemplo, Google Drive)</strong>:
-                pega el enlace en la sala para reproducirlo juntos.
-              </p>
-            </aside>
           )}
         </div>
 
