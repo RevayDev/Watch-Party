@@ -522,11 +522,16 @@ export class RoomController {
   }
 
   /**
-   * Ultra-fast HTTP 206 Partial Content Video Streaming with chunk caching and zero delay
+   * HTTP 206 Partial Content sin bloquear el event loop (stat async + ETag).
+   * Soporta rangos cerrados/abiertos/sufijo, If-Range e If-None-Match.
    */
   public static async streamVideo(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { roomId } = req.params;
+      if (typeof roomId !== 'string' || !roomId.trim()) {
+        res.status(400).json({ error: 'roomId is required' });
+        return;
+      }
       const room = await RoomService.getRoomById(roomId);
 
       if (!room || !room.video) {
@@ -539,51 +544,100 @@ export class RoomController {
         return;
       }
 
-      const filePath = path.join(uploadsDir, room.video.fileName);
-      if (!fs.existsSync(filePath)) {
+      // Evita path traversal: solo el basename del fichero registrado.
+      const safeFileName = path.basename(room.video.fileName);
+      const filePath = path.join(uploadsDir, safeFileName);
+      let stat: { size: number; mtimeMs: number };
+      try {
+        stat = await fs.promises.stat(filePath);
+      } catch {
+        res.status(404).json({ error: 'El archivo de video no existe en el disco' });
+        return;
+      }
+      const fileSize = stat.size;
+      if (!Number.isFinite(fileSize) || fileSize <= 0) {
         res.status(404).json({ error: 'El archivo de video no existe en el disco' });
         return;
       }
 
-      const stat = fs.statSync(filePath);
-      const fileSize = stat.size;
+      const mimeType = room.video.mimeType || 'video/mp4';
+      const etag = `"${fileSize.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}"`;
+      const lastModified = new Date(stat.mtimeMs).toUTCString();
+      res.setHeader('ETag', etag);
+      res.setHeader('Last-Modified', lastModified);
+      res.setHeader('Accept-Ranges', 'bytes');
+
+      if (req.headers['if-none-match'] === etag) {
+        res.status(304).end();
+        return;
+      }
+
       const range = req.headers.range;
+      const ifRange = req.headers['if-range'];
+      const rangeStale = typeof ifRange === 'string' && ifRange !== etag && ifRange !== lastModified;
 
-      if (range) {
-        // Range: bytes=start-end
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        // Serve 2MB - 4MB chunks for instant seek responsiveness
-        const chunkSize = 3 * 1024 * 1024;
-        const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + chunkSize, fileSize - 1);
+      const streamWithCleanup = (start: number, end: number | undefined): void => {
+        const fileStream = end === undefined
+          ? fs.createReadStream(filePath)
+          : fs.createReadStream(filePath, { start, end });
+        fileStream.on('error', (err) => {
+          if (!res.headersSent) {
+            next(err);
+            return;
+          }
+          try { res.destroy(); } catch { /* noop */ }
+        });
+        // Si el cliente aborta, se cierra el fd de inmediato.
+        req.on('close', () => {
+          try { fileStream.destroy(); } catch { /* noop */ }
+        });
+        fileStream.pipe(res);
+      };
 
-        if (start >= fileSize) {
-          res.status(416).send(`Requested range not satisfiable: ${start} >= ${fileSize}`);
+      if (range && !rangeStale) {
+        const match = range.trim().match(/^bytes=(\d*)-(\d*)$/);
+        if (!match || (match[1] === '' && match[2] === '')) {
+          res.status(416).setHeader('Content-Range', `bytes */${fileSize}`).end();
+          return;
+        }
+        let start: number;
+        let end: number;
+        if (match[1] === '') {
+          // Sufijo: últimos N bytes.
+          const suffix = parseInt(match[2], 10);
+          if (!Number.isFinite(suffix) || suffix <= 0) {
+            res.status(416).setHeader('Content-Range', `bytes */${fileSize}`).end();
+            return;
+          }
+          start = Math.max(0, fileSize - suffix);
+          end = fileSize - 1;
+        } else {
+          start = parseInt(match[1], 10);
+          const chunkSize = 3 * 1024 * 1024;
+          end = match[2] ? parseInt(match[2], 10) : Math.min(start + chunkSize, fileSize - 1);
+        }
+
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start >= fileSize || end >= fileSize || start > end) {
+          res.status(416).setHeader('Content-Range', `bytes */${fileSize}`).end();
           return;
         }
 
-        const contentLength = end - start + 1;
-        const fileStream = fs.createReadStream(filePath, { start, end });
-
-        const headers = {
+        res.writeHead(206, {
           'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': contentLength,
-          'Content-Type': room.video.mimeType || 'video/mp4',
+          'Content-Length': end - start + 1,
+          'Content-Type': mimeType,
           'Cache-Control': 'public, max-age=3600',
-        };
-
-        res.writeHead(206, headers);
-        fileStream.pipe(res);
-      } else {
-        const headers = {
-          'Content-Length': fileSize,
-          'Content-Type': room.video.mimeType || 'video/mp4',
-          'Accept-Ranges': 'bytes',
-        };
-        res.writeHead(200, headers);
-        fs.createReadStream(filePath).pipe(res);
+        });
+        streamWithCleanup(start, end);
+        return;
       }
+
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': mimeType,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      streamWithCleanup(0, undefined);
     } catch (error) {
       next(error);
     }

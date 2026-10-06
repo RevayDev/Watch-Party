@@ -45,6 +45,11 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       const room = await RoomService.getRoomById(cleanRoomId);
       if (!room) return;
 
+      // Solo miembros de la sala pueden sincronizar (evita que un socket
+      // ajeno desincronice la sala; cualquier participante sí puede).
+      const member = activeUsers.get(socket.id);
+      if (!member || member.roomId !== cleanRoomId || member.pending) return;
+
       // ── Update in-memory playback state (vía caso de uso) ──────────────────
       const payload = SyncPlaybackUseCase.execute({ roomId: cleanRoomId, action, currentTime });
       if (!payload) return;
@@ -131,7 +136,7 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       if (typeof roomId !== 'string' || !roomId.trim()) return;
       // El cliente emite porcentaje 0-100 y `null` para limpiar la barra.
       if (progress !== null && (!Number.isFinite(progress) || progress < 0 || progress > 100)) return;
-      if (fileName !== undefined && typeof fileName !== 'string') return;
+      if (fileName !== undefined && (typeof fileName !== 'string' || fileName.length > 255)) return;
       const cleanRoomId = roomId.toUpperCase().trim();
       const room = await RoomService.getRoomById(cleanRoomId);
       if (!room) return;

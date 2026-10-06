@@ -1,7 +1,14 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../../types/room';
+
+// hls.js (~500KB) solo se carga cuando el video es HLS (dynamic import).
+let hlsModulePromise: Promise<typeof import('hls.js')> | null = null;
+function loadHls(): Promise<typeof import('hls.js')> {
+  if (!hlsModulePromise) hlsModulePromise = import('hls.js');
+  return hlsModulePromise;
+}
 import { BottomSheet } from '../../shared/components/BottomSheet';
 import { isDemoMode } from '../../shared/demo';
 import { VideoUploadPicker } from './VideoUploadPicker';
@@ -156,58 +163,78 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     lastLoadKeyRef.current = loadKey;
 
     if (isHls) {
-      if (Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 90,
-        });
-        hlsInstanceRef.current = hls;
-        hls.loadSource(videoSrc);
-        hls.attachMedia(vid);
-
-        let fatalNetworkRetries = 0;
-        let fatalMediaRetries = 0;
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (!data.fatal) return;
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              if (fatalNetworkRetries < 3) {
-                fatalNetworkRetries += 1;
-                console.warn(`HLS network error, retrying (${fatalNetworkRetries}/3)...`, data.details);
-                hls.startLoad();
-                break;
-              }
-              setPlaybackError(
-                `No se pudo cargar la transmisión (${data.details}). El enlace puede haber expirado o no permitir reproducirlo.`
-              );
-              hls.destroy();
-              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              if (fatalMediaRetries < 3) {
-                fatalMediaRetries += 1;
-                console.warn(`HLS media error, recovering (${fatalMediaRetries}/3)...`, data.details);
-                hls.recoverMediaError();
-                break;
-              }
-              setPlaybackError('No se pudo decodificar el video del stream. Prueba con otro enlace.');
-              hls.destroy();
-              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
-              break;
-            default:
-              console.error('Fatal HLS error cannot be recovered:', data);
-              setPlaybackError('No se pudo decodificar el stream HLS o el enlace expiró.');
-              hls.destroy();
-              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
-              break;
-          }
-        });
-      } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
-        // Native Safari / iOS HLS support
+      if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native Safari / iOS HLS support (sin descargar hls.js)
         vid.src = videoSrc;
       } else {
-        setPlaybackError('Tu navegador no soporta reproducción HLS (.m3u8).');
+        let cancelled = false;
+        loadHls()
+          .then((mod) => {
+            if (cancelled) return;
+            // Revalidar: la fuente pudo cambiar mientras se descargaba hls.js.
+            if (lastLoadKeyRef.current !== loadKey) return;
+            const HlsClass = mod.default;
+            if (!HlsClass.isSupported()) {
+              setPlaybackError('Tu navegador no soporta reproducción HLS (.m3u8).');
+              return;
+            }
+            const hls = new HlsClass({
+              enableWorker: true,
+              lowLatencyMode: true,
+              backBufferLength: 90,
+            });
+            hlsInstanceRef.current = hls;
+            hls.loadSource(videoSrc);
+            hls.attachMedia(vid);
+
+            let fatalNetworkRetries = 0;
+            let fatalMediaRetries = 0;
+            hls.on(HlsClass.Events.ERROR, (_event, data) => {
+              if (!data.fatal) return;
+              switch (data.type) {
+                case HlsClass.ErrorTypes.NETWORK_ERROR:
+                  if (fatalNetworkRetries < 3) {
+                    fatalNetworkRetries += 1;
+                    console.warn(`HLS network error, retrying (${fatalNetworkRetries}/3)...`, data.details);
+                    hls.startLoad();
+                    break;
+                  }
+                  setPlaybackError(
+                    `No se pudo cargar la transmisión (${data.details}). El enlace puede haber expirado o no permitir reproducirlo.`
+                  );
+                  hls.destroy();
+                  if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+                  break;
+                case HlsClass.ErrorTypes.MEDIA_ERROR:
+                  if (fatalMediaRetries < 3) {
+                    fatalMediaRetries += 1;
+                    console.warn(`HLS media error, recovering (${fatalMediaRetries}/3)...`, data.details);
+                    hls.recoverMediaError();
+                    break;
+                  }
+                  setPlaybackError('No se pudo decodificar el video del stream. Prueba con otro enlace.');
+                  hls.destroy();
+                  if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+                  break;
+                default:
+                  console.error('Fatal HLS error cannot be recovered:', data);
+                  setPlaybackError('No se pudo decodificar el stream HLS o el enlace expiró.');
+                  hls.destroy();
+                  if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+                  break;
+              }
+            });
+          })
+          .catch(() => {
+            if (!cancelled) setPlaybackError('No se pudo cargar el reproductor HLS. Revisa tu conexión.');
+          });
+        return () => {
+          cancelled = true;
+          if (hlsInstanceRef.current) {
+            hlsInstanceRef.current.destroy();
+            hlsInstanceRef.current = null;
+          }
+        };
       }
     } else {
       // Standard MP4 / WebM direct streaming

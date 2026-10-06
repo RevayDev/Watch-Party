@@ -102,6 +102,12 @@ describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () 
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-dedup');
+    activeUsers.set('s-dedup', {
+      socketId: 's-dedup',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+    });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId: room.roomId, action: 'play', currentTime: 10 });
@@ -115,6 +121,12 @@ describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () 
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-dedup2');
+    activeUsers.set('s-dedup2', {
+      socketId: 's-dedup2',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+    });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId: room.roomId, action: 'play', currentTime: 10 });
@@ -147,6 +159,12 @@ describe('sync-video: validación de payloads (sin romper clientes legítimos)',
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-legit');
+    activeUsers.set('s-legit', {
+      socketId: 's-legit',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+    });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId: room.roomId, action: 'pause', currentTime: 42 });
@@ -156,6 +174,26 @@ describe('sync-video: validación de payloads (sin romper clientes legítimos)',
     expect(emitted[0].payload).toMatchObject({ action: 'pause', currentTime: 42 });
     expect((emitted[0].payload as any).sentAt).toEqual(expect.any(Number));
     expect((emitted[0].payload as any).senderSocketId).toBe('s-legit');
+  });
+});
+
+describe('sync-video: solo miembros (anti inyección externa)', () => {
+  it('socket ajeno a la sala no sincroniza', async () => {
+    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    created.push(room.roomId);
+    const { io } = makeIo();
+    const sock = makeSocket('s-outsider');
+    activeUsers.set('s-outsider', {
+      socketId: 's-outsider',
+      roomId: 'OTRASALA',
+      userName: 'Troll',
+      isHost: false,
+    });
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'sync-video', { roomId: room.roomId, action: 'play', currentTime: 10 });
+
+    expect(sock.toEmitted.filter((e) => e.event === 'sync-video')).toHaveLength(0);
   });
 });
 

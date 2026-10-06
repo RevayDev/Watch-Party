@@ -25,6 +25,8 @@ import {
   roadmapItems,
   timelineEvents,
   donationCards,
+  SUPPORT_PLANS,
+  planPaymentUrl,
   features,
   faqs,
   KOFI_URL,
@@ -352,6 +354,8 @@ export const Home: React.FC<HomeProps> = ({
               src={exampleImg}
               alt="Watch Party Experiencia en Vivo"
               className="home-showcase-img"
+              loading="lazy"
+              decoding="async"
             />
             <div className="home-showcase-overlay" />
           </div>
@@ -711,6 +715,80 @@ export const Home: React.FC<HomeProps> = ({
         </div>
       </section>
 
+      {/* ── SECTION: Planes de apoyo (pago único) ── */}
+      <section className="home-section home-plans" id="planes">
+        <div className="home-section__header">
+          <span className="home-section__badge">Planes de apoyo</span>
+          <h2 className="home-section__title">Impulsa Watch Party con un pago único</h2>
+          <p className="home-section__subtitle">
+            Sin suscripciones ni anuncios. Eliges un plan, pagas una sola vez
+            por PayPal y lo recaudado cubre servidor, almacenamiento y desarrollo.
+          </p>
+        </div>
+
+        <div className="home-plans-grid">
+          {SUPPORT_PLANS.map((plan) => {
+            const Icon = plan.icon;
+            const url = planPaymentUrl(plan);
+            const isReady = Boolean(url);
+            return (
+              <article
+                key={plan.id}
+                className={`home-plan-card${plan.highlighted ? ' home-plan-card--highlighted' : ''}${!isReady ? ' home-plan-card--pending' : ''}`}
+              >
+                {plan.badge && (
+                  <span className="home-plan-card__badge">{plan.badge}</span>
+                )}
+                <span
+                  className={`home-donate-card__icon home-donate-card__icon--${plan.tone}`}
+                  aria-hidden="true"
+                >
+                  <Icon size={20} strokeWidth={2} />
+                </span>
+                <h3 className="home-plan-card__name">{plan.name}</h3>
+                <p className="home-plan-card__price">
+                  ${plan.amount}
+                  <span className="home-plan-card__currency"> {plan.currency} · pago único</span>
+                </p>
+                <p className="home-donate-card__desc">{plan.tagline}</p>
+                <ul className="home-plan-card__perks">
+                  {plan.perks.map((perk) => (
+                    <li key={perk}>
+                      <Check size={14} className="text-primary-color" aria-hidden="true" />
+                      <span>{perk}</span>
+                    </li>
+                  ))}
+                </ul>
+                {isReady ? (
+                  <a
+                    className="home-hero-btn home-hero-btn--primary home-plan-card__cta"
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span>{plan.cta}</span>
+                    <ExternalLink size={14} />
+                  </a>
+                ) : (
+                  <span className="home-plan-card__cta-pending">
+                    Próximamente — configura VITE_PAYPAL_URL
+                  </span>
+                )}
+              </article>
+            );
+          })}
+        </div>
+
+        <aside className="home-donate__note" aria-label="Nota sobre los planes">
+          <Lightbulb size={16} strokeWidth={2.2} aria-hidden="true" />
+          <p>
+            <strong>Pago único, sin cuenta.</strong> Los botones abren PayPal en
+            una pestaña nueva con el monto del plan. Si aún no hay enlace de
+            cobro configurado, las tarjetas muestran «Próximamente».
+          </p>
+        </aside>
+      </section>
+
       {/* ── Modal Pop-up: Crear Nueva Sala ── */}
       <CreateRoomModal
         open={showCreateModal}
@@ -804,6 +882,9 @@ export const Home: React.FC<HomeProps> = ({
 
             <div className="home-footer__col">
               <h4 className="home-footer__heading">Comunidad</h4>
+              <a className="home-footer__link" href="#planes">
+                Planes de apoyo
+              </a>
               <a className="home-footer__link" href="#roadmap">
                 Lo que viene
               </a>

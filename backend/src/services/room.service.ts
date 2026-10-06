@@ -110,15 +110,16 @@ export class RoomService {
    */
   public static removeOldVideoFile(fileName: string | undefined): void {
     if (!fileName) return;
-    try {
-      const filePath = path.join(uploadsDir, fileName);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`🗑️ Archivo de video eliminado del servidor: ${fileName}`);
+    // No bloqueante: evita existsSync/unlinkSync en el event loop.
+    // El borrado es mejor esfuerzo; ENOENT se ignora en silencio.
+    const filePath = path.join(uploadsDir, fileName);
+    void fs.promises.unlink(filePath).then(
+      () => console.log(`🗑️ Archivo de video eliminado del servidor: ${fileName}`),
+      (err: unknown) => {
+        const code = (err as { code?: string } | null)?.code;
+        if (code !== 'ENOENT') console.warn('⚠️ No se pudo eliminar el archivo de video:', err);
       }
-    } catch (err) {
-      console.warn('⚠️ No se pudo eliminar el archivo de video:', err);
-    }
+    );
   }
 
   /**
@@ -545,7 +546,7 @@ export class RoomService {
         name: request.name,
         userId: request.userId,
         kickedAt: new Date(),
-        kickedBy: opts.rejectedBy || 'Afitrión',
+        kickedBy: opts.rejectedBy || 'Anfitrión',
         banned: true,
       });
     }
@@ -623,7 +624,7 @@ export class RoomService {
       room.participants[0].role = 'host';
       room.hostName = room.participants[0].name;
       newHostName = room.participants[0].name;
-      console.log(`👑 Rol de Affitrión transferido a: ${newHostName} en la sala ${cleanId}`);
+      console.log(`👑 Rol de Anfitrión transferido a: ${newHostName} en la sala ${cleanId}`);
     }
 
     room.updatedAt = new Date();

@@ -13,17 +13,26 @@ export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
       callerIsHost: boolean;
     } | undefined) => {
       if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
+      // Solo sockets conocidos de la misma sala pueden señalizar (anti-reflector).
+      const sender = activeUsers.get(socket.id);
+      const target = activeUsers.get(data.targetSocketId);
+      if (!sender || sender.pending || !target || target.pending) return;
+      if (sender.roomId !== target.roomId) return;
       io.to(data.targetSocketId).emit('webrtc-offer', {
         senderSocketId: socket.id,
         offer: data.offer,
-        callerName: data.callerName,
-        callerIsHost: data.callerIsHost,
+        callerName: typeof data.callerName === 'string' ? data.callerName.slice(0, 50) : '',
+        callerIsHost: data.callerIsHost === true,
       });
     }
   );
 
   socket.on('webrtc-answer', (data: { targetSocketId: string; answer: unknown } | undefined) => {
     if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
+    const sender = activeUsers.get(socket.id);
+    const target = activeUsers.get(data.targetSocketId);
+    if (!sender || sender.pending || !target || target.pending) return;
+    if (sender.roomId !== target.roomId) return;
     io.to(data.targetSocketId).emit('webrtc-answer', {
       senderSocketId: socket.id,
       answer: data.answer,
@@ -32,6 +41,10 @@ export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
 
   socket.on('webrtc-ice-candidate', (data: { targetSocketId: string; candidate: unknown } | undefined) => {
     if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
+    const sender = activeUsers.get(socket.id);
+    const target = activeUsers.get(data.targetSocketId);
+    if (!sender || sender.pending || !target || target.pending) return;
+    if (sender.roomId !== target.roomId) return;
     io.to(data.targetSocketId).emit('webrtc-ice-candidate', {
       senderSocketId: socket.id,
       candidate: data.candidate,
@@ -40,11 +53,16 @@ export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
 
   // 4.1 Broadcast Peer Media State (Camera / Mic on/off)
   socket.on('peer-media-state', (data: { roomId: string; userName?: string; isCameraOn: boolean; isMicOn: boolean }) => {
-    const { roomId, isCameraOn, isMicOn } = data;
-    if (!roomId) return;
+    if (!data || typeof data !== 'object') return;
+    const { roomId } = data;
+    if (typeof roomId !== 'string' || !roomId.trim()) return;
     const cleanRoomId = roomId.toUpperCase().trim();
     const user = activeUsers.get(socket.id);
-    const effectiveUserName = data.userName?.trim() || user?.userName || '';
+    if (!user || user.roomId !== cleanRoomId || user.pending) return;
+    const isCameraOn = data.isCameraOn === true;
+    const isMicOn = data.isMicOn === true;
+    const effectiveUserName =
+      (typeof data.userName === 'string' && data.userName.trim()) || user?.userName || '';
 
     activeMediaStates.set(socket.id, { isCameraOn, isMicOn });
     if (effectiveUserName) {

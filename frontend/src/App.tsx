@@ -1,13 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Home } from './features/home/Home';
-import { Room } from './features/room/Room';
-import { StatusPage } from './features/status/StatusPage';
-import { AdminPage } from './features/admin/AdminPage';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { ApiService } from './services/api';
 import { saveRecentRoom, removeRecentRoom } from './services/recentRooms';
 import { NotificationProvider, notify } from './services/notifications';
 import { STORAGE_KEYS } from './shared/constants';
 import { saveHostSession } from './shared/utils';
+
+const Home = lazy(() =>
+  import('./features/home/Home').then((m) => ({ default: m.Home }))
+);
+const Room = lazy(() =>
+  import('./features/room/Room').then((m) => ({ default: m.Room }))
+);
+const StatusPage = lazy(() =>
+  import('./features/status/StatusPage').then((m) => ({ default: m.StatusPage }))
+);
+const AdminPage = lazy(() =>
+  import('./features/admin/AdminPage').then((m) => ({ default: m.AdminPage }))
+);
 
 type ViewState = 'home' | 'room' | 'status' | 'admin';
 
@@ -110,6 +119,7 @@ export const App: React.FC = () => {
   return (
     <NotificationProvider>
       <div className="app">
+      <Suspense fallback={<div className="app-loading">Cargando…</div>}>
       {view === 'home' && (
         <Home
           initialRoomCode={currentRoomId}
@@ -131,6 +141,7 @@ export const App: React.FC = () => {
       {view === 'status' && <StatusPage onBack={handleBackToHome} />}
 
       {view === 'admin' && <AdminPage onBack={handleBackToHome} />}
+      </Suspense>
       </div>
     </NotificationProvider>
   );
