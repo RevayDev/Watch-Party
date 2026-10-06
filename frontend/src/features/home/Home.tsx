@@ -27,7 +27,7 @@ import {
   donationCards,
   features,
   faqs,
-  PATREON_URL,
+  KOFI_URL,
   PAYPAL_URL,
   TimelineEvent,
 } from './homeData';
@@ -760,15 +760,15 @@ export const Home: React.FC<HomeProps> = ({
                 reacciones en tiempo real.
               </p>
               <div className="home-footer__social">
-                {PATREON_URL && (
+                {KOFI_URL && (
                   <a
                     className="home-footer__social-link"
-                    href={PATREON_URL}
+                    href={KOFI_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     <Heart size={14} strokeWidth={2.2} />
-                    Patreon
+                    Ko-fi
                   </a>
                 )}
                 {PAYPAL_URL && (

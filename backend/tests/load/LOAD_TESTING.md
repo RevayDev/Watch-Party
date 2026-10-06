@@ -100,6 +100,15 @@ en non-demo NO hay cuota de usuarios (el 10×10 mide Node+Socket.IO, no una cuot
 premium real). `PREMIUM_ROOM_MAX_USERS=10` solo alimenta `getPremiumPlan()`.
 Cuando pagos imponga cuotas premium, repetir el 10×10 con el plan aplicado.
 
+### Re-medición 2026-10-06 (cuotas vigentes: demo 5/5)
+
+Servidor propio en :4100 (el :4000 del usuario no se tocó). Escenarios demo:
+1×10 → 4 joins OK + 6 `room-full`; 5×10 → 20 OK + 30 `room-full`;
+10×10 → 5/10 salas (5 `DEMO_ROOM_LIMIT`); join p50 3–5 ms, p95 16–17 ms;
+0 errores WS, 0 desconexiones espontáneas. Confirma que la cuota demo se
+impone exacta bajo carga. 25×10/50×10 NO medidos (requieren entorno
+dedicado y sortear el techo single-IP): quedan como ESTIMADO.
+
 ## Limitaciones conocidas (no invalidan, acotan)
 
 - Single-IP: el `globalLimiter` recorta mucho antes que CPU/RAM.

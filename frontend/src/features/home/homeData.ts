@@ -24,8 +24,8 @@ import {
  * Datos estáticos del Home (movidos verbatim desde pages/Home.tsx, sin lógica).
  */
 
-export const PATREON_URL =
-  (import.meta.env.VITE_PATREON_URL as string | undefined)?.trim() || '';
+export const KOFI_URL =
+  (import.meta.env.VITE_KOFI_URL as string | undefined)?.trim() || '';
 export const PAYPAL_URL =
   (import.meta.env.VITE_PAYPAL_URL as string | undefined)?.trim() || '';
 
@@ -120,12 +120,12 @@ export type TimelineEvent = (typeof timelineEvents)[number];
 
 export const donationCards = [
   {
-    id: 'patreon',
+    id: 'kofi',
     icon: Heart,
-    title: 'Patreon',
-    desc: 'Apoyo mensual recurrente para pagar el servidor y priorizar nuevas funciones.',
-    cta: 'Apoyar en Patreon',
-    url: PATREON_URL,
+    title: 'Ko-fi',
+    desc: 'Apoya el proyecto con una aportación para pagar el servidor y priorizar nuevas funciones.',
+    cta: 'Apoyar en Ko-fi',
+    url: KOFI_URL,
     tone: 'rose' as const,
   },
   {

@@ -18,6 +18,12 @@ Frontend (Vercel) → REST + Socket.IO → Backend (Render, 1 instancia) → Mon
 
 Mensajes exactos: `"La demo ha alcanzado el límite de 5 salas. Intenta nuevamente más tarde."`, `"Esta sala está llena."`, `"La subida de archivos está deshabilitada en la demo. Usa un enlace de video (por ejemplo, Google Drive) en su lugar."`
 
+### Cuotas FREE vs PREMIUM (vigentes, no cambiar sin medición)
+
+- **FREE/DEMO: 5 usuarios por sala** (`DEMO_MAX_USERS_PER_ROOM = 5`).
+- **PREMIUM: 10 usuarios por sala** (`PREMIUM_ROOM_MAX_USERS = 10`, `$5.000 COP`; se aplica cuando pagos imponga la cuota, aún no impuesta).
+- Estos números son **capacidad técnica parcial**, no capacidad comercial: falta medir en local 1×5, 5×5, 10×5 y 1×10, 5×10, 10×10, 25×10, 50×10 (CPU, RAM, latencia, WS, errores, desconexiones, req/s, ancho de banda, duración) antes de sostener cualquier promesa comercial.
+
 Disponibilidad: `GET /api/demo/availability` → `{roomsUsed, roomsTotal: 5, roomsAvailable}` (solo conteos).
 
 ## 3. Crear sala / entrar con código

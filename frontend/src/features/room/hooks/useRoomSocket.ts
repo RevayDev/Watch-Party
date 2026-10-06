@@ -818,16 +818,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   const handleUploadVideo = async (file: File) => {
     try {
       setUploadProgress(0);
-      socket.emit('upload-progress', { roomId, progress: 0, fileName: file.name });
+      socket.emit('upload-progress', { roomId, progress: 0, fileName: file.name, ...buildSocketAuth(roomId, myName) });
       const res = await ApiService.uploadVideo(roomId, file, (progress) => {
         setUploadProgress(progress);
-        socket.emit('upload-progress', { roomId, progress, fileName: file.name });
+        socket.emit('upload-progress', { roomId, progress, fileName: file.name, ...buildSocketAuth(roomId, myName) });
       });
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
-      socket.emit('video-changed', { roomId, video: res.video });
-      socket.emit('upload-progress', { roomId, progress: null });
+      socket.emit('video-changed', { roomId, video: res.video, ...buildSocketAuth(roomId, myName) });
+      socket.emit('upload-progress', { roomId, progress: null, ...buildSocketAuth(roomId, myName) });
     } catch (err: any) {
-      socket.emit('upload-progress', { roomId, progress: null });
+      socket.emit('upload-progress', { roomId, progress: null, ...buildSocketAuth(roomId, myName) });
       notify('error', err.message || 'Error al subir el video', 'Error al subir');
     } finally {
       setUploadProgress(null);
@@ -839,7 +839,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       setLoading(true);
       const res = await ApiService.setVideoUrl(roomId, url, title);
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
-      socket.emit('video-changed', { roomId, video: res.video });
+      socket.emit('video-changed', { roomId, video: res.video, ...buildSocketAuth(roomId, myName) });
     } catch (err: any) {
       notify('error', err.message || 'Error al cargar el enlace de video', 'Error al cargar video');
     } finally {
