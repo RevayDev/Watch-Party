@@ -7,6 +7,7 @@ import { registerChatReactionsHandlers } from './handlers/chat-reactions.handler
 import { registerModerationHandlers } from './handlers/moderation.handler.js';
 import { registerWebrtcRelayHandlers } from './handlers/webrtc-relay.handler.js';
 import { registerSettingsHandlers } from './handlers/settings.handler.js';
+import { recordWsConnect, recordWsDisconnect } from '../services/metrics.service.js';
 
 // Re-export de compatibilidad: la regla pura vive en domain/playback-policy.ts.
 export { resolveRoomTime } from '../domain/playback-policy.js';
@@ -14,6 +15,17 @@ export { resolveRoomTime } from '../domain/playback-policy.js';
 export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
     console.log(`⚡ Socket conectado: ${socket.id}`);
+
+    // Observabilidad (best-effort): totales + pico de sockets crudos. El pico
+    // de usuarios con sala lo actualizan los endpoints desde `activeUsers`.
+    try {
+      recordWsConnect(io.engine.clientsCount);
+    } catch { /* métricas jamás rompen conexiones */ }
+    socket.on('disconnect', () => {
+      try {
+        recordWsDisconnect();
+      } catch { /* métricas jamás rompen conexiones */ }
+    });
 
     registerJoinApprovalHandlers(io, socket);
     registerSyncPlaybackHandlers(io, socket);
