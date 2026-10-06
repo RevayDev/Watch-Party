@@ -102,9 +102,46 @@ export const deleteRoomLimiter = createRateLimiter({
   message: 'Has alcanzado el límite de eliminación de salas por minuto.',
 });
 
+// ── Límite configurable por variables de entorno ────────────────────────────
+// Formato: "max/windowMs" (ej. "30/60000" = 30 peticiones por minuto).
+// Si la variable no existe o es inválida se usa el default indicado.
+export function parseRateLimitEnv(
+  name: string,
+  defaultMax: number,
+  defaultWindowMs: number
+): { windowMs: number; max: number } {
+  const raw = (process.env[name] || '').trim();
+  const match = /^(\d+)\s*\/\s*(\d+)$/.exec(raw);
+  if (!match) return { windowMs: defaultWindowMs, max: defaultMax };
+  const max = Number.parseInt(match[1], 10);
+  const windowMs = Number.parseInt(match[2], 10);
+  if (!Number.isSafeInteger(max) || max <= 0) return { windowMs: defaultWindowMs, max: defaultMax };
+  if (!Number.isSafeInteger(windowMs) || windowMs <= 0) return { windowMs: defaultWindowMs, max: defaultMax };
+  return { windowMs, max };
+}
+
 // Proxy de streaming: máximo 120 peticiones por minuto por IP
 export const proxyLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 120,
   message: 'Límite de solicitudes de streaming/proxy excedido.',
+});
+
+// Pagos: límites configurables por entorno (nunca agresivos por defecto).
+// - checkout: por usuario/IP.
+// - redeem: por usuario/IP/código (anti fuerza bruta, con margen para typos).
+// - webhook: laxo para no bloquear reintentos legítimos del proveedor.
+export const checkoutLimiter = createRateLimiter({
+  ...parseRateLimitEnv('PAYMENT_CHECKOUT_RATE_LIMIT', 30, 60 * 1000),
+  message: 'Demasiadas compras iniciadas, por favor inténtalo de nuevo más tarde.',
+});
+
+export const redeemLimiter = createRateLimiter({
+  ...parseRateLimitEnv('PAYMENT_REDEEM_RATE_LIMIT', 20, 60 * 1000),
+  message: 'Demasiados intentos de canje, por favor inténtalo de nuevo más tarde.',
+});
+
+export const webhookLimiter = createRateLimiter({
+  ...parseRateLimitEnv('PAYMENT_WEBHOOK_RATE_LIMIT', 60, 60 * 1000),
+  message: 'Demasiadas notificaciones de pago, por favor inténtalo de nuevo más tarde.',
 });

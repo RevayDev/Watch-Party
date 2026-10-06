@@ -1,19 +1,7 @@
 /**
- * SUBAGENTE 4 (testing/security): guards de `video-changed` / `upload-progress`.
- *
- * PREGUNTA DOCUMENTADA EN CÓDIGO: ¿quién puede cambiar el video hoy?
- * - REST `POST /api/rooms/:roomId/video-url` y `uploadVideo` → SOLO host
- *   (403 sin secreto/rol; cubierto en `tests/rest-security.test.ts`).
- * - Socket `video-changed` → SIN guard de auth: CUALQUIER socket (miembro,
- *   no-miembro, sin hostSecret) provoca un broadcast `video-changed` a toda
- *   la sala (ver `src/sockets/handlers/sync-playback.handler.ts:84-114`:
- *   valida forma del payload pero nunca llama a `requireHost`).
- * - Socket `upload-progress` → igual, sin guard (spoofing de barra de progreso).
- *
- * Estos tests NO fijan el comportamiento deseado, solo el ACTUAL, para que
- * cualquier endurecimiento futuro (exigir host) se discuta con el equipo
- * antes de romper el flujo del frontend (que reemite `res.video` tras el
- * upload del host). NO tocar sin coordinar UI.
+ * Guards de `video-changed` / `upload-progress`: SOLO el host puede cambiar
+ * el video o informar progreso de subida (el frontend solo lo emite desde
+ * el panel del anfitrión). Sin permiso → `action-denied`, sin broadcast.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
 import { RoomService } from '../src/services/room.service.js';
@@ -93,8 +81,8 @@ const VALID_VIDEO = (tag: string) => ({
   sourceType: 'file' as const,
 });
 
-describe('video-changed vía socket: estado ACTUAL (sin guard de host)', () => {
-  it('ACTUAL: un MIEMBRO (no host, sin secreto) provoca broadcast a la sala', async () => {
+describe('video-changed vía socket: solo host', () => {
+  it('un MIEMBRO (no host, sin secreto) recibe action-denied y no hay broadcast', async () => {
     const { room } = await RoomService.createRoom({ hostName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
@@ -111,27 +99,21 @@ describe('video-changed vía socket: estado ACTUAL (sin guard de host)', () => {
     });
     registerSyncPlaybackHandlers(io, sock.socket);
 
-    // Sin hostSecret, sin requesterUserId de host: payload "normal" de miembro.
     await fire(sock.handlers, 'video-changed', {
       roomId: room.roomId,
       video: VALID_VIDEO('miembro'),
     });
 
-    const broadcasts = roomEmits.filter((e) => e.event === 'video-changed');
-    expect(broadcasts).toHaveLength(1);
-    expect(broadcasts[0].room).toBe(room.roomId);
-    expect((broadcasts[0].payload as any)?.video?.originalName).toContain('pelicula-');
-    // Y nadie recibe action-denied: el servidor no lo considera privilegiado.
-    expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(false);
+    expect(roomEmits.filter((e) => e.event === 'video-changed')).toHaveLength(0);
+    expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(true);
   });
 
-  it('ACTUAL: un socket ANÓNIMO (fuera de la sala) también provoca broadcast', async () => {
+  it('un socket ANÓNIMO (fuera de la sala) es denegado sin broadcast', async () => {
     const { room } = await RoomService.createRoom({ hostName: 'Host' });
     created.push(room.roomId);
 
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-anon-video');
-    // Sin entrada en activeUsers: el handler ni siquiera lo mira.
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'video-changed', {
@@ -139,11 +121,38 @@ describe('video-changed vía socket: estado ACTUAL (sin guard de host)', () => {
       video: VALID_VIDEO('anonimo'),
     });
 
-    expect(roomEmits.filter((e) => e.event === 'video-changed')).toHaveLength(1);
+    expect(roomEmits.filter((e) => e.event === 'video-changed')).toHaveLength(0);
+    expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(true);
   });
 
-  it('la validación de FORMA sí existe: sin originalName/fileName no hay broadcast', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+  it('el HOST (con secreto) sí provoca broadcast', async () => {
+    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+    created.push(room.roomId);
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+
+    const { io, roomEmits } = makeIo();
+    const sock = makeSocket('s-host-video');
+    activeUsers.set('s-host-video', {
+      socketId: 's-host-video',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+      userId: 'u-host',
+    });
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'video-changed', {
+      roomId: room.roomId,
+      video: VALID_VIDEO('host'),
+      hostSecret,
+    });
+
+    expect(roomEmits.filter((e) => e.event === 'video-changed')).toHaveLength(1);
+    expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(false);
+  });
+
+  it('la validación de FORMA sigue exigiendo originalName/fileName', async () => {
+    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
     created.push(room.roomId);
 
     const { io, roomEmits } = makeIo();
@@ -153,25 +162,20 @@ describe('video-changed vía socket: estado ACTUAL (sin guard de host)', () => {
     await fire(sock.handlers, 'video-changed', {
       roomId: room.roomId,
       video: { originalName: '', fileName: '' },
+      hostSecret,
     });
 
     expect(roomEmits.filter((e) => e.event === 'video-changed')).toHaveLength(0);
   });
 });
 
-describe('upload-progress vía socket: estado ACTUAL (sin guard)', () => {
-  it('ACTUAL: cualquiera reemite progreso a la sala (superficie de spoofing)', async () => {
+describe('upload-progress vía socket: solo host', () => {
+  it('un NO-host recibe action-denied y no hay reemisión', async () => {
     const { room } = await RoomService.createRoom({ hostName: 'Host' });
     created.push(room.roomId);
 
     const { io } = makeIo();
     const sock = makeSocket('s-spoof-prog');
-    const toEmitted: Array<{ event: string; payload: unknown }> = [];
-    sock.socket.to = (_room: string) => ({
-      emit: (event: string, payload?: unknown) => {
-        toEmitted.push({ event, payload });
-      },
-    });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'upload-progress', {
@@ -180,6 +184,33 @@ describe('upload-progress vía socket: estado ACTUAL (sin guard)', () => {
       fileName: 'falso.mp4',
     });
 
-    expect(toEmitted.some((e) => e.event === 'upload-progress')).toBe(true);
+    expect(sock.emitted.some((e) => e.event === 'to:' + room.roomId + ':upload-progress')).toBe(false);
+    expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(true);
+  });
+
+  it('el HOST sí reemite progreso', async () => {
+    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+    created.push(room.roomId);
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+
+    const { io } = makeIo();
+    const sock = makeSocket('s-host-prog');
+    activeUsers.set('s-host-prog', {
+      socketId: 's-host-prog',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+      userId: 'u-host',
+    });
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'upload-progress', {
+      roomId: room.roomId,
+      progress: 42,
+      fileName: 'peli.mp4',
+      hostSecret,
+    });
+
+    expect(sock.emitted.some((e) => e.event === 'to:' + room.roomId + ':upload-progress')).toBe(true);
   });
 });

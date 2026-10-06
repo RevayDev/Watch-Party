@@ -15,6 +15,11 @@ import { PaymentService } from '../payments/payment.service.js';
 import { GiftCodeService } from '../payments/gift-code.service.js';
 import { toServiceError } from '../payments/errors.js';
 import { listPlans } from '../payments/plans.js';
+import {
+  checkoutLimiter,
+  redeemLimiter,
+  webhookLimiter,
+} from '../middleware/rate-limit.middleware.js';
 
 export const paymentsRouter = Router();
 
@@ -37,7 +42,7 @@ function webhookSignature(req: Request): string | undefined {
 }
 
 /** Intención de compra. NUNCA confirma pagos (solo crea el `pending`). */
-paymentsRouter.post('/checkout', (req, res) => {
+paymentsRouter.post('/checkout', checkoutLimiter, (req, res) => {
   const body = (req.body ?? {}) as {
     provider?: unknown;
     plan?: unknown;
@@ -56,7 +61,7 @@ paymentsRouter.post('/checkout', (req, res) => {
 });
 
 /** Webhook PayPal: la ÚNICA vía de confirmación (firma obligatoria). */
-paymentsRouter.post('/paypal/webhook', (req, res) => {
+paymentsRouter.post('/paypal/webhook', webhookLimiter, (req, res) => {
   PaymentService.confirmFromWebhook('paypal', req.body, webhookSignature(req))
     .then((result) => {
       if (result.ignored) {
@@ -83,7 +88,7 @@ paymentsRouter.post('/card/webhook', (_req, res) => {
 });
 
 /** Canje de código de regalo (idempotente por sujeto). */
-paymentsRouter.post('/gift-codes/redeem', (req, res) => {
+paymentsRouter.post('/gift-codes/redeem', redeemLimiter, (req, res) => {
   const body = (req.body ?? {}) as { code?: unknown; userId?: unknown; roomId?: unknown };
   GiftCodeService.redeem({
     code: typeof body.code === 'string' ? body.code : '',
