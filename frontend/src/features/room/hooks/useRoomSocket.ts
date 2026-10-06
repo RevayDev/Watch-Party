@@ -83,6 +83,10 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     sentAt?: number;
     timestamp: number;
   } | null>(null);
+  // Último consenso de playback ya aplicado: `room-state` llega en cada
+  // (re)join con la misma posición y reaplicarlo corta el video. Solo se
+  // re-aplica si cambia play/pause o el salto supera la tolerancia (2 s).
+  const lastConsensusRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
 
   // Active side panel tab: null | 'chat' | 'participants'
   const [activeSideTab, setActiveSideTab] = useState<'chat' | 'participants' | null>(null);
@@ -211,6 +215,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     enableMedia,
   } = useWebRTC(socket, roomId, myName, isHost);
 
+  // Espejos por ref del estado media/host para el efecto socket gigante.
+  // Sin esto, togglear mic/cámara cambiaba isMicOn/isCameraOn (deps del
+  // efecto) y re-ejecutaba loadRoom + join-room → recarga/reconexión.
+  const enableMediaRef = useRef(enableMedia);
+  enableMediaRef.current = enableMedia;
+  const isMicOnRef = useRef(isMicOn);
+  isMicOnRef.current = isMicOn;
+  const isCameraOnRef = useRef(isCameraOn);
+  isCameraOnRef.current = isCameraOn;
+
   // Clears local data only for THIS room (keeps sessions of other rooms intact)
   const clearRoomLocalData = useCallback(() => {
     try {
@@ -297,17 +311,25 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
         applyMediaOnJoinRef.current = false;
         const { micOn, camOn } = pendingMediaPrefRef.current;
         if (micOn || camOn) {
-          enableMedia(micOn, camOn);
+          enableMediaRef.current(micOn, camOn);
         }
       }
 
       if (state.playback && state.video) {
-        setRemoteAction({
-          action: state.playback.isPlaying ? 'play' : 'seek',
-          currentTime: state.playback.currentTime,
-          sentAt: Date.now(),
-          timestamp: Date.now(),
-        });
+        const nextPlaying = state.playback.isPlaying;
+        const prev = lastConsensusRef.current;
+        const timeJump = prev ? Math.abs(state.playback.currentTime - prev.currentTime) : Infinity;
+        // Solo seeks redundantes verificados se filtran: primer estado,
+        // cambio play/pause o salto >2 s siempre se aplican.
+        if (!prev || prev.isPlaying !== nextPlaying || timeJump > 2) {
+          lastConsensusRef.current = { currentTime: state.playback.currentTime, isPlaying: nextPlaying };
+          setRemoteAction({
+            action: state.playback.isPlaying ? 'play' : 'seek',
+            currentTime: state.playback.currentTime,
+            sentAt: Date.now(),
+            timestamp: Date.now(),
+          });
+        }
       }
     };
 
@@ -400,6 +422,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     };
 
     const handleSyncVideo = (data: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number }) => {
+      if (data.action === 'play') {
+        lastConsensusRef.current = { currentTime: data.currentTime, isPlaying: true };
+      } else if (data.action === 'pause') {
+        lastConsensusRef.current = { currentTime: data.currentTime, isPlaying: false };
+      } else {
+        lastConsensusRef.current = {
+          currentTime: data.currentTime,
+          isPlaying: lastConsensusRef.current?.isPlaying ?? false,
+        };
+      }
       setRemoteAction({
         action: data.action,
         currentTime: data.currentTime,
@@ -431,27 +463,27 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     // Moderation remote actions
     const handleForceMuteUser = (data: { targetSocketId?: string; targetUserName: string }) => {
       if (data.targetUserName.toLowerCase() === myName.toLowerCase() || data.targetSocketId === socket.id) {
-        enableMedia(false, isCameraOn);
+        enableMediaRef.current(false, isCameraOnRef.current);
         notify('warning', 'El anfitrión o co-anfitrión ha silenciado tu micrófono.', 'Micro silenciado');
       }
     };
 
     const handleForceDisableCamera = (data: { targetSocketId?: string; targetUserName: string }) => {
       if (data.targetUserName.toLowerCase() === myName.toLowerCase() || data.targetSocketId === socket.id) {
-        enableMedia(isMicOn, false);
+        enableMediaRef.current(isMicOnRef.current, false);
         notify('warning', 'El anfitrión o co-anfitrión ha apagado tu cámara.', 'Cámara apagada');
       }
     };
 
     const handleForceMuteAll = () => {
-      if (!isHost) {
-        enableMedia(false, isCameraOn);
+      if (!isHostRef.current) {
+        enableMediaRef.current(false, isCameraOnRef.current);
       }
     };
 
     const handleForceDisableAllCameras = () => {
-      if (!isHost) {
-        enableMedia(isMicOn, false);
+      if (!isHostRef.current) {
+        enableMediaRef.current(isMicOnRef.current, false);
       }
     };
 
@@ -678,7 +710,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       socket.off('settings-error', handleSettingsError);
       socket.off('action-denied', handleActionDenied);
     };
-  }, [roomId, myName, initialIsHost, socket, onLeave, enableMedia, userId, clearRoomLocalData, isCameraOn, isMicOn, isHost]);
+  }, [roomId, myName, initialIsHost, socket, onLeave, userId, clearRoomLocalData]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -786,16 +818,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   const handleUploadVideo = async (file: File) => {
     try {
       setUploadProgress(0);
-      socket.emit('upload-progress', { roomId, progress: 0, fileName: file.name });
+      socket.emit('upload-progress', { roomId, progress: 0, fileName: file.name, ...buildSocketAuth(roomId, myName) });
       const res = await ApiService.uploadVideo(roomId, file, (progress) => {
         setUploadProgress(progress);
-        socket.emit('upload-progress', { roomId, progress, fileName: file.name });
+        socket.emit('upload-progress', { roomId, progress, fileName: file.name, ...buildSocketAuth(roomId, myName) });
       });
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
-      socket.emit('video-changed', { roomId, video: res.video });
-      socket.emit('upload-progress', { roomId, progress: null });
+      socket.emit('video-changed', { roomId, video: res.video, ...buildSocketAuth(roomId, myName) });
+      socket.emit('upload-progress', { roomId, progress: null, ...buildSocketAuth(roomId, myName) });
     } catch (err: any) {
-      socket.emit('upload-progress', { roomId, progress: null });
+      socket.emit('upload-progress', { roomId, progress: null, ...buildSocketAuth(roomId, myName) });
       notify('error', err.message || 'Error al subir el video', 'Error al subir');
     } finally {
       setUploadProgress(null);
@@ -807,7 +839,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       setLoading(true);
       const res = await ApiService.setVideoUrl(roomId, url, title);
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
-      socket.emit('video-changed', { roomId, video: res.video });
+      socket.emit('video-changed', { roomId, video: res.video, ...buildSocketAuth(roomId, myName) });
     } catch (err: any) {
       notify('error', err.message || 'Error al cargar el enlace de video', 'Error al cargar video');
     } finally {
@@ -825,6 +857,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       });
     },
     [roomId, socket, myName]
+  );
+
+  // Callback ESTABLE para el heartbeat del player: el inline anterior
+  // recreaba la función en cada render y el efecto del player re-reportaba
+  // (spam de playback-heartbeat en cada mensaje/reacción/toggle).
+  const handlePlaybackHeartbeat = useCallback(
+    (currentTime: number, isPlaying: boolean) => {
+      socket.emit('playback-heartbeat', { roomId, currentTime, isPlaying });
+    },
+    [socket, roomId]
   );
 
   const handleSendMessage = (text: string) => {
@@ -902,6 +944,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     handleUploadVideo,
     handleSetVideoUrl,
     handleSyncAction,
+    handlePlaybackHeartbeat,
     handleSendMessage,
     handleReaction,
     handleCancelWaiting,

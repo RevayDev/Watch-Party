@@ -130,6 +130,8 @@ describe('webrtc relay', () => {
   it('webrtc-offer se reenvía al target con el senderSocketId', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-caller');
+    activeUsers.set('s-caller', { socketId: 's-caller', roomId: 'ROOM1', userName: 'Ana', isHost: false });
+    activeUsers.set('s-target', { socketId: 's-target', roomId: 'ROOM1', userName: 'Bob', isHost: false });
     registerWebrtcRelayHandlers(io, sock.socket);
 
     (sock.handlers.get('webrtc-offer') as any)({
@@ -147,12 +149,31 @@ describe('webrtc relay', () => {
   it('answer e ice-candidate se reenvían al target', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-a');
+    activeUsers.set('s-a', { socketId: 's-a', roomId: 'ROOM1', userName: 'Ana', isHost: false });
+    activeUsers.set('s-b', { socketId: 's-b', roomId: 'ROOM1', userName: 'Bob', isHost: false });
     registerWebrtcRelayHandlers(io, sock.socket);
 
     (sock.handlers.get('webrtc-answer') as any)({ targetSocketId: 's-b', answer: { sdp: 'y' } });
     (sock.handlers.get('webrtc-ice-candidate') as any)({ targetSocketId: 's-b', candidate: { c: 1 } });
 
     expect(roomEmits.map((e) => e.event)).toEqual(['webrtc-answer', 'webrtc-ice-candidate']);
+  });
+
+  it('webrtc-offer entre salas distintas se descarta (anti-reflector)', () => {
+    const { io, roomEmits } = makeIo();
+    const sock = makeSocket('s-x');
+    activeUsers.set('s-x', { socketId: 's-x', roomId: 'ROOM1', userName: 'Ana', isHost: false });
+    activeUsers.set('s-y', { socketId: 's-y', roomId: 'ROOM2', userName: 'Bob', isHost: false });
+    registerWebrtcRelayHandlers(io, sock.socket);
+
+    (sock.handlers.get('webrtc-offer') as any)({
+      targetSocketId: 's-y',
+      offer: { sdp: 'x' },
+      callerName: 'Ana',
+      callerIsHost: false,
+    });
+
+    expect(roomEmits).toHaveLength(0);
   });
 
   // Corregido: payload `undefined` se ignora sin lanzar.

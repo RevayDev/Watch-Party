@@ -3,6 +3,7 @@ import { Video, Hash, Link as LinkIcon, Share2, Users, Settings } from 'lucide-r
 import { usePresence } from '../hooks/usePresence';
 import { useSwipeDown } from '../shared/hooks/useSheetDrag';
 import { formatRemaining } from '../shared/utils';
+import { DEMO_MAX_USERS_PER_ROOM, isDemoMode } from '../shared/demo';
 
 interface RoomHeaderProps {
   roomId: string;
@@ -11,6 +12,10 @@ interface RoomHeaderProps {
   roomName?: string;
   roomDescription?: string;
   timerEndsAt?: string | null;
+  /** Estado de la sala (demo: se muestra como píldora informativa). */
+  roomStatus?: 'waiting' | 'active' | 'closed';
+  /** Duración del vídeo en segundos, si la hay (demo: se muestra). */
+  videoDurationSeconds?: number | null;
   onOpenSettings?: () => void;
   onLeaveClick?: () => void;
   /** Abre/cierra el panel de participantes (igual que el botón de abajo) */
@@ -26,6 +31,8 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   roomName,
   roomDescription,
   timerEndsAt,
+  roomStatus,
+  videoDurationSeconds = null,
   onOpenSettings,
   onOpenParticipants,
   participantsActive = false,
@@ -92,6 +99,13 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   };
 
   const hasRoomName = Boolean(roomName && roomName.trim());
+
+  // Demo gratuita: cupo visible X/5 (participants incluye al host; las
+  // solicitudes en espera NO consumen cupo). Con VITE_DEMO_MODE=false se
+  // muestra el conteo original sin capacidad.
+  const demo = isDemoMode();
+  const statusLabel =
+    roomStatus === 'waiting' ? 'En espera' : roomStatus === 'active' ? 'En curso' : roomStatus === 'closed' ? 'Cerrada' : null;
 
   return (
     <header className={`header ${className} ${hasRoomName ? 'header--has-name' : ''}`}>
@@ -189,11 +203,36 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           type="button"
           onClick={onOpenParticipants}
           className={`header__users-pill ${participantsActive ? 'header__users-pill--active' : ''}`}
-          title={`${participantCount} participantes — ver lista`}
+          title={
+            demo
+              ? `${participantCount} de ${DEMO_MAX_USERS_PER_ROOM} participantes — ver lista`
+              : `${participantCount} participantes — ver lista`
+          }
+          data-testid="room-capacity"
         >
           <Users size={14} />
-          <span>{participantCount}</span>
+          <span>{demo ? `${participantCount}/${DEMO_MAX_USERS_PER_ROOM}` : participantCount}</span>
         </button>
+
+        {/* Demo: estado de la sala y duración del vídeo (si hay) */}
+        {demo && statusLabel && (
+          <div
+            className="header__room-pill"
+            title={`Estado de la sala: ${statusLabel}`}
+            data-testid="room-status"
+          >
+            <span className="header__pill-label">{statusLabel}</span>
+          </div>
+        )}
+        {demo && videoDurationSeconds !== null && videoDurationSeconds !== undefined && (
+          <div
+            className="header__room-pill"
+            title="Duración del vídeo"
+            data-testid="video-duration"
+          >
+            <span className="header__pill-label">{formatRemaining(videoDurationSeconds * 1000)}</span>
+          </div>
+        )}
 
         {/* ⚙ Room settings (host only): name, info, save-mode, approval, timer */}
         {isHost && onOpenSettings && (

@@ -9,7 +9,7 @@
 - **Backend**: Node + Express + Socket.IO + Mongoose, arquitectura hexagonal.
   - `domain/` (entidades, `playback-policy` con `resolveRoomTime`, `auth-policy`, `settings-policy`), `ports/`, `application/` (use-cases), `adapters/` (repos mongo/memoria + routing dinámico con `getIsMongoConnected()`), `sockets/handlers/` por dominio, `services/proxy.service.ts`, `routes/proxy.routes.ts`, `middleware/rate-limit.middleware.ts`, `config/cors.ts`.
   - Tests vitest: `backend/tests/` (playback, room.service memoria, validaciones, settings, auth, name-collision, disconnect-grace, rest-security, socket-guards con permisos de sync).
-- **Verificación**: `npx tsc --noEmit` + `npm run build` + `npm run test` en ambos paquetes (221 backend + 94 frontend en verde). ESLint 9 + `npm run lint` en ambos (0 errores; warnings de `any` legacy aceptados).
+- **Verificación**: `npx tsc --noEmit` + `npm run build` + `npm run test` en ambos paquetes (310 backend + 143 frontend en verde). ESLint 9 + `npm run lint` en ambos (0 errores; warnings de `any` legacy aceptados).
 - **CORS**: allowlist explícita (`CLIENT_URL` + `ALLOWED_ORIGINS` con exactos y comodines controlados `*.dominio` solo https) + loopback dev `:5173/:4173` + LAN solo en no-producción (`ALLOW_LAN_DEV`, default sí). Previews `https://*.vercel.app` y dominios custom www/apex vía env. `credentials: true` preservado aunque hoy no hay cookies.
 - **Anónimos**: dos conexiones sin `userId` y mismo nombre se fusionan (legacy, con tests); frente a nombre registrado rige `name-taken`/409.
 
@@ -36,3 +36,10 @@
 - `docs/DECISIONS.md`: Registro de decisiones de arquitectura (ADRs 01 a 06).
 - `docs/PROJECT_ARCHITECTURE.md`: Documento de referencia de capas hexagonal y frontend.
 - `docs/PROJECT_LEARNING_GUIDE.md`: Guía de estudio y mantenimiento para el desarrollador.
+
+## 5. Observabilidad y monetización
+- **Métricas** (`services/metrics.service.ts`, en memoria con buckets): requests, latencia avg/p95, errores, WS connects/disconnects, usuarios pico, CPU/RAM (`null` si no disponible).
+- **Público**: `GET /api/health` (retrocompatible), `GET /api/status` (10 claves agregadas, cero PII), `GET /api/status/stream` (SSE cada 5s). Frontend: `/status` con sparklines (SSE + fallback polling 12s).
+- **Admin** (`ADMIN_TOKEN`, `x-admin-token`/Bearer, token solo en memoria en `/admin`): `GET /api/admin/summary|rooms|payments|gift-codes|audit|metrics`, CRUD de códigos `WATCH-XXXX-XXXX`, reembolsos (solo estado), auditoría. Frontend `/admin` con 7 tabs y gráficas SVG propias.
+- **Pagos** (`src/payments/`): `PaymentProvider` + `PaypalProvider` (sandbox/HMAC) + `CardProvider` (stub 501); `POST /checkout`, webhooks PayPal con firma e idempotencia por `providerTransactionId`, canje de regalos idempotente. Sin tarjetas/CVV jamás. Planes centrales en `src/config/plans.ts` (FREE 5/480min, PREMIUM 10/$5000 COP, override por env).
+- **Carga** (`backend/tests/load/`, autocannon devDep): rampas 10→100 y escenarios 1×10/5×10/10×10 medidos en local (0 errores; ver `LOAD_TESTING.md`). Nunca contra producción sin aviso.

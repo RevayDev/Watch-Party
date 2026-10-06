@@ -86,6 +86,7 @@ describe('MemoryRoomRepository: contrato del adaptador en memoria', () => {
   });
 
   it('fichero corrupto en disco no tumba el adaptador (sigue utilizable)', async () => {
+    fs.mkdirSync(path.dirname(roomsFile), { recursive: true });
     fs.writeFileSync(roomsFile, '{{{no-json', 'utf-8');
     try {
       let repo: MemoryRoomRepository | undefined;

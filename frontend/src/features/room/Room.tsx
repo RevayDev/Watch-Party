@@ -93,6 +93,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         roomName={r.roomData.settings?.name}
         roomDescription={r.roomData.settings?.description}
         timerEndsAt={r.roomData.settings?.timerEndsAt}
+        roomStatus={r.roomData.status}
+        videoDurationSeconds={r.roomData.video?.durationSeconds ?? null}
         onOpenSettings={() => r.setShowRoomSettings(true)}
         onOpenParticipants={() => r.setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
         participantsActive={r.sideTabView === 'participants'}
@@ -112,9 +114,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             onSetVideoUrl={r.handleSetVideoUrl}
             uploadProgress={r.uploadProgress}
             onSyncAction={r.handleSyncAction}
-            onPlaybackHeartbeat={(currentTime, isPlaying) => {
-              r.socket.emit('playback-heartbeat', { roomId, currentTime, isPlaying });
-            }}
+            onPlaybackHeartbeat={r.handlePlaybackHeartbeat}
             remoteAction={r.remoteAction}
             reactions={r.reactions}
             isMicOn={r.isMicOn}

@@ -38,6 +38,10 @@ class RoutingRoomRepository implements RoomRepository {
   findTimerCandidates(): Promise<IRoom[]> {
     return this.active().findTimerCandidates();
   }
+
+  count(): Promise<number> {
+    return this.active().count();
+  }
 }
 
 /** Singleton usado por RoomService. */

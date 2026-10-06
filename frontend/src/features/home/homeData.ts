@@ -18,14 +18,17 @@ import {
   Heart,
   Wallet,
   WandSparkles,
+  Coffee,
+  Rocket,
+  Crown,
 } from 'lucide-react';
 
 /**
  * Datos estáticos del Home (movidos verbatim desde pages/Home.tsx, sin lógica).
  */
 
-export const PATREON_URL =
-  (import.meta.env.VITE_PATREON_URL as string | undefined)?.trim() || '';
+export const KOFI_URL =
+  (import.meta.env.VITE_KOFI_URL as string | undefined)?.trim() || '';
 export const PAYPAL_URL =
   (import.meta.env.VITE_PAYPAL_URL as string | undefined)?.trim() || '';
 
@@ -34,6 +37,7 @@ export const navLinks = [
   { href: '#como-funciona', label: 'Cómo funciona' },
   { href: '#tecnologias', label: 'Tecnologías' },
   { href: '#roadmap', label: 'Lo que viene' },
+  { href: '#planes', label: 'Planes' },
   { href: '#donaciones', label: 'Donaciones' },
   { href: '#faq', label: 'FAQ' },
 ];
@@ -120,12 +124,12 @@ export type TimelineEvent = (typeof timelineEvents)[number];
 
 export const donationCards = [
   {
-    id: 'patreon',
+    id: 'kofi',
     icon: Heart,
-    title: 'Patreon',
-    desc: 'Apoyo mensual recurrente para pagar el servidor y priorizar nuevas funciones.',
-    cta: 'Apoyar en Patreon',
-    url: PATREON_URL,
+    title: 'Ko-fi',
+    desc: 'Apoya el proyecto con una aportación para pagar el servidor y priorizar nuevas funciones.',
+    cta: 'Apoyar en Ko-fi',
+    url: KOFI_URL,
     tone: 'rose' as const,
   },
   {
@@ -145,6 +149,85 @@ export const donationCards = [
     cta: 'Ver lo que viene',
     url: '#roadmap',
     tone: 'amber' as const,
+  },
+];
+
+/**
+ * Planes de apoyo de PAGO ÚNICO (recaudación, sin suscripción).
+ * El enlace de cobro se construye sobre VITE_PAYPAL_URL:
+ * si es un paypal.me se le anexa el monto (…/5), si no, se usa la base.
+ * Sin VITE_PAYPAL_URL la tarjeta queda "Próximamente" (misma regla que donaciones).
+ */
+export interface SupportPlan {
+  id: string;
+  icon: typeof Coffee;
+  name: string;
+  amount: number;
+  currency: string;
+  tagline: string;
+  perks: string[];
+  cta: string;
+  tone: 'amber' | 'blue' | 'rose';
+  highlighted?: boolean;
+  badge?: string;
+}
+
+export function planPaymentUrl(plan: SupportPlan): string {
+  if (!PAYPAL_URL) return '';
+  const base = PAYPAL_URL.replace(/\/$/, '');
+  if (base.includes('paypal.me')) return `${base}/${plan.amount}`;
+  return base;
+}
+
+export const SUPPORT_PLANS: SupportPlan[] = [
+  {
+    id: 'cafe',
+    icon: Coffee,
+    name: 'Café',
+    amount: 3,
+    currency: 'USD',
+    tagline: 'Un gesto pequeño que mantiene el servidor encendido.',
+    perks: [
+      'Cubre ~1 día de servidor',
+      'Nombre en la lista de agradecimientos',
+      'Pago único, sin suscripción',
+    ],
+    cta: 'Apoyar con $3',
+    tone: 'amber',
+  },
+  {
+    id: 'impulso',
+    icon: Rocket,
+    name: 'Impulso',
+    amount: 10,
+    currency: 'USD',
+    tagline: 'Acelera el roadmap: voto en la próxima función.',
+    perks: [
+      'Cubre ~1 semana de servidor',
+      'Voto en el roadmap',
+      'Insignia "Impulsor" en agradecimientos',
+      'Pago único, sin suscripción',
+    ],
+    cta: 'Apoyar con $10',
+    tone: 'blue',
+    highlighted: true,
+    badge: 'Más popular',
+  },
+  {
+    id: 'productor',
+    icon: Crown,
+    name: 'Productor',
+    amount: 25,
+    currency: 'USD',
+    tagline: 'Sostén un mes de almacenamiento y propone funciones.',
+    perks: [
+      'Cubre ~1 mes de almacenamiento',
+      'Propone una función del roadmap',
+      'Mención destacada como productor',
+      'Pago único, sin suscripción',
+    ],
+    cta: 'Apoyar con $25',
+    tone: 'rose',
   },
 ];
 

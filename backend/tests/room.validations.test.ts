@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { RoomController } from '../src/controllers/room.controller.js';
 import { RoomService } from '../src/services/room.service.js';
+import { setDemoModeOverride } from '../src/config/demo-mode.js';
 import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
+
+// Este fichero verifica el comportamiento ORIGINAL (p. ej. modo persistente
+// con `isTemporary: false`), así que fija la demo desactivada con override
+// (sin mutar process.env: los ficheros vitest comparten proceso). La
+// cobertura del modo demo vive en tests/demo-limits.test.ts.
+setDemoModeOverride(false);
 
 const created: string[] = [];
 

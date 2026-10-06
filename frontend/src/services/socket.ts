@@ -20,6 +20,14 @@ export function getSocket(): Socket {
     socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       withCredentials: false,
+      // Backoff exponencial: evita tormentas de reconexión contra el backend.
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      randomizationFactor: 0.5,
+      timeout: 15000,
+      autoConnect: true,
     });
   }
   return socket;

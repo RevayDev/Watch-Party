@@ -9,7 +9,10 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "load": "node tests/load/run-local.mjs",
+    "load:ramp": "node tests/load/ramp.mjs",
+    "load:rooms": "node tests/load/rooms-scenarios.mjs"
   },
   "keywords": [
     "watchparty",
@@ -33,9 +36,11 @@
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.7",
+    "autocannon": "^8.0.0",
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
     "mongodb-memory-server": "^11.3.0",
+    "socket.io-client": "^4.8.4",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.71.0",

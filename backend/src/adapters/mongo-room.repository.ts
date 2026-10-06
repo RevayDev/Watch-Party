@@ -55,6 +55,10 @@ export class MongoRoomRepository implements RoomRepository {
     }).lean();
     return rooms as unknown as IRoom[];
   }
+
+  async count(): Promise<number> {
+    return RoomModel.countDocuments({});
+  }
 }
 
 /** Singleton del adaptador MongoDB. */

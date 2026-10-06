@@ -102,6 +102,12 @@ describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () 
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-dedup');
+    activeUsers.set('s-dedup', {
+      socketId: 's-dedup',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+    });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId: room.roomId, action: 'play', currentTime: 10 });
@@ -115,6 +121,12 @@ describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () 
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-dedup2');
+    activeUsers.set('s-dedup2', {
+      socketId: 's-dedup2',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+    });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId: room.roomId, action: 'play', currentTime: 10 });
@@ -147,6 +159,12 @@ describe('sync-video: validación de payloads (sin romper clientes legítimos)',
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-legit');
+    activeUsers.set('s-legit', {
+      socketId: 's-legit',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+    });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId: room.roomId, action: 'pause', currentTime: 42 });
@@ -159,17 +177,48 @@ describe('sync-video: validación de payloads (sin romper clientes legítimos)',
   });
 });
 
-describe('video-changed / upload-progress: validación + dedup', () => {
-  it('video-changed válido se emite; sin originalName/fileName se descarta', async () => {
+describe('sync-video: solo miembros (anti inyección externa)', () => {
+  it('socket ajeno a la sala no sincroniza', async () => {
+    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    created.push(room.roomId);
+    const { io } = makeIo();
+    const sock = makeSocket('s-outsider');
+    activeUsers.set('s-outsider', {
+      socketId: 's-outsider',
+      roomId: 'OTRASALA',
+      userName: 'Troll',
+      isHost: false,
+    });
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'sync-video', { roomId: room.roomId, action: 'play', currentTime: 10 });
+
+    expect(sock.toEmitted.filter((e) => e.event === 'sync-video')).toHaveLength(0);
+  });
+});
+
+describe('video-changed / upload-progress: validación + dedup (con host)', () => {
+  it('video-changed válido del host se emite; sin originalName/fileName se descarta', async () => {
+    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+    created.push(room.roomId);
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-vc');
+    activeUsers.set('s-vc', {
+      socketId: 's-vc',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+      userId: 'u-host',
+    });
     registerSyncPlaybackHandlers(io, sock.socket);
     const video = { originalName: 'peli.mp4', fileName: 'abc.mp4', mimeType: 'video/mp4', sizeBytes: 10 };
+    const auth = { hostSecret };
 
-    await fire(sock.handlers, 'video-changed', { roomId: 'ABC123', video });
-    await fire(sock.handlers, 'video-changed', { roomId: 'ABC123', video }); // duplicado idéntico
-    await fire(sock.handlers, 'video-changed', { roomId: 'ABC123', video: { fileName: 'x.mp4' } });
-    await fire(sock.handlers, 'video-changed', { roomId: 'ABC123', video: { originalName: 'x' } });
+    await fire(sock.handlers, 'video-changed', { roomId: room.roomId, video, ...auth });
+    await fire(sock.handlers, 'video-changed', { roomId: room.roomId, video, ...auth }); // duplicado idéntico
+    await fire(sock.handlers, 'video-changed', { roomId: room.roomId, video: { fileName: 'x.mp4' }, ...auth });
+    await fire(sock.handlers, 'video-changed', { roomId: room.roomId, video: { originalName: 'x' }, ...auth });
     await fire(sock.handlers, 'video-changed', undefined);
 
     const emitted = roomEmits.filter((e) => e.event === 'video-changed');
@@ -177,16 +226,27 @@ describe('video-changed / upload-progress: validación + dedup', () => {
     expect(emitted[0].payload).toMatchObject({ video });
   });
 
-  it('upload-progress: 0-100 y null pasan; fuera de rango se descarta; idénticos se dedupan', async () => {
+  it('upload-progress del host: 0-100 y null pasan; fuera de rango se descarta; idénticos se dedupan', async () => {
+    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+    created.push(room.roomId);
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
     const { io } = makeIo();
     const sock = makeSocket('s-up');
+    activeUsers.set('s-up', {
+      socketId: 's-up',
+      roomId: room.roomId,
+      userName: 'Host',
+      isHost: true,
+      userId: 'u-host',
+    });
     registerSyncPlaybackHandlers(io, sock.socket);
+    const auth = { hostSecret };
 
-    await fire(sock.handlers, 'upload-progress', { roomId: 'ABC123', progress: 50, fileName: 'peli.mp4' });
-    await fire(sock.handlers, 'upload-progress', { roomId: 'ABC123', progress: 50, fileName: 'peli.mp4' });
-    await fire(sock.handlers, 'upload-progress', { roomId: 'ABC123', progress: 150, fileName: 'peli.mp4' });
-    await fire(sock.handlers, 'upload-progress', { roomId: 'ABC123', progress: -1 });
-    await fire(sock.handlers, 'upload-progress', { roomId: 'ABC123', progress: null });
+    await fire(sock.handlers, 'upload-progress', { roomId: room.roomId, progress: 50, fileName: 'peli.mp4', ...auth });
+    await fire(sock.handlers, 'upload-progress', { roomId: room.roomId, progress: 50, fileName: 'peli.mp4', ...auth });
+    await fire(sock.handlers, 'upload-progress', { roomId: room.roomId, progress: 150, fileName: 'peli.mp4', ...auth });
+    await fire(sock.handlers, 'upload-progress', { roomId: room.roomId, progress: -1, ...auth });
+    await fire(sock.handlers, 'upload-progress', { roomId: room.roomId, progress: null, ...auth });
 
     const emitted = sock.toEmitted.filter((e) => e.event === 'upload-progress');
     expect(emitted).toHaveLength(2);

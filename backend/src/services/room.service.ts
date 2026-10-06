@@ -11,6 +11,13 @@ import {
   IKickedParticipant,
 } from '../types/room.types.js';
 import { roomRepository } from '../adapters/room-repository.routing.js';
+import {
+  DEMO_MAX_ROOMS,
+  DEMO_MAX_USERS_PER_ROOM,
+  DEMO_ROOM_FULL_MESSAGE,
+  DEMO_ROOM_LIMIT_MESSAGE,
+  isDemoMode,
+} from '../config/demo-mode.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,21 +27,99 @@ function cleanIdOf(roomId: string): string {
   return roomId.toUpperCase().trim();
 }
 
+/** Error de cuota demo (HTTP 429). Los controladores lo traducen al contrato exacto. */
+export type DemoCapacityCode = 'DEMO_ROOM_LIMIT' | 'DEMO_ROOM_FULL';
+
+export class DemoCapacityError extends Error {
+  readonly statusCode = 429;
+  readonly code: DemoCapacityCode;
+  constructor(code: DemoCapacityCode, message: string) {
+    super(message);
+    this.name = 'DemoCapacityError';
+    this.code = code;
+  }
+}
+
+/**
+ * Mutex async simple en memoria (cola FIFO de adquirentes).
+ * Protege las secciones críticas crear-contando y leer-modificar-escribir de
+ * participantes: Node es single-thread pero los `await` intercalan operaciones
+ * concurrentes (dos creates/joins paralelos leerían el mismo conteo).
+ * ASUME 1 INSTANCIA (Render Free): con varias réplicas cada una serializaría
+ * solo su propio proceso y contaría solo su store visible.
+ */
+class AsyncMutex {
+  private locked = false;
+  private readonly queue: Array<() => void> = [];
+
+  get isLocked(): boolean {
+    return this.locked;
+  }
+
+  get waiters(): number {
+    return this.queue.length;
+  }
+
+  private release(): void {
+    const next = this.queue.shift();
+    if (next) {
+      next();
+    } else {
+      this.locked = false;
+    }
+  }
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.locked) {
+      await new Promise<void>((resolve) => this.queue.push(resolve));
+    } else {
+      this.locked = true;
+    }
+    try {
+      return await fn();
+    } finally {
+      this.release();
+    }
+  }
+}
+
+/** Mutex global para la sección crítica contar+crear salas. */
+const createRoomMutex = new AsyncMutex();
+
+/** Mutex por sala para la reserva de cupo en join/approve (se reciclan al quedar libres). */
+const joinRoomMutexes = new Map<string, AsyncMutex>();
+
+async function withRoomLock<T>(cleanId: string, fn: () => Promise<T>): Promise<T> {
+  let mutex = joinRoomMutexes.get(cleanId);
+  if (!mutex) {
+    mutex = new AsyncMutex();
+    joinRoomMutexes.set(cleanId, mutex);
+  }
+  try {
+    return await mutex.run(fn);
+  } finally {
+    if (!mutex.isLocked && mutex.waiters === 0) {
+      joinRoomMutexes.delete(cleanId);
+    }
+  }
+}
+
 export class RoomService {
   /**
    * Helper to safely remove an old video file from disk
    */
   public static removeOldVideoFile(fileName: string | undefined): void {
     if (!fileName) return;
-    try {
-      const filePath = path.join(uploadsDir, fileName);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`🗑️ Archivo de video eliminado del servidor: ${fileName}`);
+    // No bloqueante: evita existsSync/unlinkSync en el event loop.
+    // El borrado es mejor esfuerzo; ENOENT se ignora en silencio.
+    const filePath = path.join(uploadsDir, fileName);
+    void fs.promises.unlink(filePath).then(
+      () => console.log(`🗑️ Archivo de video eliminado del servidor: ${fileName}`),
+      (err: unknown) => {
+        const code = (err as { code?: string } | null)?.code;
+        if (code !== 'ENOENT') console.warn('⚠️ No se pudo eliminar el archivo de video:', err);
       }
-    } catch (err) {
-      console.warn('⚠️ No se pudo eliminar el archivo de video:', err);
-    }
+    );
   }
 
   /**
@@ -65,13 +150,28 @@ export class RoomService {
 
   /**
    * Create a new room with a host.
+   *
+   * DEMO (flag `DEMO_MODE`): tope de 5 salas vivas por servidor (429 con
+   * mensaje exacto) y `isTemporary` forzado a true (ninguna sala permanente).
+   * La sección crítica contar+crear va tras mutex en memoria (1 instancia).
    */
   public static async createRoom(dto: CreateRoomDTO): Promise<{ room: IRoom; hostSecret: string }> {
-    const roomId = await this.getUniqueRoomCode();
-    const hostSecret = crypto.randomBytes(16).toString('hex');
-    const now = new Date();
+    return createRoomMutex.run(async () => {
+      if (isDemoMode()) {
+        const liveRooms = await roomRepository.count();
+        if (liveRooms >= DEMO_MAX_ROOMS) {
+          throw new DemoCapacityError('DEMO_ROOM_LIMIT', DEMO_ROOM_LIMIT_MESSAGE);
+        }
+      }
 
-    const isTemporary = dto.isTemporary !== undefined ? dto.isTemporary : true;
+      const roomId = await this.getUniqueRoomCode();
+      const hostSecret = crypto.randomBytes(16).toString('hex');
+      const now = new Date();
+
+      // En demo NINGUNA sala es permanente (se ignora el modo persistente sin borrar su código).
+      const isTemporary = isDemoMode()
+        ? true
+        : (dto.isTemporary !== undefined ? dto.isTemporary : true);
     const roomData: IRoom = {
       roomId,
       hostName: dto.hostName.trim(),
@@ -102,7 +202,19 @@ export class RoomService {
     };
 
     const room = await roomRepository.create(roomData);
-    return { room, hostSecret };
+      return { room, hostSecret };
+    });
+  }
+
+  /**
+   * Nº de salas vivas en el store activo (mismo proceso; cubre Mongo o memoria
+   * según el enrutado). Solo conteo para la cuota demo y el endpoint
+   * `GET /api/demo/availability`: jamás expone códigos ni listas (privacidad).
+   * NOTA: si el store activo cambia (caída/recuperación de Mongo), el conteo
+   * refleja el nuevo activo; las salas del otro store no se suman.
+   */
+  public static async countLiveRooms(): Promise<number> {
+    return roomRepository.count();
   }
 
   /**
@@ -138,7 +250,22 @@ export class RoomService {
   ): Promise<IRoom | null> {
     const cleanId = cleanIdOf(roomId);
     const trimmedName = userName.trim();
+    // Reserva atómica del cupo: leer+insertar+guardar bajo el mutex de la sala.
+    return withRoomLock(cleanId, () => this.joinRoomLocked(cleanId, trimmedName, device, userId));
+  }
 
+  /**
+   * Núcleo de join (ASUME el mutex de la sala ya adquirido). Reserva el cupo
+   * al añadir al participante; en demo, un genuinely-nuevo participante con
+   * la sala llena (≥5) lanza `DemoCapacityError`. Rejoin/claim/merge legacy
+   * NO consumen cupo y nunca se rechazan por lleno.
+   */
+  private static async joinRoomLocked(
+    cleanId: string,
+    trimmedName: string,
+    device: string,
+    userId?: string
+  ): Promise<IRoom | null> {
     const findParticipantIndex = (participants: IParticipant[]): number => {
       if (userId) {
         const byId = participants.findIndex((p) => p.userId === userId);
@@ -156,6 +283,9 @@ export class RoomService {
     const existingIndex = findParticipantIndex(room.participants);
 
     if (existingIndex === -1) {
+      if (isDemoMode() && room.participants.length >= DEMO_MAX_USERS_PER_ROOM) {
+        throw new DemoCapacityError('DEMO_ROOM_FULL', DEMO_ROOM_FULL_MESSAGE);
+      }
       const isHost = room.hostName.toLowerCase() === trimmedName.toLowerCase();
       room.participants.push({
         name: trimmedName,
@@ -173,6 +303,22 @@ export class RoomService {
       await roomRepository.save(room);
     }
     return room;
+  }
+
+  /** ¿Añadiría (userId, nombre) un participante NUEVO (consume cupo)? */
+  private static wouldAddParticipant(
+    participants: IParticipant[],
+    userId: string | undefined,
+    trimmedName: string
+  ): boolean {
+    if (userId) {
+      if (participants.some((p) => p.userId === userId)) return false;
+    }
+    // Merge legacy: mismo nombre sin userId registrado = la misma persona.
+    if (participants.some((p) => p.name.toLowerCase() === trimmedName.toLowerCase() && !p.userId)) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -329,6 +475,10 @@ export class RoomService {
 
   /**
    * Approve a join request: moves the requester into the participants list.
+   *
+   * DEMO: si la sala está llena y la solicitud añadiría un participante nuevo,
+   * lanza `DemoCapacityError` SIN desencolar (la solicitud sigue en espera y
+   * el host puede aprobar más tarde). Todo ello bajo el mutex de la sala.
    */
   public static async approveJoinRequest(
     roomId: string,
@@ -342,16 +492,31 @@ export class RoomService {
       return false;
     };
 
-    const room = await roomRepository.findById(cleanId);
-    if (!room) return { room: null, request: null };
-    const request = (room.joinRequests || []).find(matches) || null;
-    if (!request) return { room, request: null };
-    room.joinRequests = (room.joinRequests || []).filter((j) => !matches(j));
-    room.updatedAt = new Date();
-    await roomRepository.save(room);
-    await this.joinRoom(cleanId, request.name, request.device, request.userId);
-    const updated = await roomRepository.findById(cleanId);
-    return { room: updated, request };
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room) return { room: null, request: null };
+      const request = (room.joinRequests || []).find(matches) || null;
+      if (!request) return { room, request: null };
+      if (
+        isDemoMode() &&
+        this.wouldAddParticipant(room.participants, request.userId, request.name.trim()) &&
+        room.participants.length >= DEMO_MAX_USERS_PER_ROOM
+      ) {
+        throw new DemoCapacityError('DEMO_ROOM_FULL', DEMO_ROOM_FULL_MESSAGE);
+      }
+      room.joinRequests = (room.joinRequests || []).filter((j) => !matches(j));
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      // joinRoomLocked (no el público): el mutex ya está adquirido.
+      const updated = await this.joinRoomLocked(
+        cleanId,
+        request.name.trim(),
+        request.device || 'Web Browser',
+        request.userId
+      );
+      const refreshed = updated ?? (await roomRepository.findById(cleanId));
+      return { room: refreshed, request };
+    });
   }
 
   /**
@@ -381,7 +546,7 @@ export class RoomService {
         name: request.name,
         userId: request.userId,
         kickedAt: new Date(),
-        kickedBy: opts.rejectedBy || 'Afitrión',
+        kickedBy: opts.rejectedBy || 'Anfitrión',
         banned: true,
       });
     }
@@ -392,6 +557,9 @@ export class RoomService {
 
   /**
    * Update Room Settings (e.g. mute on entry, disable camera on entry)
+   *
+   * DEMO: fuerza `isTemporary=true` (ninguna sala permanente; se ignora el
+   * modo persistente sin borrar su código).
    */
   public static async updateSettings(
     roomId: string,
@@ -400,7 +568,12 @@ export class RoomService {
     const cleanId = cleanIdOf(roomId);
     const room = await roomRepository.findById(cleanId);
     if (!room) return null;
-    room.settings = { ...(room.settings || {}), ...settings } as IRoom['settings'];
+    // En demo ninguna sala es permanente (sin mutar el objeto del llamador).
+    const demoForced = isDemoMode() ? { isTemporary: true as const } : {};
+    room.settings = { ...(room.settings || {}), ...settings, ...demoForced } as IRoom['settings'];
+    if (isDemoMode()) {
+      room.isTemporary = true;
+    }
     room.updatedAt = new Date();
     await roomRepository.save(room);
     return room;
@@ -451,11 +624,21 @@ export class RoomService {
       room.participants[0].role = 'host';
       room.hostName = room.participants[0].name;
       newHostName = room.participants[0].name;
-      console.log(`👑 Rol de Affitrión transferido a: ${newHostName} en la sala ${cleanId}`);
+      console.log(`👑 Rol de Anfitrión transferido a: ${newHostName} en la sala ${cleanId}`);
     }
 
     room.updatedAt = new Date();
     await roomRepository.save(room);
+
+    if (isDemoMode() && room.participants.length === 0) {
+      // Cuota demo: la sala que queda vacía se borra para liberar el cupo de
+      // las 5 salas (ver reporte: fuera de demo las salas vacías PERSISTEN —
+      // el código real solo limpiaba el playback en memoria, no la sala).
+      // El cupo se libera al eliminar de verdad (incluida la gracia de 20s,
+      // que solo elimina al expirar), nunca al desconectar.
+      await this.deleteRoom(cleanId, false);
+      console.log(`🧹 Demo: sala vacía [${cleanId}] eliminada para liberar cupo.`);
+    }
 
     return { room, newHostName };
   }

@@ -1,5 +1,11 @@
 import { Server, Socket } from 'socket.io';
 import { RoomService } from '../../services/room.service.js';
+import { DemoCapacityError } from '../../services/room.service.js';
+import {
+  DEMO_MAX_USERS_PER_ROOM,
+  DEMO_ROOM_FULL_MESSAGE,
+  isDemoMode,
+} from '../../config/demo-mode.js';
 import { ApproveJoinUseCase, RejectJoinUseCase } from '../../application/approve-join.usecase.js';
 import { ResolveSyncTimeUseCase } from '../../application/sync-playback.usecase.js';
 import { dropPosition, roomPlayback, roomPositions } from '../../domain/playback-policy.js';
@@ -84,6 +90,22 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         (existingRoom && existingRoom.hostName.toLowerCase() === cleanName.toLowerCase()) ||
         Boolean(participantMatch?.isHost);
 
+      // ── Cuota demo: sala llena (≥5 participantes) → `join-rejected` con el
+      // mensaje exacto. Rejoin/merge (alreadyParticipant) no consumen cupo.
+      // Va antes de la lista de espera: una sala llena tampoco encola.
+      if (
+        !alreadyParticipant &&
+        isDemoMode() &&
+        (existingRoom?.participants?.length ?? 0) >= DEMO_MAX_USERS_PER_ROOM
+      ) {
+        activeUsers.delete(socket.id);
+        socket.emit('join-rejected', {
+          reason: 'room-full',
+          message: DEMO_ROOM_FULL_MESSAGE,
+        });
+        return;
+      }
+
       // ── Manual approval (waiting list): hold newcomers until host approves ──
       const requireApproval = existingRoom?.settings?.requireApproval === true;
       if (requireApproval && !isActuallyHost && !alreadyParticipant) {
@@ -121,8 +143,22 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       };
       activeUsers.set(socket.id, socketUser);
 
-      // Add to database/memory participant list
-      await RoomService.joinRoom(cleanRoomId, cleanName, 'Web Browser', userId);
+      // Add to database/memory participant list (reserva atómica del cupo en
+      // el servicio; la carrera residual se traduce a `join-rejected`).
+      try {
+        await RoomService.joinRoom(cleanRoomId, cleanName, 'Web Browser', userId);
+      } catch (error) {
+        if (error instanceof DemoCapacityError) {
+          activeUsers.delete(socket.id);
+          socket.leave(cleanRoomId);
+          socket.emit('join-rejected', {
+            reason: 'room-full',
+            message: DEMO_ROOM_FULL_MESSAGE,
+          });
+          return;
+        }
+        throw error;
+      }
       const room = await RoomService.getRoomById(cleanRoomId);
 
       console.log(`👤 ${cleanName} se unió a la sala [${cleanRoomId}] (Host: ${socketUser.isHost})`);
@@ -276,7 +312,37 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         return;
       }
 
-      const { room, request } = await ApproveJoinUseCase.execute({ roomId: cleanRoomId, userId, name });
+      // Demo: aprobar contra una sala llena lanza DemoCapacityError SIN
+      // desencolar (la solicitud sigue en espera). Se avisa a la sala
+      // (lista intacta) y al solicitante (mismo mensaje de sala llena).
+      let room: Awaited<ReturnType<typeof RoomService.getRoomById>>;
+      let request: Awaited<ReturnType<typeof ApproveJoinUseCase.execute>>['request'];
+      try {
+        const result = await ApproveJoinUseCase.execute({ roomId: cleanRoomId, userId, name });
+        room = result.room;
+        request = result.request;
+      } catch (error) {
+        if (error instanceof DemoCapacityError) {
+          const current = await RoomService.getRoomById(cleanRoomId);
+          io.to(cleanRoomId).emit('join-requests-updated', {
+            joinRequests: current?.joinRequests || [],
+          });
+          for (const [, u] of activeUsers.entries()) {
+            if (u.roomId !== cleanRoomId || !u.pending) continue;
+            const matchById = Boolean(u.userId && userId && u.userId === userId);
+            const matchByName =
+              !userId && name && u.userName.toLowerCase() === name.trim().toLowerCase();
+            if (matchById || matchByName) {
+              io.to(u.socketId).emit('join-rejected', {
+                reason: 'room-full',
+                message: DEMO_ROOM_FULL_MESSAGE,
+              });
+            }
+          }
+          return;
+        }
+        throw error;
+      }
       if (!request) return;
       console.log(`✅ Solicitud aprobada: ${request.name} en sala [${cleanRoomId}]`);
 

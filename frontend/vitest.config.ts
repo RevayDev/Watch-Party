@@ -13,6 +13,8 @@ export default defineConfig({
       ['**/usePresence.test.ts', 'jsdom'],
       ['**/socket-singleton.test.ts', 'jsdom'],
       ['**/uploadVideo.test.ts', 'jsdom'],
+      ['**/demo-visual.test.tsx', 'jsdom'],
+      ['**/demo-home.test.tsx', 'jsdom'],
     ],
     globals: true,
     setupFiles: ['tests/setup.ts'],
