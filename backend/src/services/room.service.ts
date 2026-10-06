@@ -256,7 +256,7 @@ export class RoomService {
   /**
    * Núcleo de join (ASUME el mutex de la sala ya adquirido). Reserva el cupo
    * al añadir al participante; en demo, un genuinely-nuevo participante con
-   * la sala llena (≥10) lanza `DemoCapacityError`. Rejoin/claim/merge legacy
+   * la sala llena (≥5) lanza `DemoCapacityError`. Rejoin/claim/merge legacy
    * NO consumen cupo y nunca se rechazan por lleno.
    */
   private static async joinRoomLocked(

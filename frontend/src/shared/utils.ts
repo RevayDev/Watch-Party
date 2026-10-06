@@ -190,7 +190,7 @@ export function resolveJoinRejectedFeedback(
       message: message || 'Ese nombre ya está en uso en esta sala. Vuelve al inicio y entra con otro nombre.',
     };
   }
-  // Demo: la sala alcanzó su cupo (10 participantes incl. host). El backend
+  // Demo: la sala alcanzó su cupo (5 participantes incl. host). El backend
   // envía reason 'room-full' con el mensaje EXACTO 'Esta sala está llena.';
   // si hay mensaje del servidor, ese texto manda (contrato).
   if (reason === 'room-full') {

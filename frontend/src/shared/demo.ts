@@ -15,7 +15,7 @@
  */
 
 export const DEMO_MAX_ROOMS = 5;
-export const DEMO_MAX_USERS_PER_ROOM = 10;
+export const DEMO_MAX_USERS_PER_ROOM = 5;
 
 /** Mensaje EXACTO al alcanzar el tope de salas (contrato con backend). */
 export const DEMO_ROOM_LIMIT_MESSAGE =

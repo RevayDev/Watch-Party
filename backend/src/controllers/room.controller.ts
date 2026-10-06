@@ -260,7 +260,7 @@ export class RoomController {
         return !p.userId && p.name.toLowerCase() === trimmedName.toLowerCase();
       });
 
-      // ── Cuota demo: sala llena (≥10 participantes) → 429, salvo rejoin/merge
+      // ── Cuota demo: sala llena (≥5 participantes) → 429, salvo rejoin/merge
       // que no consumen cupo. Va antes de la puerta de aprobación: una sala
       // llena tampoco acepta nuevas solicitudes en espera.
       if (

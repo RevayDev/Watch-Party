@@ -15,7 +15,7 @@
  */
 
 export const DEMO_MAX_ROOMS = 5;
-export const DEMO_MAX_USERS_PER_ROOM = 10;
+export const DEMO_MAX_USERS_PER_ROOM = 5;
 export const DEMO_TIMER_MIN_MINUTES = 1;
 export const DEMO_TIMER_MAX_MINUTES = 480;
 

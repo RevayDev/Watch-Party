@@ -111,9 +111,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [showChangePanel, resetHideTimer]);
 
+  // Identidad estable de la fuente: `room-state` recrea el objeto `video` en
+  // cada mensaje. Depender del objeto entero desmontaba/recargaba HLS
+  // (el cleanup destruye la instancia) aunque la fuente fuese idéntica.
+  const videoSourceType = video?.sourceType;
+  const videoDirectUrl = video?.directUrl;
+  const videoFileName = video?.fileName;
+
   // HLS and Media Stream Setup with Recovery mechanism
   useEffect(() => {
-    if (!video || !videoRef.current) {
+    if ((!videoFileName && !videoDirectUrl) || !videoRef.current) {
       setPlaybackError(null);
       lastLoadKeyRef.current = null;
       if (hlsInstanceRef.current) {
@@ -124,14 +131,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const backendBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
-    const isExternal = (video.sourceType === 'url' || video.sourceType === 'hls') && !!video.directUrl;
+    const isExternal = (videoSourceType === 'url' || videoSourceType === 'hls') && !!videoDirectUrl;
     // External URLs go through the backend CORS proxy so hls.js/XHR are not blocked
     const videoSrc = isExternal
-      ? `${backendBase}/api/proxy?url=${encodeURIComponent(video.directUrl!)}`
+      ? `${backendBase}/api/proxy?url=${encodeURIComponent(videoDirectUrl!)}`
       : `${backendBase}/api/rooms/${roomId}/video/stream`;
 
     const vid = videoRef.current;
-    const isHls = video.sourceType === 'hls' || !!video.directUrl?.includes('.m3u8') || videoSrc.includes('.m3u8');
+    const isHls = videoSourceType === 'hls' || !!videoDirectUrl?.includes('.m3u8') || videoSrc.includes('.m3u8');
 
     // Same source already attached (room-state events re-create the video object on every
     // socket message): re-setting src aborts the in-flight request and fires a bogus error.
@@ -213,7 +220,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hlsInstanceRef.current = null;
       }
     };
-  }, [video, roomId, retryToken]);
+  }, [videoSourceType, videoDirectUrl, videoFileName, roomId, retryToken]);
 
   // Apply incoming remote sync actions with latency compensation
   useEffect(() => {
@@ -232,7 +239,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const diff = Math.abs(vid.currentTime - targetTime);
 
-    if (diff > 0.5 || remoteAction.action === 'seek') {
+    if (diff > 2 || remoteAction.action === 'seek') {
       vid.currentTime = targetTime;
     }
 

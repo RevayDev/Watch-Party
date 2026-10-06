@@ -90,7 +90,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         (existingRoom && existingRoom.hostName.toLowerCase() === cleanName.toLowerCase()) ||
         Boolean(participantMatch?.isHost);
 
-      // ── Cuota demo: sala llena (≥10 participantes) → `join-rejected` con el
+      // ── Cuota demo: sala llena (≥5 participantes) → `join-rejected` con el
       // mensaje exacto. Rejoin/merge (alreadyParticipant) no consumen cupo.
       // Va antes de la lista de espera: una sala llena tampoco encola.
       if (

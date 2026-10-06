@@ -100,7 +100,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
 
   const hasRoomName = Boolean(roomName && roomName.trim());
 
-  // Demo gratuita: cupo visible X/10 (participants incluye al host; las
+  // Demo gratuita: cupo visible X/5 (participants incluye al host; las
   // solicitudes en espera NO consumen cupo). Con VITE_DEMO_MODE=false se
   // muestra el conteo original sin capacidad.
   const demo = isDemoMode();
