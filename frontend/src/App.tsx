@@ -1,13 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Home } from './features/home/Home';
 import { Room } from './features/room/Room';
+import { StatusPage } from './features/status/StatusPage';
+import { AdminPage } from './features/admin/AdminPage';
 import { ApiService } from './services/api';
 import { saveRecentRoom, removeRecentRoom } from './services/recentRooms';
 import { NotificationProvider, notify } from './services/notifications';
 import { STORAGE_KEYS } from './shared/constants';
 import { saveHostSession } from './shared/utils';
 
-type ViewState = 'home' | 'room';
+type ViewState = 'home' | 'room' | 'status' | 'admin';
+
+/** Ruta manual (sin router): `/status`, `/admin`, `?room=` o `/`. */
+function routeFromLocation(): { view: ViewState; roomId: string | null } {
+  if (typeof window === 'undefined') return { view: 'home', roomId: null };
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  if (path === '/status') return { view: 'status', roomId: null };
+  if (path === '/admin') return { view: 'admin', roomId: null };
+  const roomParam = new URLSearchParams(window.location.search).get('room');
+  return { view: 'home', roomId: roomParam ? roomParam.toUpperCase() : null };
+}
 
 export const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('home');
@@ -15,19 +27,39 @@ export const App: React.FC = () => {
   const [currentUserName, setCurrentUserName] = useState<string>('');
   const [isHost, setIsHost] = useState<boolean>(false);
 
-  // Parse URL if roomId query exists or restore active session
+  // Parse URL if roomId query exists or restore active session.
+  // También respeta rutas manuales `/status` y `/admin` (con popstate).
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const roomParam = params.get('room');
-    if (roomParam) {
-      setCurrentRoomId(roomParam.toUpperCase());
+    const applyRoute = () => {
+      const route = routeFromLocation();
+      if (route.view === 'status' || route.view === 'admin') {
+        setView(route.view);
+        setCurrentRoomId(null);
+        return;
+      }
+      if (route.roomId) setCurrentRoomId(route.roomId);
+    };
+    applyRoute();
+    window.addEventListener('popstate', applyRoute);
+    return () => window.removeEventListener('popstate', applyRoute);
+  }, []);
+
+  const navigate = useCallback((path: '/' | '/status' | '/admin') => {
+    window.history.pushState({}, '', path);
+    if (path === '/status') {
+      setView('status');
+      setCurrentRoomId(null);
+    } else if (path === '/admin') {
+      setView('admin');
+      setCurrentRoomId(null);
+    } else {
+      setView('home');
+      setCurrentRoomId(null);
     }
   }, []);
 
   const handleBackToHome = () => {
-    window.history.pushState({}, '', window.location.pathname);
-    setView('home');
-    setCurrentRoomId(null);
+    navigate('/');
   };
 
   const handleRoomCreated = (roomId: string, hostName: string, hostSecret: string) => {
@@ -95,6 +127,10 @@ export const App: React.FC = () => {
           onLeave={handleBackToHome}
         />
       )}
+
+      {view === 'status' && <StatusPage onBack={handleBackToHome} />}
+
+      {view === 'admin' && <AdminPage onBack={handleBackToHome} />}
       </div>
     </NotificationProvider>
   );
