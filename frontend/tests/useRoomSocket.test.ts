@@ -333,4 +333,80 @@ describe('useRoomSocket (eventos socket críticos)', () => {
     expect(localStorage.getItem('watchparty_host_session')).toBeNull();
     expect(JSON.parse(localStorage.getItem('watchparty_recent_rooms') ?? '[]')).toEqual([]);
   });
+
+  it('toggle mic/cámara NO re-emite join-room ni recarga la sala (sin re-join)', async () => {
+    const { mockSocket, rerender } = setup(true);
+    await waitFor(() => {
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        'join-room',
+        expect.objectContaining({ roomId: 'ABC123', userName: 'Beto' })
+      );
+    });
+    expect(mockSocket.emit).toHaveBeenCalledTimes(1);
+    expect(ApiService.getRoom).toHaveBeenCalledTimes(1);
+
+    // Simula lo que hace useWebRTC al togglear: cambian isMicOn/isCameraOn
+    // (antes eran deps del efecto gigante → re-join + room-state → corte).
+    webRTCStubs.isMicOn = true;
+    webRTCStubs.isCameraOn = true;
+    rerender();
+    // Deja que los efectos post-rerender se asienten
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(mockSocket.emit).toHaveBeenCalledTimes(1);
+    expect(ApiService.getRoom).toHaveBeenCalledTimes(1);
+    webRTCStubs.isMicOn = false;
+    webRTCStubs.isCameraOn = false;
+  });
+
+  it('room-state duplicado con mismo playback NO reaplica seek (sin corte)', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    const video = { originalName: 'noche.mp4', fileName: 'abc.mp4', mimeType: 'video/mp4', sizeBytes: 1000 };
+    act(() => {
+      mockSocket._fire('room-state', {
+        video,
+        participants: [],
+        joinRequests: [],
+        playback: { currentTime: 42, isPlaying: false },
+      });
+    });
+    const first = result.current.remoteAction;
+    expect(first).toMatchObject({ currentTime: 42 });
+
+    // Mismo consenso (p. ej. re-join tras togglear mic): no debe re-seekear
+    act(() => {
+      mockSocket._fire('room-state', {
+        video: { ...video },
+        participants: [],
+        joinRequests: [],
+        playback: { currentTime: 42.5, isPlaying: false },
+      });
+    });
+    expect(result.current.remoteAction?.timestamp).toBe(first?.timestamp);
+
+    // Salto real (>2 s) o cambio play/pause sí se aplica
+    act(() => {
+      mockSocket._fire('room-state', {
+        video: { ...video },
+        participants: [],
+        joinRequests: [],
+        playback: { currentTime: 60, isPlaying: false },
+      });
+    });
+    expect(result.current.remoteAction?.timestamp).not.toBe(first?.timestamp);
+    expect(result.current.remoteAction).toMatchObject({ currentTime: 60 });
+  });
+
+  it('handlePlaybackHeartbeat es estable entre renders (sin spam de heartbeat)', async () => {
+    const { mockSocket, result, rerender } = setup(false);
+    await waitForSubscribed(mockSocket);
+    const first = result.current.handlePlaybackHeartbeat;
+    webRTCStubs.isMicOn = true;
+    rerender();
+    expect(result.current.handlePlaybackHeartbeat).toBe(first);
+    webRTCStubs.isMicOn = false;
+  });
 });

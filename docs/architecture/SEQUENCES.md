@@ -125,7 +125,7 @@ sequenceDiagram
     H->>BE: sync-video{roomId,action,currentTime} (sin auth)
     BE->>BE: SyncPlaybackUseCase → setPlaybackSnapshot (memoria)
     BE-->>M: sync-video{action,currentTime,sentAt,senderSocketId}
-    M->>V: aplica con compensación (Date.now()-sentAt)s; seek si diff>0.5s
+    M->>V: aplica con compensación (Date.now()-sentAt)s; seek si diff>2s
     loop heartbeat ~5s (VideoPlayer→Room.tsx→socket)
         M->>BE: playback-heartbeat{roomId,currentTime,isPlaying} (solo miembros)
         BE->>BE: RecordHeartbeatUseCase → roomPositions[socketId]

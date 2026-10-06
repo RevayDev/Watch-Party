@@ -25,10 +25,10 @@ import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
  * controller (REST) + service + handlers socket con sockets mockeados
  * (mismo patrón que los tests existentes). Todo en memoria.
  *
- * Cubre: (1) salas 1–5 OK + 6ª 429 vía REST; (2) usuarios 10/10, 11º
+ * Cubre: (1) salas 1–5 OK + 6ª 429 vía REST; (2) usuarios 5/5, 6º
  * rechazado REST+socket, salida libera cupo, gracia 20s con timers falsos,
  * close-room libera cupo global; (3) privacidad; (4) Drive sin red;
- * (5) temporizador server-side; (6) simulación 5×10 en memoria.
+ * (5) temporizador server-side; (6) simulación 5×5 en memoria.
  */
 
 const __filename = fileURLToPath(import.meta.url);
@@ -111,10 +111,10 @@ async function fire(handlers: Map<string, (...args: any[]) => unknown>, event: s
 async function makeFullRoom(): Promise<string> {
   const { room } = await RoomService.createRoom({ hostName: 'Host' });
   created.push(room.roomId);
-  for (let i = 1; i <= 9; i++) {
+  for (let i = 1; i <= 4; i++) {
     await RoomService.joinRoom(room.roomId, `U${i}`, 'Web', `uid-${i}`);
   }
-  expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(10);
+  expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(5);
   return room.roomId;
 }
 
@@ -165,9 +165,9 @@ describe('integrado salas: 5×201 vía REST y la 6ª 429 exacto', () => {
   });
 });
 
-// ── 2. Usuarios 10/10, 11º rechazado, salida/gracia/cierre ──────────────────
-describe('integrado usuarios: 10/10, 11º rechazado, liberación de cupo', () => {
-  it('PROBADO: sala llena 10/10 — 11º REST 429 exacto y socket join-rejected room-full', async () => {
+// ── 2. Usuarios 5/5, 6º rechazado, salida/gracia/cierre ──────────────────
+describe('integrado usuarios: 5/5, 6º rechazado, liberación de cupo', () => {
+  it('PROBADO: sala llena 5/5 — 6º REST 429 exacto y socket join-rejected room-full', async () => {
     const roomId = await makeFullRoom();
     const rest = mockRes();
     await RoomController.join(
@@ -187,11 +187,11 @@ describe('integrado usuarios: 10/10, 11º rechazado, liberación de cupo', () =>
     expect(rejected).toHaveLength(1);
     expect(rejected[0]).toEqual({ reason: 'room-full', message: DEMO_ROOM_FULL_MESSAGE });
     expect(sock.emitted.some((e) => e.event === 'room-state')).toBe(false);
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(10);
-    expect(DEMO_MAX_USERS_PER_ROOM).toBe(10);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(5);
+    expect(DEMO_MAX_USERS_PER_ROOM).toBe(5);
   });
 
-  it('PROBADO: leave-room voluntario libera cupo de inmediato (9 → join nuevo → 10)', async () => {
+  it('PROBADO: leave-room voluntario libera cupo de inmediato (4 → join nuevo → 5)', async () => {
     const roomId = await makeFullRoom();
     const { io } = makeIo();
     const sock = makeSocket('s-u1');
@@ -204,7 +204,7 @@ describe('integrado usuarios: 10/10, 11º rechazado, liberación de cupo', () =>
     });
     registerJoinApprovalHandlers(io, sock.socket);
     await fire(sock.handlers, 'leave-room', { roomId, userName: 'U1', userId: 'uid-1' });
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(9);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(4);
 
     const res = mockRes();
     await RoomController.join(
@@ -213,7 +213,7 @@ describe('integrado usuarios: 10/10, 11º rechazado, liberación de cupo', () =>
       next
     );
     expect(res.statusCode).toBe(200);
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(5);
   });
 
   it('PROBADO: gracia 20s — disconnect retiene cupo (429 durante la gracia) y al expirar libera', async () => {
@@ -233,7 +233,7 @@ describe('integrado usuarios: 10/10, 11º rechazado, liberación de cupo', () =>
 
     // Dentro de la ventana: el participante SIGUE en sala (cupo retenido).
     expect(hasPendingGrace(roomId, 'uid-1')).toBe(true);
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(5);
     const during = mockRes();
     await RoomController.join(
       mockReq({ roomId }, { userName: 'Nuevo', userId: 'uid-new' }, {}) as any,
@@ -247,7 +247,7 @@ describe('integrado usuarios: 10/10, 11º rechazado, liberación de cupo', () =>
     await vi.advanceTimersByTimeAsync(20_000);
     for (let i = 0; i < 20; i++) await Promise.resolve();
     expect(hasPendingGrace(roomId, 'uid-1')).toBe(false);
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(9);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(4);
 
     const after = mockRes();
     await RoomController.join(
@@ -256,7 +256,7 @@ describe('integrado usuarios: 10/10, 11º rechazado, liberación de cupo', () =>
       next
     );
     expect(after.statusCode).toBe(200);
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(5);
   });
 
   it('PROBADO: close-room por socket libera cupo global (5→4→5)', async () => {
@@ -480,9 +480,9 @@ describe('integrado temporizador: server-side, estable ante rejoins', () => {
   });
 });
 
-// ── 6. Simulación 5×10 en memoria ────────────────────────────────────────────
-describe('simulación 5×10 en memoria (PROBADO memoria; 50 reales = ESTIMADO)', () => {
-  it('PROBADO: 5 salas × 10 usuarios en memoria + sockets mock rechazados al 11º; mide CPU', async () => {
+// ── 6. Simulación 5×5 en memoria ────────────────────────────────────────────
+describe('simulación 5×5 en memoria (PROBADO memoria; 25 reales = ESTIMADO)', () => {
+  it('PROBADO: 5 salas × 5 usuarios en memoria + sockets mock rechazados al 6º; mide CPU', async () => {
     await drain();
     const t0 = performance.now();
     const ids: string[] = [];
@@ -490,17 +490,17 @@ describe('simulación 5×10 en memoria (PROBADO memoria; 50 reales = ESTIMADO)',
       const { room } = await RoomService.createRoom({ hostName: `Host${s}` });
       created.push(room.roomId);
       ids.push(room.roomId);
-      for (let u = 1; u <= 9; u++) {
+      for (let u = 1; u <= 4; u++) {
         await RoomService.joinRoom(room.roomId, `S${s}U${u}`, 'Web', `uid-s${s}u${u}`);
       }
     }
     const setupMs = performance.now() - t0;
     expect(await RoomService.countLiveRooms()).toBe(5);
     for (const id of ids) {
-      expect((await RoomService.getRoomById(id))?.participants).toHaveLength(10);
+      expect((await RoomService.getRoomById(id))?.participants).toHaveLength(5);
     }
 
-    // 50 conexiones socket mockeadas extra (1 por cupo ya ocupado no basta:
+    // 25 conexiones socket mockeadas extra (1 por cupo ya ocupado no basta:
     // una por sala) → todas room-full, nadie agregado.
     const t1 = performance.now();
     for (const id of ids) {
@@ -514,13 +514,13 @@ describe('simulación 5×10 en memoria (PROBADO memoria; 50 reales = ESTIMADO)',
     }
     const socketsMs = performance.now() - t1;
     for (const id of ids) {
-      expect((await RoomService.getRoomById(id))?.participants).toHaveLength(10);
+      expect((await RoomService.getRoomById(id))?.participants).toHaveLength(5);
     }
 
-    // Tiempos de CPU en memoria (referencia, NO equivalen a 50 usuarios reales
+    // Tiempos de CPU en memoria (referencia, NO equivalen a 25 usuarios reales
     // con WebRTC/red). Se reportan como PROBADO-memoria; producción = ESTIMADO.
     expect(setupMs).toBeGreaterThanOrEqual(0);
     expect(socketsMs).toBeGreaterThanOrEqual(0);
-    console.log(`[5x10-mem] setup 5 salas×10 users: ${setupMs.toFixed(1)}ms; 5 sockets mock: ${socketsMs.toFixed(1)}ms`);
+    console.log(`[5x5-mem] setup 5 salas×5 users: ${setupMs.toFixed(1)}ms; 5 sockets mock: ${socketsMs.toFixed(1)}ms`);
   });
 });

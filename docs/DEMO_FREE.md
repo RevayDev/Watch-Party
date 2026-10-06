@@ -11,7 +11,7 @@ Frontend (Vercel) → REST + Socket.IO → Backend (Render, 1 instancia) → Mon
 | Límite | Valor | Dónde se valida |
 |---|---|---|
 | Salas globales | 5 | `RoomService.createRoom` (mutex + `DemoCapacityError` → REST 429) |
-| Usuarios por sala | 10 (`participants`, incluye host; espera no consume) | `join` REST 429 + `join-room`/`approve-join` socket |
+| Usuarios por sala | 5 (`participants`, incluye host; espera no consume) | `join` REST 429 + `join-room`/`approve-join` socket |
 | Upload de archivo | Deshabilitado (403 antes de multer) | `demoUploadGuard` + respaldo en controlador |
 | Salas | Siempre temporales; la vacía se borra (libera cupo) | servicio + settings forzado |
 | Timer | 1–480 min, `timerEndsAt` de servidor, `null` desactiva | `sanitizeRoomSettings` |
@@ -30,14 +30,14 @@ Render Free tiene disco efímero y poco ancho de banda: guardar vídeos ahí se 
 
 ## 5. Sala llena / liberación
 
-Llena (10/10): el 11º recibe "Esta sala está llena." (REST 429 o `join-rejected room-full`) y su socket no entra al canal. Al salir/desconectar (tras la gracia de 20s) o cerrar, el cupo se libera; sala vacía se borra y libera cupo global (verificable en `availability`).
+Llena (5/5): el 6º recibe "Esta sala está llena." (REST 429 o `join-rejected room-full`) y su socket no entra al canal. Al salir/desconectar (tras la gracia de 20s) o cerrar, el cupo se libera; sala vacía se borra y libera cupo global (verificable en `availability`).
 
 ## 6. Limitaciones de Drive y de la demo
 
 - Links con cuota de descarga de Google pueden fallar (error 403 de Google): reintentar o regenerar el enlace.
 - Reinicios de Render: se pierden consenso, snapshots, gracias y rate-limits en memoria; las salas en Mongo sobreviven, en memoria no.
 - Cuotas válidas para **1 instancia**; con N réplicas haría falta contador distribuido.
-- 50 usuarios reales con WebRTC/red: ESTIMADO (medido solo en memoria: setup 5×10 en ~1–2 ms). Recomendado: k6/Artillery en staging.
+- 25 usuarios reales con WebRTC/red: ESTIMADO (medido solo en memoria: setup 5×5 en ~1–2 ms). Recomendado: k6/Artillery en staging.
 
 ## 7. Volver a `backup`
 

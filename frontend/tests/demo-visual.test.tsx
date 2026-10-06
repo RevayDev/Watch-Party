@@ -64,15 +64,15 @@ describe('RoomHeader en demo', () => {
     onLeaveClick: vi.fn(),
   };
 
-  it('muestra capacidad X/10, estado y duración del vídeo', async () => {
+  it('muestra capacidad X/5, estado y duración del vídeo', async () => {
     await act(async () => {
       render(<RoomHeader {...baseProps} />);
     });
     const capacity = screen.getByTestId('room-capacity');
-    expect(capacity).toHaveTextContent('3/10');
+    expect(capacity).toHaveTextContent('3/5');
     expect(capacity).toHaveAttribute(
       'title',
-      '3 de 10 participantes — ver lista',
+      '3 de 5 participantes — ver lista',
     );
     expect(screen.getByTestId('room-status')).toHaveTextContent('En curso');
     // 125 s → formato m:ss reutilizado (2:05)
@@ -91,7 +91,7 @@ describe('RoomHeader en demo', () => {
         />,
       );
     });
-    expect(screen.getByTestId('room-capacity')).toHaveTextContent('1/10');
+    expect(screen.getByTestId('room-capacity')).toHaveTextContent('1/5');
     expect(screen.queryByTestId('room-status')).toBeNull();
     expect(screen.queryByTestId('video-duration')).toBeNull();
   });

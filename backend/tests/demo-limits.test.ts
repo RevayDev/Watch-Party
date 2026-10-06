@@ -21,7 +21,7 @@ import { clearAllPendingGraces } from '../src/sockets/disconnect-grace.js';
 import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
 
 /**
- * Cobertura demo-free (tareas 2–7): flag, topes 5 salas / 10 usuarios con
+ * Cobertura demo-free (tareas 2–7): flag, topes 5 salas / 5 usuarios con
  * reserva atómica, 429/403 exactos, availability sin fugas y demo-off =
  * comportamiento original.
  *
@@ -142,9 +142,9 @@ describe('DEMO_MODE: flag y parseo puro', () => {
     setDemoModeOverride(undefined);
   });
 
-  it('constantes de cuota: 5 salas y 10 usuarios/sala', () => {
+  it('constantes de cuota: 5 salas y 5 usuarios/sala', () => {
     expect(DEMO_MAX_ROOMS).toBe(5);
-    expect(DEMO_MAX_USERS_PER_ROOM).toBe(10);
+    expect(DEMO_MAX_USERS_PER_ROOM).toBe(5);
   });
 });
 
@@ -238,7 +238,7 @@ describe('demo: límite de 5 salas por servidor', () => {
   });
 });
 
-describe('demo: límite de 10 usuarios por sala (reserva atómica)', () => {
+describe('demo: límite de 5 usuarios por sala (reserva atómica)', () => {
   beforeEach(() => {
     setDemoModeOverride(true);
   });
@@ -246,14 +246,14 @@ describe('demo: límite de 10 usuarios por sala (reserva atómica)', () => {
   async function makeFullRoom(): Promise<string> {
     const { room } = await RoomService.createRoom({ hostName: 'Host' });
     created.push(room.roomId);
-    for (let i = 1; i <= 9; i++) {
+    for (let i = 1; i <= 4; i++) {
       await RoomService.joinRoom(room.roomId, `U${i}`, 'Web', `uid-${i}`);
     }
-    expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(5);
     return room.roomId;
   }
 
-  it('el 11º join (servicio) lanza DemoCapacityError 429 con mensaje exacto', async () => {
+  it('el 6º join (servicio) lanza DemoCapacityError 429 con mensaje exacto', async () => {
     const roomId = await makeFullRoom();
     const err = await RoomService.joinRoom(roomId, 'Nuevo', 'Web', 'uid-new').catch((e) => e);
     expect(err).toBeInstanceOf(DemoCapacityError);
@@ -261,13 +261,13 @@ describe('demo: límite de 10 usuarios por sala (reserva atómica)', () => {
     expect((err as DemoCapacityError).code).toBe('DEMO_ROOM_FULL');
     expect((err as Error).message).toBe(DEMO_ROOM_FULL_MESSAGE);
     expect((err as Error).message).toBe('Esta sala está llena.');
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(5);
   });
 
-  it('reserva atómica: 3 joins paralelos sobre 9 → solo 1 entra (total 10)', async () => {
+  it('reserva atómica: 3 joins paralelos sobre 4 → solo 1 entra (total 5)', async () => {
     const { room } = await RoomService.createRoom({ hostName: 'Host' });
     created.push(room.roomId);
-    for (let i = 1; i <= 8; i++) {
+    for (let i = 1; i <= 3; i++) {
       await RoomService.joinRoom(room.roomId, `U${i}`, 'Web', `uid-${i}`);
     }
     const results = await Promise.allSettled(
@@ -280,7 +280,7 @@ describe('demo: límite de 10 usuarios por sala (reserva atómica)', () => {
         expect((r.reason as Error).message).toBe(DEMO_ROOM_FULL_MESSAGE);
       }
     }
-    expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(5);
   });
 
   it('REST join en sala llena → 429; rejoin con mismo userId sigue permitido', async () => {
@@ -301,17 +301,17 @@ describe('demo: límite de 10 usuarios por sala (reserva atómica)', () => {
       next
     );
     expect(res2.status).not.toHaveBeenCalledWith(429);
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(5);
   });
 
-  it('merge legacy con cupo lleno no consume cupo (sigue en 10)', async () => {
+  it('merge legacy con cupo lleno no consume cupo (sigue en 5)', async () => {
     const { room } = await RoomService.createRoom({ hostName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Anon', 'Web');
-    for (let i = 1; i <= 8; i++) {
+    for (let i = 1; i <= 3; i++) {
       await RoomService.joinRoom(room.roomId, `U${i}`, 'Web', `uid-${i}`);
     }
-    expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(5);
 
     const res = mockRes();
     await RoomController.join(
@@ -320,7 +320,7 @@ describe('demo: límite de 10 usuarios por sala (reserva atómica)', () => {
       next
     );
     expect(res.status).not.toHaveBeenCalledWith(429);
-    expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(room.roomId))?.participants).toHaveLength(5);
   });
 
   it('socket join-room en sala llena → join-rejected room-full sin agregar', async () => {
@@ -335,15 +335,15 @@ describe('demo: límite de 10 usuarios por sala (reserva atómica)', () => {
     expect(rejected).toHaveLength(1);
     expect(rejected[0]).toEqual({ reason: 'room-full', message: DEMO_ROOM_FULL_MESSAGE });
     expect(sock.emitted.some((e) => e.event === 'room-state')).toBe(false);
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(5);
   });
 
   it('salir libera el cupo: tras removeParticipant cabe un join nuevo', async () => {
     const roomId = await makeFullRoom();
     await RoomService.removeParticipantAndTransferHost(roomId, 'U1', 'uid-1');
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(9);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(4);
     await RoomService.joinRoom(roomId, 'Nuevo', 'Web', 'uid-new');
-    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(10);
+    expect((await RoomService.getRoomById(roomId))?.participants).toHaveLength(5);
   });
 
   it('sala que queda vacía se elimina y libera cupo de salas', async () => {
@@ -365,7 +365,7 @@ describe('demo: límite de 10 usuarios por sala (reserva atómica)', () => {
     expect((err as Error).message).toBe(DEMO_ROOM_FULL_MESSAGE);
     const stored = await RoomService.getRoomById(roomId);
     expect(stored?.joinRequests?.some((j) => j.userId === 'uid-wait')).toBe(true);
-    expect(stored?.participants).toHaveLength(10);
+    expect(stored?.participants).toHaveLength(5);
   });
 
   it('demo fuerza isTemporary=true en create y en update de settings', async () => {
