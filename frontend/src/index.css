@@ -7123,6 +7123,10 @@ div[id] {
   gap: 1rem;
 }
 
+.status-grid > :only-child {
+  max-width: 560px;
+}
+
 .status-card {
   background: var(--color-bg-card);
   backdrop-filter: blur(18px);

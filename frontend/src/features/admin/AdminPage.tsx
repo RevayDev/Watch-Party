@@ -452,7 +452,7 @@ const RoomsSection: React.FC<{ token: string }> = ({ token }) => {
       </div>
       {error && <p className="admin-login__error" role="alert">{error}</p>}
       <form className="admin-form-row" onSubmit={lookup}>
-        <input className="form-group__input" value={roomId} onChange={(e) => setRoomId(e.target.value.toUpperCase())} placeholder="?roomId=XXX para el detalle sanitizado" aria-label="Código de sala" />
+        <input className="form-group__input" value={roomId} onChange={(e) => setRoomId(e.target.value.toUpperCase())} placeholder="Código de sala (p. ej. AB12CD)" aria-label="Código de sala" />
         <button type="submit" className="btn btn--secondary">Buscar sala</button>
       </form>
       {room && (
