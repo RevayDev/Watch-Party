@@ -14,11 +14,15 @@ vi.mock('../src/services/api', () => ({
   ApiService: {
     getDemoAvailability: vi.fn(),
     createRoom: vi.fn(),
+    getPlans: vi.fn(),
+    createCheckout: vi.fn(),
+    redeemGiftCode: vi.fn(),
   },
   BACKEND_BASE: '',
 }));
 
 const availabilityMock = vi.mocked(ApiService.getDemoAvailability);
+const plansMock = vi.mocked(ApiService.getPlans);
 
 function stubMatchMedia() {
   Object.defineProperty(window, 'matchMedia', {
@@ -56,6 +60,9 @@ afterEach(() => {
 describe('Home en demo', () => {
   it('muestra badge DEMO, contador de salas y aviso de enlace externo', async () => {
     availabilityMock.mockResolvedValue({ roomsUsed: 2, roomsTotal: 5, roomsAvailable: 3 });
+    plansMock.mockResolvedValue({
+      plans: [{ id: 'PREMIUM_ROOM', name: 'Sala premium', amount: 5000, currency: 'COP' }],
+    });
     await act(async () => {
       render(<Home {...homeProps} />);
     });
@@ -70,6 +77,7 @@ describe('Home en demo', () => {
 
   it('si availability falla, oculta el contador sin romper el Home', async () => {
     availabilityMock.mockRejectedValue(new Error('network down'));
+    plansMock.mockRejectedValue(new Error('network down'));
     await act(async () => {
       render(<Home {...homeProps} />);
     });

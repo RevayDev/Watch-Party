@@ -123,6 +123,65 @@ export class ApiService {
   }
 
   /**
+   * Catálogo público de planes (`GET /api/payments/plans`). Sin secretos.
+   */
+  static async getPlans(): Promise<{ plans: Array<{ id: string; name: string; amount: number; currency: string }> }> {
+    const response = await fetch(`${API_BASE_URL}/payments/plans`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo consultar los planes');
+    }
+    return response.json();
+  }
+
+  /**
+   * Crea una intención de compra (`POST /api/payments/checkout`).
+   * Nunca confirma pagos: la confirmación llega por webhook del proveedor.
+   */
+  static async createCheckout(input: {
+    provider: 'paypal' | 'card';
+    plan: string;
+    roomId?: string;
+    userId?: string;
+  }): Promise<{ paymentId: string; approveUrl?: string; status: string; message?: string }> {
+    const response = await fetch(`${API_BASE_URL}/payments/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo iniciar la compra');
+    }
+    return response.json();
+  }
+
+  /**
+   * Canjea un código de regalo (`POST /api/payments/gift-codes/redeem`).
+   * Requiere un sujeto (nombre o sala) para la idempotencia.
+   */
+  static async redeemGiftCode(input: {
+    code: string;
+    userName?: string;
+    roomId?: string;
+  }): Promise<{ entitlement: unknown; duplicate: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/payments/gift-codes/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: input.code,
+        userId: input.userName,
+        roomId: input.roomId,
+      }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo canjear el código');
+    }
+    return response.json();
+  }
+
+  /**
    * Upload or replace video with progress tracking.
    */
   static uploadVideo(

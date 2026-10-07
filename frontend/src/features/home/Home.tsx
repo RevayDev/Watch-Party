@@ -34,6 +34,7 @@ import {
   TimelineEvent,
 } from './homeData';
 import { RecentRooms } from './RecentRooms';
+import { PremiumPurchase } from './PremiumPurchase';
 import { CreateRoomModal, JoinRoomModal, TimelineModal } from './HomeModals';
 import {
   formatDemoAvailability,
@@ -717,6 +718,7 @@ export const Home: React.FC<HomeProps> = ({
 
       {/* ── SECTION: Planes de apoyo (pago único) ── */}
       <section className="home-section home-plans" id="planes">
+        <PremiumPurchase />
         <div className="home-section__header">
           <span className="home-section__badge">Planes de apoyo</span>
           <h2 className="home-section__title">Impulsa Watch Party con un pago único</h2>
