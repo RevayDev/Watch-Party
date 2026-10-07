@@ -735,6 +735,10 @@ button.header__users-pill:hover {
 }
 
 .home-nav__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   font-family: inherit;
   font-size: 0.85rem;
   font-weight: 600;
