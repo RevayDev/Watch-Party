@@ -22,13 +22,20 @@ beforeEach(() => {
 });
 
 describe('PremiumPurchase (canje)', () => {
-  it('muestra el formulario de canje', async () => {
+  it('muestra subtítulo, formulario centrado y botón acorde al diseño', async () => {
     await act(async () => {
       render(<PremiumPurchase />);
     });
+    expect(screen.getByText(/¿Tienes un código de regalo\?/i)).toBeDefined();
     expect(screen.getByPlaceholderText(/código de regalo/i)).toBeDefined();
     expect(screen.getByPlaceholderText(/tu nombre/i)).toBeDefined();
-    expect(screen.getByRole('button', { name: /canjear/i })).toBeDefined();
+    // Nombre primero (posiciones invertidas) y botón primario del diseño
+    const inputs = document.querySelectorAll('.home-buy__redeem input');
+    expect(inputs[0].getAttribute('aria-label')).toBe('Tu nombre');
+    expect(inputs[1].getAttribute('aria-label')).toBe('Código de regalo');
+    expect(
+      screen.getByRole('button', { name: /canjear/i }).className
+    ).toContain('home-hero-btn--primary');
   });
 
   it('canjear pide código y nombre, y confirma el acceso', async () => {

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ArrowLeft,
   BadgeDollarSign,
+  Check,
+  Copy,
   Gift,
   LayoutDashboard,
   LogOut,
@@ -567,6 +569,7 @@ const GiftCodesSection: React.FC<{ token: string }> = ({ token }) => {
   const [maxUses, setMaxUses] = useState('10');
   const [expiresInDays, setExpiresInDays] = useState('30');
   const [busy, setBusy] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     setError(null);
@@ -627,15 +630,36 @@ const GiftCodesSection: React.FC<{ token: string }> = ({ token }) => {
 
   const historyFor = (code: string) => history.filter((h) => (h.detail ?? '').includes(code));
 
+  const handleCopyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      window.setTimeout(() => {
+        setCopiedCode((current) => (current === code ? null : current));
+      }, 2000);
+    } catch {
+      setError('No se pudo copiar al portapapeles en este navegador.');
+    }
+  };
+
   return (
     <section aria-label="Códigos de regalo">
-      <form className="admin-form-row" onSubmit={handleCreate}>
-        <select className="form-group__input" value={type} onChange={(e) => setType(e.target.value)} aria-label="Tipo">
-          <option value="PREMIUM_ROOM">PREMIUM_ROOM</option>
-          <option value="FREE_ROOM">FREE_ROOM</option>
-        </select>
-        <input className="form-group__input" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="maxUses" aria-label="Usos máximos" inputMode="numeric" />
-        <input className="form-group__input" value={expiresInDays} onChange={(e) => setExpiresInDays(e.target.value)} placeholder="expira en días (vacío = sin expiración)" aria-label="Expira en días" inputMode="numeric" />
+      <form className="admin-gift-form" onSubmit={handleCreate}>
+        <label className="admin-field">
+          <span>Tipo</span>
+          <select className="form-group__input" value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="PREMIUM_ROOM">PREMIUM_ROOM</option>
+            <option value="FREE_ROOM">FREE_ROOM</option>
+          </select>
+        </label>
+        <label className="admin-field">
+          <span>Usos máximos</span>
+          <input className="form-group__input" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="10" inputMode="numeric" />
+        </label>
+        <label className="admin-field">
+          <span>Expira en días (vacío = sin expiración)</span>
+          <input className="form-group__input" value={expiresInDays} onChange={(e) => setExpiresInDays(e.target.value)} placeholder="30" inputMode="numeric" />
+        </label>
         <button type="submit" className="btn btn--primary" disabled={busy === 'create'}>Crear código</button>
       </form>
       {error && <p className="admin-login__error" role="alert">{error}</p>}
@@ -645,7 +669,20 @@ const GiftCodesSection: React.FC<{ token: string }> = ({ token }) => {
           <tbody>
             {codes.map((c) => (
               <tr key={c.code}>
-                <td><code>{c.code}</code></td>
+                <td>
+                  <span className="admin-code-cell">
+                    <code>{c.code}</code>
+                    <button
+                      type="button"
+                      className="admin-code-copy"
+                      onClick={() => handleCopyCode(c.code)}
+                      title={copiedCode === c.code ? '¡Copiado!' : 'Copiar código'}
+                      aria-label={copiedCode === c.code ? '¡Copiado!' : `Copiar código ${c.code}`}
+                    >
+                      {copiedCode === c.code ? <Check size={13} /> : <Copy size={13} />}
+                    </button>
+                  </span>
+                </td>
                 <td>{c.type}</td>
                 <td>{c.uses}/{c.maxUses}</td>
                 <td><span className={`admin-pill admin-pill--${c.status}`}>{c.status}</span></td>

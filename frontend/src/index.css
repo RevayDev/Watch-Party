@@ -2422,6 +2422,14 @@ div[id] {
   color: #fca5a5;
 }
 
+.home-buy__subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  text-align: center;
+}
+
 .home-buy__redeem {
   display: flex;
   align-items: center;
@@ -7344,6 +7352,76 @@ div[id] {
 
 .admin-form-row {
   grid-template-columns: 1fr auto;
+}
+
+/* Formulario de códigos: cada campo con su etiqueta visible */
+.admin-gift-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 0.6rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.admin-field > span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Código con botón de copiar */
+.admin-code-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.admin-code-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.admin-code-copy:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+@media (max-width: 700px) {
+  .admin-gift-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-gift-form button[type='submit'] {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-gift-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-table-wrap {

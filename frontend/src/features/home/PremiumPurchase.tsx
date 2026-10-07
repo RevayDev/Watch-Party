@@ -41,18 +41,13 @@ export const PremiumPurchase: React.FC = () => {
 
   return (
     <div className="home-buy" aria-label="Canjear código de regalo">
+      <p className="home-buy__subtitle">
+        ¿Tienes un código de regalo? Canjéalo aquí para activar tu acceso premium.
+      </p>
       <form className="home-buy__redeem" onSubmit={handleRedeem}>
         <span className="home-buy__icon" aria-hidden="true">
           <Ticket size={18} strokeWidth={2} />
         </span>
-        <input
-          type="text"
-          className="home-buy__input"
-          placeholder="Código de regalo (WATCH-XXXX-XXXX)"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          aria-label="Código de regalo"
-        />
         <input
           type="text"
           className="home-buy__input"
@@ -61,7 +56,15 @@ export const PremiumPurchase: React.FC = () => {
           onChange={(e) => setName(e.target.value)}
           aria-label="Tu nombre"
         />
-        <button type="submit" className="home-hero-btn home-hero-btn--secondary" disabled={redeemState === 'loading'}>
+        <input
+          type="text"
+          className="home-buy__input"
+          placeholder="Código de regalo (WATCH-XXXX-XXXX)"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          aria-label="Código de regalo"
+        />
+        <button type="submit" className="home-hero-btn home-hero-btn--primary" disabled={redeemState === 'loading'}>
           <Gift size={15} aria-hidden="true" />
           <span>Canjear</span>
         </button>
