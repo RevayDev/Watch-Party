@@ -1,8 +1,7 @@
 # Plan de endurecimiento del `/api/admin` — IMPLEMENTADO 2026-10-06
 
 > Verificación: `tsc` limpio, `lint` 0 errores, `tests/admin-hardening.test.ts`
-> 8/8 en verde. Login del frontend sin cambios (ya mapea 503/401 a mensajes
-> genéricos en `adminApi.ts`).
+> 8/8 en verde. Login del frontend sin cambios de protocolo: sigue `x-admin-token`.
 
 > Estado actual (rama `demo-free`, verificado 2026-10-06): el admin usa
 > `ADMIN_TOKEN` en env + `requireAdmin` con `timingSafeEqual` sobre SHA-256

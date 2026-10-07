@@ -60,16 +60,61 @@ const TABS: Array<{ id: AdminTab; label: string; icon: React.ComponentType<{ siz
 ];
 
 /**
- * Ruta privada `/admin` (token SOLO en memoria React, jamás localStorage).
- * Ingresos y PII solo aquí: lo público (`/status`, Home) nunca los consulta.
+ * Ruta privada `/admin`. El token se guarda solo en `sessionStorage`: sobrevive
+ * recargas dentro de la misma pestaña pero se pierde al cerrarla (nunca
+ * `localStorage`, para no dejar la llave en el disco de forma permanente).
  */
+const ADMIN_TOKEN_SESSION_KEY = 'wp_admin_token';
+
+function readStoredToken(): string | null {
+  try {
+    const value = sessionStorage.getItem(ADMIN_TOKEN_SESSION_KEY);
+    return value && value.trim() !== '' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeToken(token: string | null): void {
+  try {
+    if (token) sessionStorage.setItem(ADMIN_TOKEN_SESSION_KEY, token);
+    else sessionStorage.removeItem(ADMIN_TOKEN_SESSION_KEY);
+  } catch {
+    // sessionStorage no disponible (modo privado estricto): sigue en memoria.
+  }
+}
+
 export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
-  // Token en memoria: se pierde al recargar/salir (a propósito, sin persistir).
+  // Token en memoria + sessionStorage (misma pestaña). "Salir" lo borra todo.
   const [token, setToken] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [tab, setTab] = useState<AdminTab>('overview');
+
+  // Restaura la sesión de la pestaña validándola contra el backend.
+  useEffect(() => {
+    let cancelled = false;
+    const stored = readStoredToken();
+    if (!stored) {
+      setRestoring(false);
+      return;
+    }
+    fetchSummary(stored)
+      .then(() => {
+        if (!cancelled) setToken(stored);
+      })
+      .catch(() => {
+        storeToken(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +129,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
       // Valida el token contra el backend (401/503 con mensaje claro).
       await fetchSummary(candidate);
       setToken(candidate);
+      storeToken(candidate);
       setDraft('');
     } catch (err) {
       setLoginError(adminErrorMessage(err));
@@ -94,6 +140,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
 
   const handleLogout = () => {
     setToken(null);
+    storeToken(null);
     setDraft('');
     setLoginError(null);
     setTab('overview');
@@ -123,12 +170,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
       </nav>
 
       <div className="admin-page__inner">
-        {!token ? (
+        {restoring ? (
+          <section className="admin-login" aria-label="Restaurando sesión">
+            <h1 className="admin-login__title">Verificando sesión…</h1>
+          </section>
+        ) : !token ? (
           <section className="admin-login" aria-label="Acceso de administración">
             <h1 className="admin-login__title">Acceso restringido</h1>
             <p className="admin-login__desc">
-              Ingresa el <code>ADMIN_TOKEN</code> del servidor. El token vive solo en la memoria de
-              esta pestaña: no se guarda en el navegador.
+              Ingresa el <code>ADMIN_TOKEN</code> del servidor. La sesión se
+              mantiene solo en esta pestaña (se olvida al cerrarla o al salir).
             </p>
             <form className="admin-login__form" onSubmit={handleLogin}>
               <label className="form-group__label" htmlFor="admin-token">
