@@ -718,7 +718,6 @@ export const Home: React.FC<HomeProps> = ({
 
       {/* ── SECTION: Planes de apoyo (pago único) ── */}
       <section className="home-section home-plans" id="planes">
-        <PremiumPurchase />
         <div className="home-section__header">
           <span className="home-section__badge">Planes de apoyo</span>
           <h2 className="home-section__title">Impulsa Watch Party con un pago único</h2>
@@ -789,6 +788,8 @@ export const Home: React.FC<HomeProps> = ({
             cobro configurado, las tarjetas muestran «Próximamente».
           </p>
         </aside>
+
+        <PremiumPurchase />
       </section>
 
       {/* ── Modal Pop-up: Crear Nueva Sala ── */}

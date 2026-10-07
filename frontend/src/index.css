@@ -2228,7 +2228,8 @@ div[id] {
 
 /* ── Donations ── */
 .home-donate {
-  max-width: 1040px;
+  width: 100%;
+  align-self: center;
 }
 
 .home-donate-grid {
@@ -2375,7 +2376,8 @@ div[id] {
 
 /* ── Support plans (pago único) ── */
 .home-plans {
-  max-width: 1040px;
+  width: 100%;
+  align-self: center;
 }
 
 /* Compra inmediata al inicio de la sección de planes */
@@ -2386,7 +2388,7 @@ div[id] {
   gap: 0.6rem;
   width: 100%;
   max-width: 800px;
-  margin: 0 auto 1.5rem;
+  margin: 1.5rem auto 0;
 }
 
 .home-buy__icon {
