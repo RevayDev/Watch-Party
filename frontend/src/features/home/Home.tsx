@@ -780,15 +780,6 @@ export const Home: React.FC<HomeProps> = ({
           })}
         </div>
 
-        <aside className="home-donate__note" aria-label="Nota sobre los planes">
-          <Lightbulb size={16} strokeWidth={2.2} aria-hidden="true" />
-          <p>
-            <strong>Pago único, sin cuenta.</strong> Los botones abren PayPal en
-            una pestaña nueva con el monto del plan. Si aún no hay enlace de
-            cobro configurado, las tarjetas muestran «Próximamente».
-          </p>
-        </aside>
-
         <PremiumPurchase />
       </section>
 
