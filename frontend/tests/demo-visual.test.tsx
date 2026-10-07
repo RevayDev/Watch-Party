@@ -96,6 +96,19 @@ describe('RoomHeader en demo', () => {
     expect(screen.queryByTestId('video-duration')).toBeNull();
   });
 
+  it('sala premium: capacidad X/10 y badge Premium', async () => {
+    await act(async () => {
+      render(<RoomHeader {...baseProps} roomPlan="premium" />);
+    });
+    const capacity = screen.getByTestId('room-capacity');
+    expect(capacity).toHaveTextContent('3/10');
+    expect(capacity).toHaveAttribute(
+      'title',
+      '3 de 10 participantes — ver lista',
+    );
+    expect(screen.getByText('Premium')).toBeDefined();
+  });
+
   it('con VITE_DEMO_MODE=false vuelve al conteo original sin extras', async () => {
     vi.stubEnv('VITE_DEMO_MODE', 'false');
     await act(async () => {

@@ -162,7 +162,7 @@ export class ApiService {
    */
   static async redeemGiftCode(input: {
     code: string;
-    userName?: string;
+    userId?: string;
     roomId?: string;
   }): Promise<{ entitlement: unknown; duplicate: boolean }> {
     const response = await fetch(`${API_BASE_URL}/payments/gift-codes/redeem`, {
@@ -170,7 +170,7 @@ export class ApiService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code: input.code,
-        userId: input.userName,
+        userId: input.userId,
         roomId: input.roomId,
       }),
     });

@@ -18,6 +18,28 @@ import {
   DEMO_ROOM_LIMIT_MESSAGE,
   isDemoMode,
 } from '../config/demo-mode.js';
+import { getPremiumPlan } from '../config/plans.js';
+import { entitlementStore } from '../payments/payment.store.js';
+
+/** Plan efectivo de una sala (ausente = 'free', compatibilidad). */
+export function getRoomPlan(room: Pick<IRoom, 'plan'>): 'free' | 'premium' {
+  return room.plan === 'premium' ? 'premium' : 'free';
+}
+
+/** Cupo de participantes según plan (demo free o premium). */
+export function maxUsersForRoom(room: Pick<IRoom, 'plan'>): number {
+  if (isDemoMode() && getRoomPlan(room) === 'premium') {
+    return getPremiumPlan().maxUsers;
+  }
+  return DEMO_MAX_USERS_PER_ROOM;
+}
+
+/** ¿Tiene este userId un acceso premium activo? */
+async function hasPremiumAccess(userId: string | undefined): Promise<boolean> {
+  if (!userId) return false;
+  const active = await entitlementStore.findActive({ userId }).catch(() => []);
+  return active.length > 0;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -152,7 +174,9 @@ export class RoomService {
    * Create a new room with a host.
    *
    * DEMO (flag `DEMO_MODE`): tope de 5 salas vivas por servidor (429 con
-   * mensaje exacto) y `isTemporary` forzado a true (ninguna sala permanente).
+   * mensaje exacto). La sala hereda plan 'premium' (persistente permitida)
+   * si el creador tiene un acceso premium activo; si no, es 'free' con
+   * `isTemporary` forzado a true (ninguna sala permanente).
    * La sección crítica contar+crear va tras mutex en memoria (1 instancia).
    */
   public static async createRoom(dto: CreateRoomDTO): Promise<{ room: IRoom; hostSecret: string }> {
@@ -168,9 +192,14 @@ export class RoomService {
       const hostSecret = crypto.randomBytes(16).toString('hex');
       const now = new Date();
 
-      // En demo NINGUNA sala es permanente (se ignora el modo persistente sin borrar su código).
+      // El acceso premium del creador se hereda a la sala (si no, 'free').
+      const premiumAccess = isDemoMode() && (await hasPremiumAccess(dto.userId));
+      const plan = premiumAccess ? ('premium' as const) : ('free' as const);
+      // En demo las free NINGUNA es permanente; las premium respetan el pedido.
       const isTemporary = isDemoMode()
-        ? true
+        ? plan === 'free'
+          ? true
+          : (dto.isTemporary !== undefined ? dto.isTemporary : false)
         : (dto.isTemporary !== undefined ? dto.isTemporary : true);
     const roomData: IRoom = {
       roomId,
@@ -178,6 +207,7 @@ export class RoomService {
       hostSecret,
       status: 'waiting',
       isTemporary,
+      plan,
       participants: [
         {
           name: dto.hostName.trim(),
@@ -283,7 +313,7 @@ export class RoomService {
     const existingIndex = findParticipantIndex(room.participants);
 
     if (existingIndex === -1) {
-      if (isDemoMode() && room.participants.length >= DEMO_MAX_USERS_PER_ROOM) {
+      if (isDemoMode() && room.participants.length >= maxUsersForRoom(room)) {
         throw new DemoCapacityError('DEMO_ROOM_FULL', DEMO_ROOM_FULL_MESSAGE);
       }
       const isHost = room.hostName.toLowerCase() === trimmedName.toLowerCase();
@@ -500,7 +530,7 @@ export class RoomService {
       if (
         isDemoMode() &&
         this.wouldAddParticipant(room.participants, request.userId, request.name.trim()) &&
-        room.participants.length >= DEMO_MAX_USERS_PER_ROOM
+        room.participants.length >= maxUsersForRoom(room)
       ) {
         throw new DemoCapacityError('DEMO_ROOM_FULL', DEMO_ROOM_FULL_MESSAGE);
       }
@@ -558,8 +588,8 @@ export class RoomService {
   /**
    * Update Room Settings (e.g. mute on entry, disable camera on entry)
    *
-   * DEMO: fuerza `isTemporary=true` (ninguna sala permanente; se ignora el
-   * modo persistente sin borrar su código).
+   * DEMO: fuerza `isTemporary=true` salvo en salas premium (ninguna sala
+   * free es permanente; se ignora el modo persistente sin borrar su código).
    */
   public static async updateSettings(
     roomId: string,
@@ -568,10 +598,10 @@ export class RoomService {
     const cleanId = cleanIdOf(roomId);
     const room = await roomRepository.findById(cleanId);
     if (!room) return null;
-    // En demo ninguna sala es permanente (sin mutar el objeto del llamador).
-    const demoForced = isDemoMode() ? { isTemporary: true as const } : {};
+    // En demo las salas free nunca son permanentes (sin mutar el objeto del llamador).
+    const demoForced = isDemoMode() && getRoomPlan(room) !== 'premium' ? { isTemporary: true as const } : {};
     room.settings = { ...(room.settings || {}), ...settings, ...demoForced } as IRoom['settings'];
-    if (isDemoMode()) {
+    if (isDemoMode() && getRoomPlan(room) !== 'premium') {
       room.isTemporary = true;
     }
     room.updatedAt = new Date();

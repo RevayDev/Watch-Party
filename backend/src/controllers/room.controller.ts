@@ -3,13 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RoomService } from '../services/room.service.js';
-import { DemoCapacityError } from '../services/room.service.js';
+import { DemoCapacityError, maxUsersForRoom } from '../services/room.service.js';
 import { IVideoMetadata } from '../types/room.types.js';
 import { findBannedEntry, isNameTaken } from '../domain/room.entity.js';
 import { AuthClaim, requireHost } from '../domain/auth-policy.js';
 import { sanitizeRoomSettings } from '../domain/settings-policy.js';
 import {
-  DEMO_MAX_USERS_PER_ROOM,
   DEMO_ROOM_FULL_MESSAGE,
   DEMO_UPLOAD_DISABLED_MESSAGE,
   isDemoMode,
@@ -260,13 +259,13 @@ export class RoomController {
         return !p.userId && p.name.toLowerCase() === trimmedName.toLowerCase();
       });
 
-      // ── Cuota demo: sala llena (≥5 participantes) → 429, salvo rejoin/merge
+      // ── Cuota demo: sala llena (según plan) → 429, salvo rejoin/merge
       // que no consumen cupo. Va antes de la puerta de aprobación: una sala
       // llena tampoco acepta nuevas solicitudes en espera.
       if (
         isDemoMode() &&
         !alreadyParticipant &&
-        (existing.participants || []).length >= DEMO_MAX_USERS_PER_ROOM
+        (existing.participants || []).length >= maxUsersForRoom(existing)
       ) {
         res.status(429).json({ error: DEMO_ROOM_FULL_MESSAGE });
         return;

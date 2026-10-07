@@ -55,6 +55,8 @@ export interface IRoom {
   hostSecret: string;
   status: 'waiting' | 'active' | 'closed';
   isTemporary?: boolean;
+  /** Plan de la sala: las premium heredan el acceso del creador (ausente = 'free'). */
+  plan?: 'free' | 'premium';
   video?: IVideoMetadata;
   participants: IParticipant[];
   joinRequests?: IJoinRequest[];

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Gift, Ticket } from 'lucide-react';
 import { ApiService } from '../../services/api';
+import { getOrCreateUserId } from '../../shared/utils';
 
 /**
  * Canje de códigos de regalo debajo de los planes de apoyo.
@@ -8,7 +9,6 @@ import { ApiService } from '../../services/api';
  */
 export const PremiumPurchase: React.FC = () => {
   const [code, setCode] = useState('');
-  const [name, setName] = useState('');
   const [redeemState, setRedeemState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [redeemMessage, setRedeemMessage] = useState('');
 
@@ -16,16 +16,17 @@ export const PremiumPurchase: React.FC = () => {
     e.preventDefault();
     if (redeemState === 'loading') return;
     const cleanCode = code.trim();
-    const cleanName = name.trim();
-    if (!cleanCode || !cleanName) {
+    if (!cleanCode) {
       setRedeemState('error');
-      setRedeemMessage('Escribe el código y tu nombre para asociar el acceso.');
+      setRedeemMessage('Escribe el código de regalo para canjearlo.');
       return;
     }
     setRedeemState('loading');
     setRedeemMessage('');
     try {
-      const result = await ApiService.redeemGiftCode({ code: cleanCode, userName: cleanName });
+      // El acceso se liga al userId estable de este navegador: el mismo que
+      // usan crear/unirse a salas, así el premium aplica automáticamente.
+      const result = await ApiService.redeemGiftCode({ code: cleanCode, userId: getOrCreateUserId() });
       setRedeemMessage(
         result.duplicate
           ? 'Ese código ya estaba canjeado a tu nombre. ¡Ya tienes el acceso!'
@@ -48,14 +49,6 @@ export const PremiumPurchase: React.FC = () => {
         <span className="home-buy__icon" aria-hidden="true">
           <Ticket size={18} strokeWidth={2} />
         </span>
-        <input
-          type="text"
-          className="home-buy__input"
-          placeholder="Tu nombre"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-label="Tu nombre"
-        />
         <input
           type="text"
           className="home-buy__input"

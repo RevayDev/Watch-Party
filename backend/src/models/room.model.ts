@@ -79,6 +79,11 @@ const RoomSchema = new Schema<RoomDocument>(
       type: Boolean,
       default: true,
     },
+    plan: {
+      type: String,
+      enum: ['free', 'premium'],
+      default: 'free',
+    },
     video: {
       type: VideoMetadataSchema,
       default: null,
