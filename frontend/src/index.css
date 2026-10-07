@@ -2383,9 +2383,16 @@ div[id] {
   margin-bottom: 1.5rem;
 }
 
+.home-buy__plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
 .home-buy__card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.9rem;
   padding: 1rem 1.15rem;
   background: rgba(99, 102, 241, 0.1);
@@ -2419,13 +2426,53 @@ div[id] {
 }
 
 .home-buy__desc {
-  margin: 0.15rem 0 0;
+  margin: 0.3rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
   font-size: 0.82rem;
   color: #cbd5e1;
 }
 
+.home-buy__spec {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.home-buy__spec svg {
+  color: #a5b4fc;
+  flex-shrink: 0;
+}
+
+.home-buy__tagline {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.home-buy__nameline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.home-buy__namelabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.home-buy__nameline .home-buy__input {
+  width: 100%;
+}
+
 .home-buy__cta {
   flex-shrink: 0;
+  align-self: center;
 }
 
 .home-buy__message {

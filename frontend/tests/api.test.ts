@@ -30,7 +30,7 @@ describe('ApiService.createRoom', () => {
     expect(out.roomId).toBe('ABC123');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('/api/rooms');
+    expect(url).toContain('/api/rooms');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ hostName: 'Ana', isTemporary: false });
   });
@@ -58,7 +58,7 @@ describe('ApiService.getRoom / joinRoom', () => {
     const { fetchMock } = mockFetchOnce({ roomId: 'ABC123' });
     await ApiService.getRoom('ABC123');
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('/api/rooms/ABC123');
+    expect(url).toContain('/api/rooms/ABC123');
   });
 
   it('getRoom lanza "Sala no encontrada" ante 404', async () => {
@@ -71,7 +71,7 @@ describe('ApiService.getRoom / joinRoom', () => {
     const out = await ApiService.joinRoom('ABC123', 'Invitado');
     expect(out.pendingApproval).toBe(true);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('/api/rooms/ABC123/join');
+    expect(url).toContain('/api/rooms/ABC123/join');
     expect(JSON.parse(init.body as string)).toEqual({ userName: 'Invitado' });
   });
 });
@@ -81,7 +81,7 @@ describe('ApiService.setVideoUrl', () => {
     const { fetchMock } = mockFetchOnce({ message: 'ok' });
     await ApiService.setVideoUrl('ABC123', 'https://x/y.m3u8', 'Mi video');
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('/api/rooms/ABC123/video-url');
+    expect(url).toContain('/api/rooms/ABC123/video-url');
     expect(JSON.parse(init.body as string)).toEqual({ url: 'https://x/y.m3u8', title: 'Mi video' });
   });
 

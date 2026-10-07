@@ -6,8 +6,9 @@ import { PremiumPurchase } from '../src/features/home/PremiumPurchase';
 import { ApiService } from '../src/services/api';
 
 /**
- * Compra inmediata: plan premium con precio, checkout a PayPal y canje
- * de códigos de regalo. Todo con fetch mockeado, sin red.
+ * Compra inmediata por niveles: tarjetas con precio/capacidad/duración,
+ * botón por nivel hacia la pasarela y canje de códigos de regalo.
+ * Todo con fetch mockeado, sin red.
  */
 vi.mock('../src/services/api', () => ({
   ApiService: {
@@ -21,23 +22,51 @@ const plansMock = vi.mocked(ApiService.getPlans);
 const checkoutMock = vi.mocked(ApiService.createCheckout);
 const redeemMock = vi.mocked(ApiService.redeemGiftCode);
 
+const TIERS = {
+  plans: [
+    { id: 'INMEDIATA', name: 'Sala Inmediata', amount: 5000, currency: 'COP', maxUsers: 10, durationHours: 3, tagline: 'Ya mismo' },
+    { id: 'ESTANDAR', name: 'Sala Estándar', amount: 3000, currency: 'COP', maxUsers: 5, durationHours: 2, tagline: 'Clásica' },
+    { id: 'PLUS', name: 'Sala Plus', amount: 8000, currency: 'COP', maxUsers: 15, durationHours: 5, tagline: 'Maratón' },
+  ],
+};
+
+function fillBuyerName(name: string) {
+  fireEvent.change(screen.getByLabelText(/para asociar la compra/i), {
+    target: { value: name },
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  plansMock.mockResolvedValue({
-    plans: [{ id: 'PREMIUM_ROOM', name: 'Sala premium', amount: 5000, currency: 'COP' }],
-  });
+  plansMock.mockResolvedValue(TIERS);
 });
 
 describe('PremiumPurchase', () => {
-  it('muestra el plan con precio y el botón de compra', async () => {
+  it('muestra los tres niveles con precio, capacidad y duración', async () => {
     await act(async () => {
       render(<PremiumPurchase />);
     });
-    expect(await screen.findByText(/sala premium — 5000 COP/i)).toBeDefined();
-    expect(screen.getByRole('button', { name: /comprar ahora/i })).toBeDefined();
+    expect(await screen.findByText(/sala inmediata — 5000 COP/i)).toBeDefined();
+    expect(screen.getByText(/sala estándar — 3000 COP/i)).toBeDefined();
+    expect(screen.getByText(/sala plus — 8000 COP/i)).toBeDefined();
+    expect(screen.getByText(/hasta 10 personas/i)).toBeDefined();
+    expect(screen.getByText(/3 horas por sala/i)).toBeDefined();
+    expect(screen.getAllByRole('button', { name: /comprar ahora/i })).toHaveLength(3);
   });
 
-  it('comprar abre PayPal y muestra confirmación', async () => {
+  it('comprar pide el nombre antes de llamar al checkout', async () => {
+    await act(async () => {
+      render(<PremiumPurchase />);
+    });
+    await screen.findAllByRole('button', { name: /comprar ahora/i });
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /comprar ahora/i })[0]);
+    });
+    expect(await screen.findByText(/escribe tu nombre/i)).toBeDefined();
+    expect(checkoutMock).not.toHaveBeenCalled();
+  });
+
+  it('comprar un nivel abre PayPal y muestra confirmación', async () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     checkoutMock.mockResolvedValue({
       paymentId: 'pay-1',
@@ -47,13 +76,15 @@ describe('PremiumPurchase', () => {
     await act(async () => {
       render(<PremiumPurchase />);
     });
-    await screen.findByRole('button', { name: /comprar ahora/i });
+    await screen.findAllByRole('button', { name: /comprar ahora/i });
+    fillBuyerName('Roberto');
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /comprar ahora/i }));
+      fireEvent.click(screen.getAllByRole('button', { name: /comprar ahora/i })[1]);
     });
     await waitFor(() => expect(checkoutMock).toHaveBeenCalledWith({
       provider: 'paypal',
-      plan: 'PREMIUM_ROOM',
+      plan: 'ESTANDAR',
+      userId: 'Roberto',
     }));
     expect(openSpy).toHaveBeenCalledWith(
       'https://paypal.example/approve',
@@ -69,9 +100,10 @@ describe('PremiumPurchase', () => {
     await act(async () => {
       render(<PremiumPurchase />);
     });
-    await screen.findByRole('button', { name: /comprar ahora/i });
+    await screen.findAllByRole('button', { name: /comprar ahora/i });
+    fillBuyerName('Roberto');
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /comprar ahora/i }));
+      fireEvent.click(screen.getAllByRole('button', { name: /comprar ahora/i })[0]);
     });
     expect(await screen.findByText(/proveedor no disponible/i)).toBeDefined();
   });
@@ -85,7 +117,7 @@ describe('PremiumPurchase', () => {
       fireEvent.change(screen.getByLabelText(/código de regalo/i), {
         target: { value: 'WATCH-AAAA-BBBB' },
       });
-      fireEvent.change(screen.getByLabelText(/tu nombre/i), {
+      fireEvent.change(screen.getByLabelText(/^tu nombre$/i), {
         target: { value: 'Roberto' },
       });
       fireEvent.click(screen.getByRole('button', { name: /canjear/i }));
@@ -117,7 +149,7 @@ describe('PremiumPurchase', () => {
       fireEvent.change(screen.getByLabelText(/código de regalo/i), {
         target: { value: 'MALO' },
       });
-      fireEvent.change(screen.getByLabelText(/tu nombre/i), {
+      fireEvent.change(screen.getByLabelText(/^tu nombre$/i), {
         target: { value: 'Roberto' },
       });
       fireEvent.click(screen.getByRole('button', { name: /canjear/i }));
