@@ -9,7 +9,8 @@ import proxyRoutes from './routes/proxy.routes.js';
 import paymentsRoutes from './routes/payments.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
-import { globalLimiter } from './middleware/rate-limit.middleware.js';
+import { globalLimiter, adminLimiter } from './middleware/rate-limit.middleware.js';
+import { adminRateLimit } from './middleware/requireAdmin.js';
 import { metricsMiddleware } from './services/metrics.service.js';
 import { getHealth, getStatus, streamStatus } from './controllers/status.controller.js';
 
@@ -56,8 +57,9 @@ export function createApp(): Express {
   app.use('/api/rooms', roomRoutes);
 
   // Pagos públicos + administración (tras requireAdmin interno).
+  // El admin lleva paraguas propio: bloqueo tras 401s + 60 req/min.
   app.use('/api/payments', globalLimiter, paymentsRoutes);
-  app.use('/api/admin', globalLimiter, adminRoutes);
+  app.use('/api/admin', adminRateLimit, adminLimiter, globalLimiter, adminRoutes);
 
   // Global Error Handler
   app.use(errorHandler);

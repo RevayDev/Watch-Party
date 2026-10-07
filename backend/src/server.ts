@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { createApp } from './app.js';
 import { connectDatabase } from './config/database.js';
 import { isOriginAllowed } from './config/cors.js';
+import { checkAdminTokenStrength } from './middleware/requireAdmin.js';
 import { setupSocketHandlers } from './sockets/room.socket.js';
 
 dotenv.config();
@@ -12,6 +13,17 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/watch_party';
 
 async function startServer() {
+  // 0. Secreto admin: en producción un token débil impide arrancar
+  // (adivinable online); en desarrollo solo avisa. Sin token, el admin
+  // responde 503 y el servidor arranca igual. HTTPS lo dan Render/Vercel.
+  const adminCheck = checkAdminTokenStrength();
+  if (adminCheck.status === 'weak' && process.env.NODE_ENV === 'production') {
+    throw new Error(`Arranque rechazado: ${adminCheck.message}`);
+  }
+  if (adminCheck.status !== 'ok') {
+    console.warn(`⚠️ ${adminCheck.message}`);
+  }
+
   // 1. Connect database
   await connectDatabase(MONGODB_URI);
 
