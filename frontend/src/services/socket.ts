@@ -28,6 +28,7 @@ export function getSocket(): Socket {
       reconnectionDelayMax: 10000,
       randomizationFactor: 0.5,
       timeout: 20000,
+      autoConnect: true,
     });
   }
   return socket;

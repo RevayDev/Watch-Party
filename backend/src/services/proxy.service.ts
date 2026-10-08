@@ -5,6 +5,9 @@ import http from 'node:http';
 export const PROXY_MAX_REDIRECTS = 5;
 export const PROXY_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+// Tope de buffering en memoria para playlists/páginas HTML (anti-DoS).
+// Los segmentos/binarios van por pipe sin buffering.
+export const PROXY_MAX_BUFFERED_BYTES = 2 * 1024 * 1024;
 
 export function handleProxyError(res: Response, status: number, message: string, details?: string): void {
   res.status(status).json({ error: message, ...(details ? { details } : {}) });
@@ -77,6 +80,13 @@ export const proxyFetch = (
   }
 
   const proxyReq = protocol.get(targetUrl, { headers }, (proxyRes) => {
+    // Si el cliente aborta, se libera el upstream de inmediato.
+    req.on('close', () => {
+      try { proxyRes.destroy(); } catch { /* noop */ }
+    });
+    proxyRes.on('error', () => {
+      try { proxyRes.destroy(); } catch { /* noop */ }
+    });
     // Follow redirects server-side (a relative Location would break on other origins)
     const status = proxyRes.statusCode || 0;
     if (status >= 300 && status < 400 && proxyRes.headers.location) {
@@ -93,12 +103,33 @@ export const proxyFetch = (
     const contentType = (proxyRes.headers['content-type'] as string) || 'application/octet-stream';
     const isPlaylist = contentType.includes('mpegurl') || targetUrl.includes('.m3u8');
 
+    const collectCapped = (onDone: (body: Buffer) => void): void => {
+      const chunks: Buffer[] = [];
+      let bytes = 0;
+      let aborted = false;
+      proxyRes.on('data', (chunk: Buffer) => {
+        if (aborted) return;
+        bytes += chunk.length;
+        if (bytes > PROXY_MAX_BUFFERED_BYTES) {
+          aborted = true;
+          try { proxyRes.destroy(); } catch { /* noop */ }
+          if (!res.headersSent) {
+            handleProxyError(res, 502, 'La respuesta del video externo es demasiado grande');
+          }
+          return;
+        }
+        chunks.push(chunk);
+      });
+      proxyRes.on('end', () => {
+        if (aborted || res.headersSent) return;
+        onDone(Buffer.concat(chunks));
+      });
+    };
+
     if (isPlaylist) {
       // For .m3u8 playlists: collect the body, rewrite URLs to route through proxy
-      const chunks: Buffer[] = [];
-      proxyRes.on('data', (chunk: Buffer) => chunks.push(chunk));
-      proxyRes.on('end', () => {
-        let body = Buffer.concat(chunks).toString('utf-8');
+      collectCapped((buffer) => {
+        let body = buffer.toString('utf-8');
 
         // Determine base URL for resolving relative paths in the playlist
         const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
@@ -132,10 +163,8 @@ export const proxyFetch = (
       });
     } else if (contentType.includes('text/html')) {
       // HTML instead of video (Google Drive virus-scan page, quota page, login wall, error page)
-      const chunks: Buffer[] = [];
-      proxyRes.on('data', (chunk: Buffer) => chunks.push(chunk));
-      proxyRes.on('end', () => {
-        const html = Buffer.concat(chunks).toString('utf-8');
+      collectCapped((buffer) => {
+        const html = buffer.toString('utf-8');
         const downloadUrl = extractDriveDownloadUrl(html);
         if (downloadUrl && downloadUrl !== targetUrl && redirectsLeft > 0) {
           // Follow the real download link extracted from the confirmation form
@@ -167,7 +196,7 @@ export const proxyFetch = (
     }
   });
 
-  proxyReq.on('error', (err) => {
+  proxyReq.on('error', (err: Error) => {
     console.error('❌ Proxy error:', err.message);
     if (!res.headersSent) {
       handleProxyError(res, 502, 'No se pudo obtener el video externo', err.message);

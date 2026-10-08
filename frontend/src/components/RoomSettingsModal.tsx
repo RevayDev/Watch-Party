@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { notify } from "../services/notifications";
 import { BottomSheet } from "../shared/components/BottomSheet";
+import { isDemoMode } from "../shared/demo";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -36,6 +37,11 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
   const [choice, setChoice] = useState<number | null>(timerMinutes);
+
+  // Demo: la persistencia y el cierre automático configurable quedan
+  // deshabilitados solo visualmente (el timer lo pone el servidor).
+  // El código original queda intacto tras el flag.
+  const demo = isDemoMode();
 
   // Re-sync from props every time the modal opens
   useEffect(() => {
@@ -120,7 +126,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                   Temporizador de sala
                 </span>
 
-                {timerEndsAt && (
+                {timerEndsAt && !demo && (
                   <button
                     type="button"
                     className="room-settings__timer-remove"
@@ -138,6 +144,16 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 </p>
               )}
 
+              {demo && (
+                <p
+                  className="room-settings__box-desc"
+                  data-testid="demo-timer-note"
+                >
+                  En la demo el temporizador lo configura el servidor y no se
+                  puede cambiar desde aquí.
+                </p>
+              )}
+
               <div className="room-settings__timer-grid">
                 {TIMER_OPTIONS.map((min) => (
                   <button
@@ -147,6 +163,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                       choice === min ? "room-settings__timer-chip--active" : ""
                     }`}
                     onClick={() => handleSetTimer(min)}
+                    disabled={demo}
+                    title={demo ? 'En la demo el temporizador lo configura el servidor' : undefined}
                   >
                     {min >= 60 ? `${min / 60} h` : `${min} min`}
                   </button>
@@ -166,23 +184,31 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             <div className="room-settings__box">
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">
-                  {isTemporary ? "Sala Temporal" : "Video Guardado"}
+                  {demo ? "Sala Temporal" : isTemporary ? "Sala Temporal" : "Video Guardado"}
                 </span>
 
-                <label className="part-switch" style={{ margin: 0 }}>
+                <label
+                  className="part-switch"
+                  style={{ margin: 0, opacity: demo ? 0.5 : 1 }}
+                  title={demo ? 'En la demo todas las salas son temporales' : undefined}
+                >
                   <input
                     type="checkbox"
-                    checked={isTemporary}
+                    checked={demo ? true : isTemporary}
                     onChange={() => onToggleTemporary()}
+                    disabled={demo}
+                    title={demo ? 'En la demo todas las salas son temporales' : undefined}
                   />
                   <span className="part-slider" />
                 </label>
               </div>
 
               <p className="room-settings__box-desc">
-                {isTemporary
-                  ? "Al cerrar la sala se borra el video y la sala automáticamente (ideal para videos pesados o funciones rápidas)."
-                  : "El video se conserva subido en el servidor para futuras sesiones."}
+                {demo
+                  ? "En la demo todas las salas son temporales y no se puede cambiar."
+                  : isTemporary
+                    ? "Al cerrar la sala se borra el video y la sala automáticamente (ideal para videos pesados o funciones rápidas)."
+                    : "El video se conserva subido en el servidor para futuras sesiones."}
               </p>
             </div>
 

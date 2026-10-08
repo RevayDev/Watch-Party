@@ -9,6 +9,7 @@ import {
   Lightbulb,
   ExternalLink,
   ArrowRight,
+  Activity,
 } from 'lucide-react';
 import exampleImg from '../../Example.png';
 import { ApiService } from '../../services/api';
@@ -24,14 +25,22 @@ import {
   roadmapItems,
   timelineEvents,
   donationCards,
+  SUPPORT_PLANS,
+  planPaymentUrl,
   features,
   faqs,
-  PATREON_URL,
+  KOFI_URL,
   PAYPAL_URL,
   TimelineEvent,
 } from './homeData';
 import { RecentRooms } from './RecentRooms';
+import { PremiumPurchase } from './PremiumPurchase';
 import { CreateRoomModal, JoinRoomModal, TimelineModal } from './HomeModals';
+import {
+  formatDemoAvailability,
+  isDemoMode,
+  type DemoAvailability,
+} from '../../shared/demo';
 
 interface HomeProps {
   initialRoomCode?: string | null;
@@ -65,6 +74,36 @@ export const Home: React.FC<HomeProps> = ({
   const [isTemporary, setIsTemporary] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
+
+  // Demo gratuita: tras VITE_DEMO_MODE (default true en `demo-free`).
+  // Con `false` todo lo demo (badge, contador, avisos) desaparece.
+  const demo = isDemoMode();
+  // Solo conteos (roomsUsed/roomsTotal/roomsAvailable). Si la lectura falla,
+  // queda en null y el contador se oculta sin romper el Home.
+  const [demoAvailability, setDemoAvailability] = useState<DemoAvailability | null>(null);
+
+  const refreshDemoAvailability = async () => {
+    try {
+      setDemoAvailability(await ApiService.getDemoAvailability());
+    } catch {
+      setDemoAvailability(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!demo) return;
+    let cancelled = false;
+    ApiService.getDemoAvailability()
+      .then((a) => {
+        if (!cancelled) setDemoAvailability(a);
+      })
+      .catch(() => {
+        if (!cancelled) setDemoAvailability(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [demo]);
 
   // Update roomCode and show modal if initialRoomCode changes
   useEffect(() => {
@@ -118,6 +157,10 @@ export const Home: React.FC<HomeProps> = ({
     setError('');
     setShowJoinModal(false);
     onJoinRoom(roomCode.trim().toUpperCase(), userName.trim());
+    // Demo: re-lee la disponibilidad tras unirse (si falla, se oculta solo).
+    if (demo) {
+      void refreshDemoAvailability();
+    }
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -135,6 +178,12 @@ export const Home: React.FC<HomeProps> = ({
         isTemporary,
       );
       setShowCreateModal(false);
+      // Demo: re-lee la disponibilidad tras crear (si falla, se oculta solo).
+      // Nota: el backend responde 429 con el texto EXACTO del límite cuando
+      // la demo llega a 5 salas; aquí se muestra `err.message` tal cual.
+      if (demo) {
+        void refreshDemoAvailability();
+      }
       onRoomCreated(data.roomId, data.hostName, data.hostSecret);
     } catch (err: any) {
       setCreateError(err.message || 'Error al conectar con el servidor.');
@@ -207,15 +256,35 @@ export const Home: React.FC<HomeProps> = ({
       <div className="home-hero-grid">
         {/* Left Column: Title, Subtitle, Reconnect banner & Action Buttons */}
         <div className="home-hero-left">
-          <aside className="home-future-note" aria-label="Planes futuros">
-            <Lightbulb size={18} strokeWidth={2.2} aria-hidden="true" />
-            <p>
-              A futuro se agregarán <strong>planes de apoyo</strong> para
-              mantener el proyecto: servidor, almacenamiento y desarrollo de
-              nuevas funciones.
-            </p>
-          </aside>
+          <div className="home-hero-badge" aria-label="Plataforma libre y en tiempo real">
+            <span className="home-hero-badge__dot" aria-hidden="true" />
+            <span>100% Libre • Sin registros • Audio y Video HD en vivo</span>
+          </div>
 
+          {demo && (
+            <span
+              className="home-section__badge home-demo-badge"
+              data-testid="demo-badge"
+            >
+              Demo gratuita
+            </span>
+          )}
+          {/* Demo: los vídeos van por enlace externo (Drive); la subida de
+              archivos está deshabilitada. Entrada por código sin cambios. */}
+          {demo && (
+            <aside
+              className="home-future-note"
+              aria-label="Vídeos por enlace en la demo"
+              data-testid="demo-drive-notice"
+            >
+              <ExternalLink size={18} strokeWidth={2.2} aria-hidden="true" />
+              <p>
+                En esta demo los vídeos se comparten con un{' '}
+                <strong>enlace externo (por ejemplo, Google Drive)</strong>:
+                pega el enlace en la sala para reproducirlo juntos.
+              </p>
+            </aside>
+          )}
           <h1 className="home-hero-title">
             Tus videos,&nbsp;
             <span className="home-hero-title--accent">
@@ -269,6 +338,19 @@ export const Home: React.FC<HomeProps> = ({
               <span>Aprobación de entrada</span>
             </div>
           </div>
+
+          {/* Demo: contador de salas (solo conteos, sin códigos ni lista).
+              Si la lectura falla, no se renderiza nada (no rompe el Home). */}
+          {demo && demoAvailability && (
+            <p
+              className="home-demo-counter"
+              role="status"
+              data-testid="demo-availability"
+            >
+              <Activity size={16} strokeWidth={2.4} aria-hidden="true" />
+              <span>{formatDemoAvailability(demoAvailability)}</span>
+            </p>
+          )}
         </div>
 
         {/* Right Column: Reference Showcase Frame (Example.png) */}
@@ -278,6 +360,8 @@ export const Home: React.FC<HomeProps> = ({
               src={exampleImg}
               alt="Watch Party Experiencia en Vivo"
               className="home-showcase-img"
+              loading="lazy"
+              decoding="async"
             />
             <div className="home-showcase-overlay" />
           </div>
@@ -637,6 +721,73 @@ export const Home: React.FC<HomeProps> = ({
         </div>
       </section>
 
+      {/* ── SECTION: Planes de apoyo (pago único) ── */}
+      <section className="home-section home-plans" id="planes">
+        <div className="home-section__header">
+          <span className="home-section__badge">Planes de apoyo</span>
+          <h2 className="home-section__title">Impulsa Watch Party con un pago único</h2>
+          <p className="home-section__subtitle">
+            Sin suscripciones ni anuncios. Eliges un plan, pagas una sola vez
+            por PayPal y lo recaudado cubre servidor, almacenamiento y desarrollo.
+          </p>
+        </div>
+
+        <div className="home-plans-grid">
+          {SUPPORT_PLANS.map((plan) => {
+            const Icon = plan.icon;
+            const url = planPaymentUrl(plan);
+            const isReady = Boolean(url);
+            return (
+              <article
+                key={plan.id}
+                className={`home-plan-card${plan.highlighted ? ' home-plan-card--highlighted' : ''}${!isReady ? ' home-plan-card--pending' : ''}`}
+              >
+                {plan.badge && (
+                  <span className="home-plan-card__badge">{plan.badge}</span>
+                )}
+                <span
+                  className={`home-donate-card__icon home-donate-card__icon--${plan.tone}`}
+                  aria-hidden="true"
+                >
+                  <Icon size={20} strokeWidth={2} />
+                </span>
+                <h3 className="home-plan-card__name">{plan.name}</h3>
+                <p className="home-plan-card__price">
+                  ${plan.amount}
+                  <span className="home-plan-card__currency"> {plan.currency} · pago único</span>
+                </p>
+                <p className="home-donate-card__desc">{plan.tagline}</p>
+                <ul className="home-plan-card__perks">
+                  {plan.perks.map((perk) => (
+                    <li key={perk}>
+                      <Check size={14} className="text-primary-color" aria-hidden="true" />
+                      <span>{perk}</span>
+                    </li>
+                  ))}
+                </ul>
+                {isReady ? (
+                  <a
+                    className="home-hero-btn home-hero-btn--primary home-plan-card__cta"
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span>{plan.cta}</span>
+                    <ExternalLink size={14} />
+                  </a>
+                ) : (
+                  <span className="home-plan-card__cta-pending">
+                    Próximamente — configura VITE_PAYPAL_URL
+                  </span>
+                )}
+              </article>
+            );
+          })}
+        </div>
+
+        <PremiumPurchase />
+      </section>
+
       {/* ── Modal Pop-up: Crear Nueva Sala ── */}
       <CreateRoomModal
         open={showCreateModal}
@@ -686,15 +837,15 @@ export const Home: React.FC<HomeProps> = ({
                 reacciones en tiempo real.
               </p>
               <div className="home-footer__social">
-                {PATREON_URL && (
+                {KOFI_URL && (
                   <a
                     className="home-footer__social-link"
-                    href={PATREON_URL}
+                    href={KOFI_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     <Heart size={14} strokeWidth={2.2} />
-                    Patreon
+                    Ko-fi
                   </a>
                 )}
                 {PAYPAL_URL && (
@@ -730,6 +881,9 @@ export const Home: React.FC<HomeProps> = ({
 
             <div className="home-footer__col">
               <h4 className="home-footer__heading">Comunidad</h4>
+              <a className="home-footer__link" href="#planes">
+                Planes de apoyo
+              </a>
               <a className="home-footer__link" href="#roadmap">
                 Lo que viene
               </a>

@@ -97,6 +97,10 @@ export class MemoryRoomRepository implements RoomRepository {
   async findTimerCandidates(): Promise<IRoom[]> {
     return [...this.rooms.values()];
   }
+
+  async count(): Promise<number> {
+    return this.rooms.size;
+  }
 }
 
 /** Singleton del adaptador en memoria (conserva el estado entre llamadas). */

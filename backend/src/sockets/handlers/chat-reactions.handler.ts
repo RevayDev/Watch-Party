@@ -5,6 +5,9 @@ import { checkSocketRateLimit } from '../socket-limits.js';
 // ~20 reacciones por ventana de 10s. Sin librerías nuevas.
 const MESSAGE_LIMIT = { max: 8, windowMs: 10_000 };
 const REACTION_LIMIT = { max: 20, windowMs: 10_000 };
+const MAX_MESSAGE_CHARS = 500;
+const MAX_EMOJI_CHARS = 20;
+const MAX_USERNAME_CHARS = 50;
 
 /** Handler de chat y reacciones. Nombres de eventos y payloads idénticos al original. */
 export function registerChatReactionsHandlers(io: Server, socket: Socket): void {
@@ -12,14 +15,21 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
   socket.on('send-message', (data: { roomId: string; text: string; userName: string } | undefined) => {
     if (!data) return;
     const { roomId, text, userName } = data;
-    if (!roomId || typeof text !== 'string' || !text.trim()) return;
+    if (typeof roomId !== 'string' || !roomId.trim()) return;
+    if (typeof text !== 'string' || !text.trim()) return;
     if (!checkSocketRateLimit(socket.id, 'send-message', MESSAGE_LIMIT.max, MESSAGE_LIMIT.windowMs)) return;
     const cleanRoomId = roomId.toUpperCase().trim();
+    const cleanText = text.trim().slice(0, MAX_MESSAGE_CHARS);
+    if (!cleanText) return;
+    const cleanUser =
+      typeof userName === 'string' && userName.trim()
+        ? userName.trim().slice(0, MAX_USERNAME_CHARS)
+        : 'Anónimo';
 
     const messagePayload = {
       id: Math.random().toString(36).substring(2, 9),
-      user: userName || 'Anónimo',
-      text: text.trim(),
+      user: cleanUser,
+      text: cleanText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
@@ -30,14 +40,22 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
   socket.on('send-reaction', (data: { roomId: string; emoji: string; userName: string } | undefined) => {
     if (!data) return;
     const { roomId, emoji, userName } = data;
-    if (!roomId || typeof emoji !== 'string' || !emoji) return;
+    if (typeof roomId !== 'string' || !roomId.trim()) return;
+    if (typeof emoji !== 'string' || !emoji.trim()) return;
     if (!checkSocketRateLimit(socket.id, 'send-reaction', REACTION_LIMIT.max, REACTION_LIMIT.windowMs)) return;
     const cleanRoomId = roomId.toUpperCase().trim();
+    // Emojis con ZWJ/variantes pueden ocupar varios code units: se mide por code points.
+    const cleanEmoji = [...emoji.trim()].slice(0, MAX_EMOJI_CHARS).join('');
+    if (!cleanEmoji) return;
+    const cleanUser =
+      typeof userName === 'string' && userName.trim()
+        ? userName.trim().slice(0, MAX_USERNAME_CHARS)
+        : 'Anónimo';
 
     const reactionPayload = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      emoji,
-      user: userName || 'Anónimo',
+      emoji: cleanEmoji,
+      user: cleanUser,
       xOffset: Math.random() * 40 - 20,
     };
 

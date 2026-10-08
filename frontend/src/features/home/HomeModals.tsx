@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { BottomSheet } from '../../shared/components/BottomSheet';
+import { isDemoMode } from '../../shared/demo';
 import { TimelineEvent } from './homeData';
 
 export interface CreateRoomModalProps {
@@ -44,6 +45,10 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
       e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
   };
+
+  // Demo: las salas siempre son temporales (persistente deshabilitado solo
+  // visualmente: el código original queda intacto tras el flag).
+  const demo = isDemoMode();
 
   return (
     <BottomSheet
@@ -124,13 +129,20 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                 color: '#f3f4f6',
               }}
             >
-              {isTemporary ? '⚡ Sala Temporal' : '💾 Sala Persistente'}
+              {demo ? '⚡ Sala Temporal' : isTemporary ? '⚡ Sala Temporal' : '💾 Sala Persistente'}
             </span>
-            <label className="part-switch" style={{ margin: 0 }}>
+            <label
+              className="part-switch"
+              style={{ margin: 0, opacity: demo ? 0.5 : 1 }}
+              title={demo ? 'En la demo todas las salas son temporales' : undefined}
+            >
               <input
                 type="checkbox"
-                checked={isTemporary}
+                checked={demo ? true : isTemporary}
                 onChange={(e) => setIsTemporary(e.target.checked)}
+                disabled={demo}
+                aria-disabled={demo}
+                title={demo ? 'En la demo todas las salas son temporales' : undefined}
               />
               <span className="part-slider" />
             </label>
@@ -143,9 +155,11 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
               lineHeight: 1.4,
             }}
           >
-            {isTemporary
-              ? 'Al cerrar la sala se borra el video y la sala automáticamente (ideal para videos pesados o funciones rápidas).'
-              : 'El video se conserva subido en el servidor para futuras sesiones.'}
+            {demo
+              ? 'En la demo todas las salas son temporales: al cerrar la sala se borra el video y la sala automáticamente.'
+              : isTemporary
+                ? 'Al cerrar la sala se borra el video y la sala automáticamente (ideal para videos pesados o funciones rápidas).'
+                : 'El video se conserva subido en el servidor para futuras sesiones.'}
           </p>
         </div>
 

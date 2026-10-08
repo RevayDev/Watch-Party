@@ -3,6 +3,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { Request, Response, NextFunction } from 'express';
+import { DEMO_UPLOAD_DISABLED_MESSAGE, isDemoMode } from '../config/demo-mode.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,3 +62,17 @@ export const uploadVideoMiddleware = multer({
     fileSize: 4 * 1024 * 1024 * 1024, // 4GB
   },
 });
+
+/**
+ * Guarda demo PREVIA a multer: con `DEMO_MODE` activo rechaza 403 sin que
+ * multer escriba ningún archivo en disco (no hay huérfanos que borrar).
+ * Con la demo desactivada es transparente (`next()`). El controlador repite
+ * la guarda como respaldo (y borra el huérfano si multer ya escribió).
+ */
+export function demoUploadGuard(_req: Request, res: Response, next: NextFunction): void {
+  if (isDemoMode()) {
+    res.status(403).json({ error: DEMO_UPLOAD_DISABLED_MESSAGE });
+    return;
+  }
+  next();
+}

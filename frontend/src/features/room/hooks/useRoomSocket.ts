@@ -219,8 +219,9 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     enableMedia,
   } = useWebRTC(socket, roomId, myName, isHost);
 
-  // Espejos por ref del estado media/host para el efecto socket.
-  // Evita que togglear mic/cámara recree listeners ni provoque recargas de sala.
+  // Espejos por ref del estado media/host para el efecto socket gigante.
+  // Sin esto, togglear mic/cámara cambiaba isMicOn/isCameraOn (deps del
+  // efecto) y re-ejecutaba loadRoom + join-room → recarga/reconexión.
   const enableMediaRef = useRef(enableMedia);
   enableMediaRef.current = enableMedia;
   const isMicOnRef = useRef(isMicOn);
@@ -821,16 +822,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   const handleUploadVideo = async (file: File) => {
     try {
       setUploadProgress(0);
-      socket.emit('upload-progress', { roomId, progress: 0, fileName: file.name });
+      socket.emit('upload-progress', { roomId, progress: 0, fileName: file.name, ...buildSocketAuth(roomId, myName) });
       const res = await ApiService.uploadVideo(roomId, file, (progress) => {
         setUploadProgress(progress);
-        socket.emit('upload-progress', { roomId, progress, fileName: file.name });
+        socket.emit('upload-progress', { roomId, progress, fileName: file.name, ...buildSocketAuth(roomId, myName) });
       });
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
-      socket.emit('video-changed', { roomId, video: res.video });
-      socket.emit('upload-progress', { roomId, progress: null });
+      socket.emit('video-changed', { roomId, video: res.video, ...buildSocketAuth(roomId, myName) });
+      socket.emit('upload-progress', { roomId, progress: null, ...buildSocketAuth(roomId, myName) });
     } catch (err: any) {
-      socket.emit('upload-progress', { roomId, progress: null });
+      socket.emit('upload-progress', { roomId, progress: null, ...buildSocketAuth(roomId, myName) });
       notify('error', err.message || 'Error al subir el video', 'Error al subir');
     } finally {
       setUploadProgress(null);
@@ -842,7 +843,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       setLoading(true);
       const res = await ApiService.setVideoUrl(roomId, url, title);
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
-      socket.emit('video-changed', { roomId, video: res.video });
+      socket.emit('video-changed', { roomId, video: res.video, ...buildSocketAuth(roomId, myName) });
     } catch (err: any) {
       notify('error', err.message || 'Error al cargar el enlace de video', 'Error al cargar video');
     } finally {
@@ -860,6 +861,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       });
     },
     [roomId, socket, myName]
+  );
+
+  // Callback ESTABLE para el heartbeat del player: el inline anterior
+  // recreaba la función en cada render y el efecto del player re-reportaba
+  // (spam de playback-heartbeat en cada mensaje/reacción/toggle).
+  const handlePlaybackHeartbeat = useCallback(
+    (currentTime: number, isPlaying: boolean) => {
+      socket.emit('playback-heartbeat', { roomId, currentTime, isPlaying });
+    },
+    [socket, roomId]
   );
 
   const handleSendMessage = (text: string) => {
@@ -880,13 +891,6 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       onLeave();
     }, 120);
   };
-
-  const handlePlaybackHeartbeat = useCallback(
-    (currentTime: number, isPlaying: boolean) => {
-      socket.emit('playback-heartbeat', { roomId, currentTime, isPlaying });
-    },
-    [roomId, socket]
-  );
 
   return {
     userId,

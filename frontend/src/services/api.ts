@@ -1,5 +1,7 @@
 import { IRoomData, IVideoMetadata } from '../types/room';
 import { buildRestAuthHeaders, getStoredUserId } from '../shared/utils';
+import type { DemoAvailability } from '../shared/demo';
+import type { HealthPayload, StatusPayload } from '../features/status/types';
 
 // In production, VITE_API_URL can be set to the backend URL (e.g., https://my-watchparty-backend.onrender.com)
 // In local development or when proxying, it defaults to empty string or /api
@@ -77,6 +79,105 @@ export class ApiService {
       throw new Error(errorData.error || 'Error al unirse a la sala');
     }
 
+    return response.json();
+  }
+
+  /**
+   * Estado público: liveness ampliado (`GET /api/health`). Sin token, sin PII.
+   */
+  static async getHealth(): Promise<HealthPayload> {
+    const response = await fetch(`${API_BASE_URL}/health`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo consultar la salud del servicio');
+    }
+    return response.json();
+  }
+
+  /**
+   * Estado público: agregados (`GET /api/status`, 10 claves exactas, cero PII).
+   * Sin token. El tiempo real va por SSE (`/api/status/stream`); esto es el
+   * snapshot inicial + fallback de polling.
+   */
+  static async getStatus(): Promise<StatusPayload> {
+    const response = await fetch(`${API_BASE_URL}/status`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo consultar el estado del servicio');
+    }
+    return response.json();
+  }
+
+  /**
+   * Demo gratuita: solo conteos de salas (roomsUsed/roomsTotal/roomsAvailable).
+   * No expone códigos ni listas. Si falla, el llamador oculta el contador.
+   */
+  static async getDemoAvailability(): Promise<DemoAvailability> {    const response = await fetch(`${API_BASE_URL}/demo/availability`);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo consultar la disponibilidad de la demo');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Catálogo público de planes (`GET /api/payments/plans`). Sin secretos.
+   */
+  static async getPlans(): Promise<{ plans: Array<{ id: string; name: string; amount: number; currency: string }> }> {
+    const response = await fetch(`${API_BASE_URL}/payments/plans`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo consultar los planes');
+    }
+    return response.json();
+  }
+
+  /**
+   * Crea una intención de compra (`POST /api/payments/checkout`).
+   * Nunca confirma pagos: la confirmación llega por webhook del proveedor.
+   */
+  static async createCheckout(input: {
+    provider: 'paypal' | 'card';
+    plan: string;
+    roomId?: string;
+    userId?: string;
+  }): Promise<{ paymentId: string; approveUrl?: string; status: string; message?: string }> {
+    const response = await fetch(`${API_BASE_URL}/payments/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo iniciar la compra');
+    }
+    return response.json();
+  }
+
+  /**
+   * Canjea un código de regalo (`POST /api/payments/gift-codes/redeem`).
+   * Requiere un sujeto (nombre o sala) para la idempotencia.
+   */
+  static async redeemGiftCode(input: {
+    code: string;
+    userId?: string;
+    roomId?: string;
+  }): Promise<{ entitlement: unknown; duplicate: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/payments/gift-codes/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: input.code,
+        userId: input.userId,
+        roomId: input.roomId,
+      }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo canjear el código');
+    }
     return response.json();
   }
 

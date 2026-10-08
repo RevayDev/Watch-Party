@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { DEMO_UPLOAD_DISABLED_MESSAGE, isDemoMode } from '../../shared/demo';
 
 export type PickerTab = 'upload' | 'url';
 
@@ -37,6 +38,10 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
   onDrop,
   onTriggerFile,
 }) => {
+  // Demo: la subida de archivos está deshabilitada solo visualmente (el tab
+  // queda disabled con tooltip y siempre se muestra el formulario de enlace).
+  // El código original queda intacto tras el flag.
+  const demo = isDemoMode();
   return (
     <>
       <div className="dropzone-tabs">
@@ -44,6 +49,10 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
           type="button"
           className={`dropzone-tab-btn ${activeTab === 'upload' ? 'dropzone-tab-btn--active' : ''}`}
           onClick={() => setActiveTab('upload')}
+          disabled={demo}
+          aria-disabled={demo}
+          title={demo ? DEMO_UPLOAD_DISABLED_MESSAGE : undefined}
+          data-testid="demo-upload-tab"
         >
           <span>Subir Archivo</span>
         </button>
@@ -52,10 +61,19 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
           className={`dropzone-tab-btn ${activeTab === 'url' ? 'dropzone-tab-btn--active' : ''}`}
           onClick={() => setActiveTab('url')}
         >
-          <span>Enlace Web / HLS</span>
+          <span>{demo ? 'Pegar enlace de Google Drive' : 'Enlace Web / HLS'}</span>
         </button>
       </div>
-      {activeTab === 'upload' ? (
+      {demo && (
+        <p
+          className="dropzone-supported-hints"
+          data-testid="demo-upload-note"
+          title={DEMO_UPLOAD_DISABLED_MESSAGE}
+        >
+          <span>{DEMO_UPLOAD_DISABLED_MESSAGE}</span>
+        </p>
+      )}
+      {activeTab === 'upload' && !demo ? (
         <div
           className={`dropzone-box ${isDragOver ? 'dropzone-box--active' : ''}`}
           onClick={onTriggerFile}

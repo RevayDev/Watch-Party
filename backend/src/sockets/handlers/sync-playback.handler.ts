@@ -2,10 +2,13 @@ import { Server, Socket } from 'socket.io';
 import { IVideoMetadata } from '../../types/room.types.js';
 import { RecordHeartbeatUseCase, SyncPlaybackUseCase } from '../../application/sync-playback.usecase.js';
 import { roomPlayback } from '../../domain/playback-policy.js';
+import { requireHost } from '../../domain/auth-policy.js';
 import { RoomService } from '../../services/room.service.js';
 import { activeUsers } from '../socket-state.js';
-import { PrivilegedPayload } from '../socket-auth.js';
+import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 import { checkSocketThrottle, isDuplicateSocketEvent } from '../socket-limits.js';
+
+const VIDEO_HOST_ONLY = 'Solo el anfitrión puede cambiar el video de la sala.';
 
 // Throttle de heartbeats por socket: mínimo 1 cada 2s (el excedente se
 // ignora). El cliente emite cada ~5s, así que es transparente en uso normal.
@@ -41,6 +44,11 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
 
       const room = await RoomService.getRoomById(cleanRoomId);
       if (!room) return;
+
+      // Solo miembros de la sala pueden sincronizar (evita que un socket
+      // ajeno desincronice la sala; cualquier participante sí puede).
+      const member = activeUsers.get(socket.id);
+      if (!member || member.roomId !== cleanRoomId || member.pending) return;
 
       // ── Update in-memory playback state (vía caso de uso) ──────────────────
       const payload = SyncPlaybackUseCase.execute({ roomId: cleanRoomId, action, currentTime });
@@ -80,8 +88,8 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // 6. Video Changed (when host uploads or swaps movie)
-  socket.on('video-changed', (data: { roomId: string; video: IVideoMetadata } | undefined) => {
+  // 6. Video Changed (solo host: la UI solo lo emite desde el panel del anfitrión)
+  socket.on('video-changed', async (data: { roomId: string; video: IVideoMetadata } & PrivilegedPayload | undefined) => {
     if (!data || typeof data !== 'object') return;
     const { roomId, video } = data;
     if (typeof roomId !== 'string' || !roomId.trim()) return;
@@ -91,6 +99,12 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
     if (typeof video.originalName !== 'string' || !video.originalName.trim()) return;
     if (typeof video.fileName !== 'string' || !video.fileName.trim()) return;
     const cleanRoomId = roomId.toUpperCase().trim();
+    const room = await RoomService.getRoomById(cleanRoomId);
+    if (!room) return;
+    if (!requireHost(room, resolveSocketClaim(socket, data))) {
+      denySocket(socket, 'video-changed', VIDEO_HOST_ONLY);
+      return;
+    }
     if (
       isDuplicateSocketEvent(
         socket.id,
@@ -113,17 +127,23 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
     io.to(cleanRoomId).emit('video-changed', { video });
   });
 
-  // 6.1 Upload Progress broadcast (so all members see live upload status)
+  // 6.1 Upload Progress broadcast (solo host: solo el anfitrión sube videos)
   socket.on(
     'upload-progress',
-    (data: { roomId: string; progress: number | null; fileName?: string } | undefined) => {
+    async (data: { roomId: string; progress: number | null; fileName?: string } & PrivilegedPayload | undefined) => {
       if (!data || typeof data !== 'object') return;
       const { roomId, progress, fileName } = data;
       if (typeof roomId !== 'string' || !roomId.trim()) return;
       // El cliente emite porcentaje 0-100 y `null` para limpiar la barra.
       if (progress !== null && (!Number.isFinite(progress) || progress < 0 || progress > 100)) return;
-      if (fileName !== undefined && typeof fileName !== 'string') return;
+      if (fileName !== undefined && (typeof fileName !== 'string' || fileName.length > 255)) return;
       const cleanRoomId = roomId.toUpperCase().trim();
+      const room = await RoomService.getRoomById(cleanRoomId);
+      if (!room) return;
+      if (!requireHost(room, resolveSocketClaim(socket, data))) {
+        denySocket(socket, 'upload-progress', VIDEO_HOST_ONLY);
+        return;
+      }
       if (
         isDuplicateSocketEvent(
           socket.id,

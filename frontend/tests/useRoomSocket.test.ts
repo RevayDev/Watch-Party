@@ -335,22 +335,28 @@ describe('useRoomSocket (eventos socket críticos)', () => {
   });
 
   it('toggle mic/cámara NO re-emite join-room ni recarga la sala (sin re-join)', async () => {
-    const getRoomSpy = vi.spyOn(ApiService, 'getRoom');
-    const { mockSocket, rerender } = setup(false);
-    await waitForSubscribed(mockSocket);
-    expect(getRoomSpy).toHaveBeenCalledTimes(1);
-    const joinEmitsBefore = mockSocket.emit.mock.calls.filter(([ev]) => ev === 'join-room').length;
+    const { mockSocket, rerender } = setup(true);
+    await waitFor(() => {
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        'join-room',
+        expect.objectContaining({ roomId: 'ABC123', userName: 'Beto' })
+      );
+    });
+    expect(mockSocket.emit).toHaveBeenCalledTimes(1);
+    expect(ApiService.getRoom).toHaveBeenCalledTimes(1);
 
-    // Simula toggle de mic y cámara en useWebRTC y rerender del hook
+    // Simula lo que hace useWebRTC al togglear: cambian isMicOn/isCameraOn
+    // (antes eran deps del efecto gigante → re-join + room-state → corte).
     webRTCStubs.isMicOn = true;
     webRTCStubs.isCameraOn = true;
     rerender();
+    // Deja que los efectos post-rerender se asienten
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
 
-    // No debe haber nueva llamada a ApiService.getRoom ni nuevo emit de join-room
-    expect(getRoomSpy).toHaveBeenCalledTimes(1);
-    const joinEmitsAfter = mockSocket.emit.mock.calls.filter(([ev]) => ev === 'join-room').length;
-    expect(joinEmitsAfter).toBe(joinEmitsBefore);
-
+    expect(mockSocket.emit).toHaveBeenCalledTimes(1);
+    expect(ApiService.getRoom).toHaveBeenCalledTimes(1);
     webRTCStubs.isMicOn = false;
     webRTCStubs.isCameraOn = false;
   });

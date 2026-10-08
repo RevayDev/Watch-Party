@@ -1,8 +1,16 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../../types/room';
+
+// hls.js (~500KB) solo se carga cuando el video es HLS (dynamic import).
+let hlsModulePromise: Promise<typeof import('hls.js')> | null = null;
+function loadHls(): Promise<typeof import('hls.js')> {
+  if (!hlsModulePromise) hlsModulePromise = import('hls.js');
+  return hlsModulePromise;
+}
 import { BottomSheet } from '../../shared/components/BottomSheet';
+import { isDemoMode } from '../../shared/demo';
 import { VideoUploadPicker } from './VideoUploadPicker';
 
 interface VideoPlayerProps {
@@ -42,7 +50,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const hlsInstanceRef = useRef<Hls | null>(null);
   const lastLoadKeyRef = useRef<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
+  // Demo: la subida de archivos está deshabilitada → el picker arranca en el
+  // tab de enlace. Con VITE_DEMO_MODE=false arranca como hoy (subida).
+  const demo = isDemoMode();
+  const [activeTab, setActiveTab] = useState<'upload' | 'url'>(demo ? 'url' : 'upload');
   const [urlInput, setUrlInput] = useState('');
   const [titleInput, setTitleInput] = useState('');
   const [isSubmittingUrl, setIsSubmittingUrl] = useState(false);
@@ -153,9 +164,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [showChangePanel, resetHideTimer]);
 
+  // Identidad estable de la fuente: `room-state` recrea el objeto `video` en
+  // cada mensaje. Depender del objeto entero desmontaba/recargaba HLS
+  // (el cleanup destruye la instancia) aunque la fuente fuese idéntica.
+  const videoSourceType = video?.sourceType;
+  const videoDirectUrl = video?.directUrl;
+  const videoFileName = video?.fileName;
+
   // HLS and Media Stream Setup with Recovery mechanism
   useEffect(() => {
-    if (!video || !videoRef.current) {
+    if ((!videoFileName && !videoDirectUrl) || !videoRef.current) {
       setPlaybackError(null);
       lastLoadKeyRef.current = null;
       if (hlsInstanceRef.current) {
@@ -166,14 +184,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const backendBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
-    const isExternal = (video.sourceType === 'url' || video.sourceType === 'hls') && !!video.directUrl;
+    const isExternal = (videoSourceType === 'url' || videoSourceType === 'hls') && !!videoDirectUrl;
     // External URLs go through the backend CORS proxy so hls.js/XHR are not blocked
     const videoSrc = isExternal
-      ? `${backendBase}/api/proxy?url=${encodeURIComponent(video.directUrl!)}`
+      ? `${backendBase}/api/proxy?url=${encodeURIComponent(videoDirectUrl!)}`
       : `${backendBase}/api/rooms/${roomId}/video/stream`;
 
     const vid = videoRef.current;
-    const isHls = video.sourceType === 'hls' || !!video.directUrl?.includes('.m3u8') || videoSrc.includes('.m3u8');
+    const isHls = videoSourceType === 'hls' || !!videoDirectUrl?.includes('.m3u8') || videoSrc.includes('.m3u8');
 
     // Same source already attached (room-state events re-create the video object on every
     // socket message): re-setting src aborts the in-flight request and fires a bogus error.
@@ -191,58 +209,78 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     lastLoadKeyRef.current = loadKey;
 
     if (isHls) {
-      if (Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 90,
-        });
-        hlsInstanceRef.current = hls;
-        hls.loadSource(videoSrc);
-        hls.attachMedia(vid);
-
-        let fatalNetworkRetries = 0;
-        let fatalMediaRetries = 0;
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (!data.fatal) return;
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              if (fatalNetworkRetries < 3) {
-                fatalNetworkRetries += 1;
-                console.warn(`HLS network error, retrying (${fatalNetworkRetries}/3)...`, data.details);
-                hls.startLoad();
-                break;
-              }
-              setPlaybackError(
-                `No se pudo cargar la transmisión (${data.details}). El enlace puede haber expirado o no permitir reproducirlo.`
-              );
-              hls.destroy();
-              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              if (fatalMediaRetries < 3) {
-                fatalMediaRetries += 1;
-                console.warn(`HLS media error, recovering (${fatalMediaRetries}/3)...`, data.details);
-                hls.recoverMediaError();
-                break;
-              }
-              setPlaybackError('No se pudo decodificar el video del stream. Prueba con otro enlace.');
-              hls.destroy();
-              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
-              break;
-            default:
-              console.error('Fatal HLS error cannot be recovered:', data);
-              setPlaybackError('No se pudo decodificar el stream HLS o el enlace expiró.');
-              hls.destroy();
-              if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
-              break;
-          }
-        });
-      } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
-        // Native Safari / iOS HLS support
+      if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native Safari / iOS HLS support (sin descargar hls.js)
         vid.src = videoSrc;
       } else {
-        setPlaybackError('Tu navegador no soporta reproducción HLS (.m3u8).');
+        let cancelled = false;
+        loadHls()
+          .then((mod) => {
+            if (cancelled) return;
+            // Revalidar: la fuente pudo cambiar mientras se descargaba hls.js.
+            if (lastLoadKeyRef.current !== loadKey) return;
+            const HlsClass = mod.default;
+            if (!HlsClass.isSupported()) {
+              setPlaybackError('Tu navegador no soporta reproducción HLS (.m3u8).');
+              return;
+            }
+            const hls = new HlsClass({
+              enableWorker: true,
+              lowLatencyMode: true,
+              backBufferLength: 90,
+            });
+            hlsInstanceRef.current = hls;
+            hls.loadSource(videoSrc);
+            hls.attachMedia(vid);
+
+            let fatalNetworkRetries = 0;
+            let fatalMediaRetries = 0;
+            hls.on(HlsClass.Events.ERROR, (_event, data) => {
+              if (!data.fatal) return;
+              switch (data.type) {
+                case HlsClass.ErrorTypes.NETWORK_ERROR:
+                  if (fatalNetworkRetries < 3) {
+                    fatalNetworkRetries += 1;
+                    console.warn(`HLS network error, retrying (${fatalNetworkRetries}/3)...`, data.details);
+                    hls.startLoad();
+                    break;
+                  }
+                  setPlaybackError(
+                    `No se pudo cargar la transmisión (${data.details}). El enlace puede haber expirado o no permitir reproducirlo.`
+                  );
+                  hls.destroy();
+                  if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+                  break;
+                case HlsClass.ErrorTypes.MEDIA_ERROR:
+                  if (fatalMediaRetries < 3) {
+                    fatalMediaRetries += 1;
+                    console.warn(`HLS media error, recovering (${fatalMediaRetries}/3)...`, data.details);
+                    hls.recoverMediaError();
+                    break;
+                  }
+                  setPlaybackError('No se pudo decodificar el video del stream. Prueba con otro enlace.');
+                  hls.destroy();
+                  if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+                  break;
+                default:
+                  console.error('Fatal HLS error cannot be recovered:', data);
+                  setPlaybackError('No se pudo decodificar el stream HLS o el enlace expiró.');
+                  hls.destroy();
+                  if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
+                  break;
+              }
+            });
+          })
+          .catch(() => {
+            if (!cancelled) setPlaybackError('No se pudo cargar el reproductor HLS. Revisa tu conexión.');
+          });
+        return () => {
+          cancelled = true;
+          if (hlsInstanceRef.current) {
+            hlsInstanceRef.current.destroy();
+            hlsInstanceRef.current = null;
+          }
+        };
       }
     } else {
       // Standard MP4 / WebM direct streaming
@@ -255,7 +293,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hlsInstanceRef.current = null;
       }
     };
-  }, [video, roomId, retryToken]);
+  }, [videoSourceType, videoDirectUrl, videoFileName, roomId, retryToken]);
 
   // Apply incoming remote sync actions with latency compensation and smooth tolerance
   useEffect(() => {
@@ -273,6 +311,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         : remoteAction.currentTime;
 
     const diff = Math.abs(vid.currentTime - targetTime);
+
+    if (diff > 2 || remoteAction.action === 'seek') {
+      vid.currentTime = targetTime;
+    }
 
     if (remoteAction.action === 'play') {
       if (diff > 2.0) {
@@ -418,7 +460,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const openChangePanel = (tab?: 'upload' | 'url') => {
     // Default to the tab matching what is currently loaded (link -> link tab, file -> upload tab)
-    const defaultTab: 'upload' | 'url' = video && video.sourceType !== 'file' ? 'url' : 'upload';
+    // Demo: siempre el tab de enlace (la subida está deshabilitada).
+    const defaultTab: 'upload' | 'url' = demo ? 'url' : video && video.sourceType !== 'file' ? 'url' : 'upload';
     setActiveTab(tab ?? defaultTab);
     setShowChangePanel(true);
   };
@@ -505,7 +548,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 onClose={closeEmptyPicker}
                 variant="inline"
                 desktopClassName="empty-picker-sheet"
-                label="Subir video o pegar enlace"
+                label={demo ? 'Pegar enlace de Google Drive' : 'Subir video o pegar enlace'}
               >
                 <div className="dropzone-container">
                   <VideoUploadPicker {...pickerProps} />
@@ -517,7 +560,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   className="btn btn--primary empty-picker-reopen"
                   onClick={() => setShowEmptyPicker(true)}
                 >
-                  <span>Subir video o pegar enlace</span>
+                  <span>{demo ? 'Pegar enlace de Google Drive' : 'Subir video o pegar enlace'}</span>
                 </button>
               )}
             </>
