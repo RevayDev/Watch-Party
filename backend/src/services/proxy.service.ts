@@ -196,7 +196,7 @@ export const proxyFetch = (
     }
   });
 
-  proxyReq.on('error', (err) => {
+  proxyReq.on('error', (err: Error) => {
     console.error('❌ Proxy error:', err.message);
     if (!res.headersSent) {
       handleProxyError(res, 502, 'No se pudo obtener el video externo', err.message);
