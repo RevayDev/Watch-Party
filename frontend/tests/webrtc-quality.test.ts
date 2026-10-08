@@ -3,6 +3,9 @@ import {
   assessQuality,
   collectPeerSample,
   nextRestartDelayMs,
+  stepLevel,
+  QUALITY_LADDER,
+  MAX_QUALITY_LEVEL,
   POOR_RTT_MS,
   MAX_ICE_RESTARTS,
   type QualitySample,
@@ -52,6 +55,26 @@ describe('nextRestartDelayMs: backoff con tope', () => {
 
   it('el tope de reintentos es 3', () => {
     expect(MAX_ICE_RESTARTS).toBe(3);
+  });
+});
+
+describe('stepLevel + QUALITY_LADDER: escalera gradual', () => {
+  it('sube de a un escalón con mala señal y baja igual al recuperarse', () => {
+    expect(stepLevel(0, 'poor')).toBe(1);
+    expect(stepLevel(1, 'poor')).toBe(2);
+    expect(stepLevel(2, 'poor')).toBe(3);
+    expect(stepLevel(3, 'poor')).toBe(3);
+    expect(stepLevel(3, 'good')).toBe(2);
+    expect(stepLevel(1, 'good')).toBe(0);
+    expect(stepLevel(0, 'good')).toBe(0);
+  });
+
+  it('la escalera degrada bitrate, resolución y al final solo audio', () => {
+    expect(QUALITY_LADDER[0].maxBitrateBps).toBeGreaterThan(QUALITY_LADDER[1].maxBitrateBps!);
+    expect(QUALITY_LADDER[1].maxBitrateBps).toBeGreaterThan(QUALITY_LADDER[2].maxBitrateBps!);
+    expect(QUALITY_LADDER[2].captureWidth).toBeLessThan(QUALITY_LADDER[0].captureWidth!);
+    expect(QUALITY_LADDER[MAX_QUALITY_LEVEL].videoEnabled).toBe(false);
+    expect(QUALITY_LADDER[0].videoEnabled).toBe(true);
   });
 });
 

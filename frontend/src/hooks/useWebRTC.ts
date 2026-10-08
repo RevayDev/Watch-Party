@@ -4,8 +4,12 @@ import {
   assessQuality,
   collectPeerSample,
   nextRestartDelayMs,
+  stepLevel,
+  QUALITY_LADDER,
+  MAX_QUALITY_LEVEL,
   MAX_ICE_RESTARTS,
   type QualitySample,
+  type QualityLevel,
 } from '../shared/webrtc-quality';
 
 export interface RemotePeer {
@@ -40,8 +44,10 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   const [isMicOn, setIsMicOn] = useState<boolean>(false);
   const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  // Señal débil: video propio pausado automáticamente, el audio sigue.
-  const [lowBandwidth, setLowBandwidth] = useState<boolean>(false);
+  // Escalera de calidad ante señal débil (0 normal → 3 solo-audio).
+  // El audio sigue siempre; el video se degrada por pasos, nunca se corta.
+  const [qualityLevel, setQualityLevel] = useState<QualityLevel>(0);
+  const lowBandwidth = qualityLevel >= MAX_QUALITY_LEVEL;
 
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());
@@ -525,14 +531,13 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   }, [enableMedia]);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Monitor de calidad: con mala señal sostenida se pausa el video propio
-  // (el audio sigue). Al recuperarse, se reanuda solo.
+  // Monitor de calidad: sube/baja UN escalón por evaluación (cada 6 s).
   // ──────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const windowSamples: QualitySample[] = [];
-    let mode: 'good' | 'poor' = 'good';
+    let current: 'good' | 'poor' = 'good';
 
     const worstOf = (samples: QualitySample[]): QualitySample => ({
       rttMs: samples.reduce<number | null>(
@@ -564,12 +569,15 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
           if (round.length > 0) {
             windowSamples.push(worstOf(round));
             if (windowSamples.length > 6) windowSamples.shift();
-            const verdict = assessQuality(windowSamples, mode);
-            if (verdict !== mode) {
-              mode = verdict;
-              setLowBandwidth(verdict === 'poor');
-              console.log(`[WebRTC] Calidad de red: ${verdict === 'poor' ? 'pobre (modo solo-audio)' : 'recuperada'}`);
-            }
+            const verdict = assessQuality(windowSamples, current);
+            current = verdict;
+            setQualityLevel((prev) => {
+              const next = stepLevel(prev, verdict);
+              if (next !== prev) {
+                console.log(`[WebRTC] Calidad ${verdict}: nivel ${prev} → ${next}`);
+              }
+              return next;
+            });
           }
         }
       } catch {}
@@ -584,14 +592,37 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     };
   }, []);
 
-  // Aplica el modo ahorro al track local (sin renegociar: enabled=false
-  // deja de enviar frames pero mantiene la negociación).
+  // Aplica el escalón: bitrate por sender (sin renegociar), captura
+  // reducida por constraints y, al final, video pausado (audio intacto).
   useEffect(() => {
+    const cfg = QUALITY_LADDER[qualityLevel];
+    for (const pc of peerConnections.current.values()) {
+      try {
+        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+        if (sender && cfg.maxBitrateBps !== null) {
+          const params = sender.getParameters();
+          sender.setParameters({
+            ...params,
+            encodings: [{ ...(params.encodings?.[0] ?? {}), maxBitrate: cfg.maxBitrateBps }],
+            degradationPreference: qualityLevel >= 2 ? 'maintain-framerate' : 'balanced',
+          }).catch(() => {});
+        }
+      } catch {}
+    }
     const track = localVideoTrackRef.current;
     if (track && isCameraOnRef.current && track.readyState === 'live') {
-      track.enabled = !lowBandwidth;
+      track.enabled = cfg.videoEnabled;
+      if (cfg.captureWidth !== null) {
+        track
+          .applyConstraints({
+            width: { ideal: cfg.captureWidth },
+            height: { ideal: cfg.captureHeight ?? 480 },
+            frameRate: { ideal: cfg.captureFrameRate ?? 30 },
+          })
+          .catch(() => {});
+      }
     }
-  }, [lowBandwidth, isCameraOn]);
+  }, [qualityLevel, isCameraOn]);
 
   // ──────────────────────────────────────────────────────────────────────────
   // Socket.IO signaling event listeners

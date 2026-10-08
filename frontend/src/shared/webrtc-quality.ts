@@ -52,6 +52,39 @@ export function nextRestartDelayMs(attempt: number): number {
   return Math.min(2000 * 2 ** capped, 15000);
 }
 
+/**
+ * Escalera de calidad (WhatsApp-style): ante mala señal se baja de a un
+ * escalón por evaluación (bitrate → resolución → solo audio) y se sube
+ * igual de gradual al recuperarse. Nunca se corta de golpe.
+ *
+ * 0 = normal · 1 = bitrate cap 300kbps · 2 = 320x240@15fps + 120kbps ·
+ * 3 = solo audio (video pausado, la llamada sigue).
+ */
+export type QualityLevel = 0 | 1 | 2 | 3;
+
+export const MAX_QUALITY_LEVEL: QualityLevel = 3;
+
+export interface LevelConfig {
+  maxBitrateBps: number | null;
+  captureWidth: number | null;
+  captureHeight: number | null;
+  captureFrameRate: number | null;
+  videoEnabled: boolean;
+}
+
+export const QUALITY_LADDER: Record<QualityLevel, LevelConfig> = {
+  0: { maxBitrateBps: 800_000, captureWidth: 640, captureHeight: 480, captureFrameRate: 30, videoEnabled: true },
+  1: { maxBitrateBps: 300_000, captureWidth: 640, captureHeight: 480, captureFrameRate: 30, videoEnabled: true },
+  2: { maxBitrateBps: 120_000, captureWidth: 320, captureHeight: 240, captureFrameRate: 15, videoEnabled: true },
+  3: { maxBitrateBps: null, captureWidth: null, captureHeight: null, captureFrameRate: null, videoEnabled: false },
+};
+
+/** Un escalón por vez según el veredicto (la histéresis ya la da assessQuality). */
+export function stepLevel(current: QualityLevel, verdict: 'good' | 'poor'): QualityLevel {
+  if (verdict === 'poor') return Math.min(MAX_QUALITY_LEVEL, current + 1) as QualityLevel;
+  return Math.max(0, current - 1) as QualityLevel;
+}
+
 interface FakeStatsReport {
   type: string;
   kind?: string;

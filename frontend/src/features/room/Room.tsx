@@ -113,6 +113,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             uploadProgress={r.uploadProgress}
             onSyncAction={r.handleSyncAction}
             onPlaybackHeartbeat={r.handlePlaybackHeartbeat}
+            heartbeatIntervalMs={r.lowBandwidth ? 15000 : 5000}
             remoteAction={r.remoteAction}
             reactions={r.reactions}
             isMicOn={r.isMicOn}
