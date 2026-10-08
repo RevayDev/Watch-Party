@@ -184,6 +184,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       />
 
       {r.mediaError && <div className="meet-error-banner">⚠️ {r.mediaError}</div>}
+      {r.lowBandwidth && (
+        <div className="meet-error-banner">📶 Señal débil: video pausado, seguís con audio</div>
+      )}
 
       <HostExitModal
         isOpen={r.showHostExitModal}

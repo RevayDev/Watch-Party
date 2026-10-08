@@ -20,6 +20,14 @@ export function getSocket(): Socket {
     socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       withCredentials: false,
+      // Reconexión resiliente ante señal intermitente: reintentos con
+      // backoff y timeout generoso (la sala tolera 20 s de gracia).
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      randomizationFactor: 0.5,
+      timeout: 20000,
     });
   }
   return socket;
