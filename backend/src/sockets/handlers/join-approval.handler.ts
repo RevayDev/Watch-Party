@@ -8,6 +8,7 @@ import {
 import { ApproveJoinUseCase, RejectJoinUseCase } from '../../application/approve-join.usecase.js';
 import { ResolveSyncTimeUseCase } from '../../application/sync-playback.usecase.js';
 import { dropPosition, roomPlayback, roomPositions } from '../../domain/playback-policy.js';
+import { clearVideoReady, pruneVideoReadySocket } from './video-ready.handler.js';
 import { findBannedEntry, isNameTaken } from '../../domain/room.entity.js';
 import { requireHost, requireModerator } from '../../domain/auth-policy.js';
 import { SocketUser, activeUsers, activeMediaStates } from '../socket-state.js';
@@ -242,6 +243,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     io.in(cleanRoomId).socketsLeave(cleanRoomId);
     roomPlayback.delete(cleanRoomId);
     roomPositions.delete(cleanRoomId);
+    clearVideoReady(cleanRoomId);
     await RoomService.deleteRoom(cleanRoomId, true);
   });
 
@@ -259,6 +261,8 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     socket.leave(cleanRoomId);
     activeUsers.delete(socket.id);
     dropPosition(cleanRoomId, socket.id);
+    // Quien sale deja de contar para el consenso y para el auto-play.
+    pruneVideoReadySocket(io, cleanRoomId, socket.id);
 
     // Pending (waiting-list) users just cancel their request
     if (entry?.pending) {
@@ -439,6 +443,9 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     if (user) {
       activeUsers.delete(socket.id);
       dropPosition(user.roomId, socket.id);
+      // La desconexión también saca al socket del conteo de auto-play (la
+      // gracia de 20 s solo difiere participante + host, nunca el consenso).
+      pruneVideoReadySocket(io, user.roomId, socket.id);
 
       // Pending (waiting-list) users: never joined the participant list.
       // Drop their join request too, so it doesn't linger as an orphan.
@@ -497,6 +504,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
           if (!roomSockets || roomSockets.size === 0) {
             roomPlayback.delete(roomId);
             roomPositions.delete(roomId);
+            clearVideoReady(roomId);
           }
         });
         return;
@@ -537,6 +545,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       if (!roomSockets || roomSockets.size === 0) {
         roomPlayback.delete(user.roomId);
         roomPositions.delete(user.roomId);
+        clearVideoReady(user.roomId);
       }
     }
   });

@@ -116,11 +116,28 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             uploadProgress={r.uploadProgress}
             onSyncAction={r.handleSyncAction}
             onPlaybackHeartbeat={r.handlePlaybackHeartbeat}
-            heartbeatIntervalMs={r.lowBandwidth ? 15000 : 5000}
+            heartbeatIntervalMs={r.lowBandwidth || r.dataSaver ? 15000 : 2500}
+onVideoReady={r.handleVideoReady}
             remoteAction={r.remoteAction}
             reactions={r.reactions}
             isMicOn={r.isMicOn}
+            duckingEnabled={r.duckingEnabled}
+            duckingLevelPct={r.duckingLevelPct}
+            reactionsEnabled={r.reactionsEnabled}
+            visualEffects={r.visualEffects}
+            fullscreenToastsEnabled={r.fullscreenToasts}
+            interestellarActive={r.interestellarActive}
           />
+          {/* Pill "Reconectando…" (Rol A): solo overlay sobre el player.
+              Visible al reconectar el socket o con calidad crítica (nivel 3:
+              la media se está restableciendo). No destruye sala/chat/video:
+              la película sigue reproduciéndose mientras se reintenta. */}
+          {(r.isReconnecting || r.qualityLevel >= 3) && (
+            <div className="reconnect-pill" role="status" aria-live="polite">
+              <span className="reconnect-pill__dot" aria-hidden="true" />
+              <span>Reconectando…</span>
+            </div>
+          )}
         </section>
 
         {/* Right Vertical Camera Strip (Collapsible Accordion Style) */}
@@ -135,6 +152,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
               isMicOn={r.isMicOn}
               isCameraOn={r.isCameraOn}
               peerMediaStates={r.peerMediaStates}
+              peerSignalStates={r.peerSignalStates}
+              dataSaverMode={r.dataSaver}
             />
           </aside>
         )}
@@ -146,6 +165,8 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           setActiveSideTab={r.setActiveSideTab}
           messages={r.messages}
           handleSendMessage={r.handleSendMessage}
+          typingUsers={r.typingUsers}
+          onTyping={r.emitTyping}
           myName={r.myName}
           roomData={r.roomData}
           userId={r.userId}
@@ -224,6 +245,14 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           const next = !(r.roomData!.settings?.requireApproval === true);
           r.socket.emit('update-room-settings', { roomId, settings: { ...r.roomData!.settings, requireApproval: next }, ...buildSocketAuth(roomId, r.myName) });
         }}
+        canEdit={r.isHost}
+        dataSaver={r.dataSaver}
+        fullscreenToasts={r.fullscreenToasts}
+        reactionsEnabled={r.reactionsEnabled}
+        visualEffects={r.visualEffects}
+        duckingEnabled={r.duckingEnabled}
+        duckingLevelPct={r.duckingLevelPct}
+        onUpdatePerf={r.handleUpdatePerfSettings}
       />
     </div>
   );

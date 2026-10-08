@@ -1,15 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, X } from 'lucide-react';
 import { ChatMessage } from '../../types/room';
+import { getAvatarColor, getInitials } from '../../shared/utils';
 
 interface ChatProps {
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
   currentUserName?: string;
   onClose?: () => void;
+  /** Usuarios escribiendo ahora (ya filtrados y sin expirar, ordenados). */
+  typingUsers?: string[];
+  /** Se llama al teclear con texto no vacío (el hook lo throttlea a 1/2 s). */
+  onTyping?: () => void;
 }
 
-export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, currentUserName, onClose }) => {
+export const Chat: React.FC<ChatProps> = ({
+  messages,
+  onSendMessage,
+  currentUserName,
+  onClose,
+  typingUsers = [],
+  onTyping,
+}) => {
   const [input, setInput] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,12 +74,28 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, currentUser
     }, 150);
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.value;
+    setInput(next);
+    // Solo con texto no vacío: el hook throttlea la emisión (máx 1/2 s).
+    if (next.trim() && onTyping) onTyping();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
     onSendMessage(input.trim());
     setInput('');
   };
+
+  const typingText =
+    typingUsers.length === 1
+      ? `${typingUsers[0]} está escribiendo`
+      : typingUsers.length === 2
+        ? `${typingUsers[0]} y ${typingUsers[1]} están escribiendo`
+        : typingUsers.length > 2
+          ? `${typingUsers[0]}, ${typingUsers[1]} y ${typingUsers.length - 2} más están escribiendo`
+          : '';
 
   return (
     <div className="drawer-chat" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -141,6 +169,30 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, currentUser
         )}
       </div>
 
+      {/* Indicador "está escribiendo" al pie del chat (sobre el input) */}
+      {typingUsers.length > 0 && (
+        <div className="typing-indicator" role="status" aria-live="polite" aria-label={typingText}>
+          <span className="typing-indicator__avatars" aria-hidden="true">
+            {typingUsers.slice(0, 5).map((name, i) => (
+              <span
+                key={name}
+                className="typing-indicator__avatar"
+                style={{ background: getAvatarColor(name), zIndex: typingUsers.length - i }}
+                title={name}
+              >
+                {getInitials(name)}
+              </span>
+            ))}
+          </span>
+          <span className="typing-indicator__text">{typingText}</span>
+          <span className="typing-indicator__dots" aria-hidden="true">
+            <span className="typing-indicator__dot" />
+            <span className="typing-indicator__dot" />
+            <span className="typing-indicator__dot" />
+          </span>
+        </div>
+      )}
+
       {/* Input bar always visible */}
       <form onSubmit={handleSubmit} className="drawer-chat__input-bar">
         <input
@@ -149,7 +201,7 @@ export const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, currentUser
           className="drawer-chat__input"
           placeholder="Escribe un mensaje…"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleInputChange}
           onFocus={handleInputFocus}
           autoComplete="off"
         />

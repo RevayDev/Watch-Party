@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff } from 'lucide-react';
 import { Reactions } from '../../../components/Reactions';
 
@@ -56,6 +56,17 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   uiPinned = true,
   toggleBarsVisibility,
 }) => {
+  // Picker persistente: solo se cierra con el botón Smile (toggle), Esc o
+  // swipe-down (emojiSheetRef). Reaccionar NO lo cierra.
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowEmojiPicker(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showEmojiPicker, setShowEmojiPicker]);
+
   return (
     <footer className={`meet-bottom-bar ${!isBarVisible ? 'meet-bottom-bar--hidden' : ''}`}>
       {/* Mic toggle — green when ON, red when OFF */}
@@ -86,12 +97,12 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
           <Smile size={18} />
         </button>
 
-        {emojiPresence.shown && (
+{emojiPresence.shown && (
           <div
             className={`meet-emoji-popup ${emojiPresence.closing ? 'meet-emoji-popup--closing' : ''}`}
             ref={emojiSheetRef}
           >
-            <Reactions onReact={(emoji) => { handleReaction(emoji); setShowEmojiPicker(false); }} />
+            <Reactions onReact={(emoji) => handleReaction(emoji)} />
           </div>
         )}
       </div>

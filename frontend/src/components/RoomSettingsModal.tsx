@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { notify } from "../services/notifications";
 import { BottomSheet } from "../shared/components/BottomSheet";
 import { isDemoMode } from "../shared/demo";
+import type { IRoomSettings } from "../types/room";
+import { DUCK_DEFAULT_PCT, DUCK_MAX_PCT, DUCK_MIN_PCT, clampDuckPct } from "../shared/perf";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -16,6 +18,17 @@ interface RoomSettingsModalProps {
   onSaveDetails: (name: string, description: string) => void;
   onSetTimer: (minutes: number | null) => void;
   onToggleRequireApproval?: () => void;
+  /** Rol B: solo el anfitrión edita (los demás ven los valores deshabilitados). */
+  canEdit?: boolean;
+  /** Rol B: valores de rendimiento persistidos en ajustes de sala. */
+  dataSaver?: boolean;
+  fullscreenToasts?: boolean;
+  reactionsEnabled?: boolean;
+  visualEffects?: boolean;
+  duckingEnabled?: boolean;
+  duckingLevelPct?: number;
+  /** Rol B: parche parcial que se emite por socket (el servidor fusiona). */
+  onUpdatePerf?: (patch: Partial<IRoomSettings>) => void;
 }
 
 const TIMER_OPTIONS = [15, 30, 45, 60, 120, 180];
@@ -33,6 +46,14 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   onSaveDetails,
   onSetTimer,
   onToggleRequireApproval,
+  canEdit = true,
+  dataSaver = false,
+  fullscreenToasts = true,
+  reactionsEnabled = true,
+  visualEffects = true,
+  duckingEnabled = true,
+  duckingLevelPct = DUCK_DEFAULT_PCT,
+  onUpdatePerf,
 }) => {
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
@@ -74,6 +95,11 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
         minute: "2-digit",
       })
     : null;
+
+  // Rol B: interruptores de rendimiento. Solo emiten si hay editor (host);
+  // el servidor valida la whitelist y difunde `room-settings-updated`.
+  const perfDisabled = !canEdit || !onUpdatePerf;
+  const duckPct = clampDuckPct(duckingLevelPct);
 
   return (
     <BottomSheet
@@ -178,7 +204,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             </div>
           </div>
 
-          {/* COLUMNA 2 — Opciones */}
+          {/* COLUMNA 2 — Opciones + Rendimiento */}
           <div className="room-settings__column">
             {/* Sala temporal */}
             <div className="room-settings__box">
@@ -233,6 +259,128 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 Los invitados que se unan quedarán en espera hasta que tú
                 apruebes su entrada desde la lista de participantes.
               </p>
+            </div>
+
+            {/* Rendimiento (rol B, persistido en ajustes de sala) */}
+            <div className="room-settings__box room-settings__box--perf">
+              <div className="room-settings__box-head room-settings__box-head--title">
+                <span className="room-settings__box-title">Rendimiento</span>
+              </div>
+              {!canEdit && (
+                <p className="room-settings__box-desc">
+                  Solo el anfitrión puede cambiar estos ajustes.
+                </p>
+              )}
+
+              {/* Ahorro de datos */}
+              <div className="room-settings__box-head">
+                <span className="room-settings__box-title">Modo ahorro de datos</span>
+                <label className="part-switch" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={dataSaver}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ dataSaver: e.target.checked })}
+                    title="Cámaras remotas solo con audio y avisos de posición cada 15 s"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
+              <p className="room-settings__box-desc">
+                Cámaras remotas solo con audio y avisos de posición cada 15 s
+                (ideal con conexión débil).
+              </p>
+
+              {/* Avisos en pantalla completa */}
+              <div className="room-settings__box-head">
+                <span className="room-settings__box-title">Avisos en pantalla completa</span>
+                <label className="part-switch" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={fullscreenToasts}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ fullscreenToasts: e.target.checked })}
+                    title="Muestra los avisos del chat dentro del vídeo en pantalla completa"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
+              <p className="room-settings__box-desc">
+                Muestra los avisos del chat dentro del vídeo en pantalla completa.
+              </p>
+
+              {/* Reacciones */}
+              <div className="room-settings__box-head">
+                <span className="room-settings__box-title">Reacciones</span>
+                <label className="part-switch" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={reactionsEnabled}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ reactionsEnabled: e.target.checked })}
+                    title="Muestra las reacciones flotantes sobre el vídeo"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
+              <p className="room-settings__box-desc">
+                Muestra las reacciones flotantes sobre el vídeo.
+              </p>
+
+              {/* Efectos visuales (combo Interestellar + animaciones largas) */}
+              <div className="room-settings__box-head">
+                <span className="room-settings__box-title">Efectos visuales</span>
+                <label className="part-switch" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={visualEffects}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ visualEffects: e.target.checked })}
+                    title="Muestra el combo Interestellar y las animaciones largas"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
+              <p className="room-settings__box-desc">
+                Muestra el combo Interestellar y las animaciones largas (las
+                reacciones normales siguen visibles).
+              </p>
+
+              {/* Atenuación al hablar (ducking dinámico) */}
+              <div className="room-settings__box-head">
+                <span className="room-settings__box-title">Atenuar vídeo al hablar</span>
+                <label className="part-switch" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={duckingEnabled}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ duckingEnabled: e.target.checked })}
+                    title="Baja el volumen del vídeo mientras hablas por el micrófono"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
+              <p className="room-settings__box-desc">
+                Baja el volumen del vídeo mientras hablas por el micrófono.
+              </p>
+              <div className="perf-slider-row">
+                <label className="room-settings__label" htmlFor="perf-duck-level">
+                  Nivel
+                </label>
+                <input
+                  id="perf-duck-level"
+                  type="range"
+                  className="perf-slider"
+                  min={DUCK_MIN_PCT}
+                  max={DUCK_MAX_PCT}
+                  step={1}
+                  value={duckPct}
+                  disabled={perfDisabled || !duckingEnabled}
+                  onChange={(e) => onUpdatePerf?.({ duckingLevel: Number(e.target.value) })}
+                  title={`Volumen del vídeo al hablar: ${duckPct}%`}
+                />
+                <span className="perf-slider-value">{duckPct}%</span>
+              </div>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { RemotePeer, PeerMediaState } from '../hooks/useWebRTC';
+import type { PeerSignalState } from '../shared/webrtc-quality';
 import { IParticipant } from '../types/room';
 import { Crown, Mic, MicOff } from 'lucide-react';
 
@@ -12,6 +13,15 @@ interface CameraGridProps {
   isMicOn: boolean;
   isCameraOn: boolean;
   peerMediaStates?: Record<string, PeerMediaState>;
+  /**
+   * Rol B (ahorro de datos): con true, las cámaras REMOTAS se muestran como
+   * avatar (audio-only). El elemento <audio> remoto sigue sonando; no se toca
+   * nada de useWebRTC (solo presentación). Agente A: si deshabilita pistas a
+   * nivel WebRTC, compone sin conflicto con este interruptor.
+   */
+  dataSaverMode?: boolean;
+  /** Rol A: señal por peer remoto (key = socketId o nombre en minúsculas). */
+  peerSignalStates?: Record<string, PeerSignalState>;
 }
 
 // ─── Audio Level Speaking Hook ────────────────────────────────────────────────
@@ -76,9 +86,16 @@ const CameraTile: React.FC<{
   isLocal?: boolean;
   isMicOn?: boolean;
   isCameraOn?: boolean;
-}> = ({ stream = null, userName, isHost = false, isLocal = false, isMicOn = false, isCameraOn = false }) => {
+  /** El remoto se congeló o pierde paquetes: avatar + "señal débil" (el audio sigue). */
+  weakSignal?: boolean;
+  /** Nivel crítico: audio-only en recepción (se oculta su <video>, nunca su <audio>). */
+  criticalSignal?: boolean;
+}> = ({ stream = null, userName, isHost = false, isLocal = false, isMicOn = false, isCameraOn = false, weakSignal = false, criticalSignal = false }) => {
   const isSpeaking = useIsSpeaking(stream, isLocal, isMicOn);
   const initial = (userName || '?').charAt(0).toUpperCase();
+  // Remoto con señal débil/crítica: no mostrar el frame congelado; el <audio>
+  // remoto de arriba sigue sonando siempre (audio-only en recepción).
+  const showFrozenAvatar = !isLocal && (weakSignal || criticalSignal);
 
   return (
     <div className={`cam-tile ${isSpeaking ? 'cam-tile--speaking' : ''}`}>
@@ -97,7 +114,7 @@ const CameraTile: React.FC<{
       )}
 
       {/* Video Element when Camera is ON */}
-      {isCameraOn && (isLocal || stream) ? (
+      {isCameraOn && (isLocal || stream) && !showFrozenAvatar ? (
         <video
           ref={(el) => {
             if (el && stream && el.srcObject !== stream) {
@@ -115,6 +132,14 @@ const CameraTile: React.FC<{
           <div className={`cam-tile__avatar-circle ${isSpeaking ? 'cam-tile__avatar-circle--speaking' : ''}`}>
             {initial}
           </div>
+        </div>
+      )}
+
+      {/* Señal débil: insignia sobre el avatar en vez del frame congelado */}
+      {showFrozenAvatar && (
+        <div className="cam-tile__signal-badge" title="Conexión débil: solo se escucha el audio">
+          <span className="cam-tile__signal-dot" />
+          <span>señal débil</span>
         </div>
       )}
 
@@ -144,6 +169,8 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
   isMicOn,
   isCameraOn,
   peerMediaStates = {},
+  dataSaverMode = false,
+  peerSignalStates = {},
 }) => {
   const normCurrent = (currentUserName || '').trim().toLowerCase();
 
@@ -168,7 +195,7 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
   });
 
   return (
-    <div className="cam-grid">
+    <div className={`cam-grid${dataSaverMode ? ' cam-grid--datasaver' : ''}`}>
       {/* 1. Local User Tile */}
       <CameraTile
         stream={localStream}
@@ -195,6 +222,10 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
           ? mediaState.isMicOn
           : false;
 
+        // Señal del remoto (por socketId; respaldo por nombre en minúsculas).
+        const signal = (peer?.socketId ? peerSignalStates[peer.socketId] : undefined)
+          ?? peerSignalStates[norm];
+
         return (
           <CameraTile
             key={p.name}
@@ -203,7 +234,11 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
             isHost={p.isHost}
             isLocal={false}
             isMicOn={peerMicOn}
-            isCameraOn={peerCameraOn}
+            // Rol B (ahorro): avatar en vez de vídeo remoto; el audio sigue
+            // sonando por el <audio> dedicado del tile.
+            isCameraOn={dataSaverMode ? false : peerCameraOn}
+            weakSignal={signal?.weak === true}
+            criticalSignal={signal?.critical === true}
           />
         );
       })}

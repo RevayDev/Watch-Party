@@ -1,10 +1,11 @@
 import { Server, Socket } from 'socket.io';
 import { checkSocketRateLimit } from '../socket-limits.js';
 
-// Anti-spam por socket (el excedente se ignora en silencio): ~8 mensajes y
-// ~20 reacciones por ventana de 10s. Sin librerías nuevas.
+// Anti-spam por socket (el excedente se ignora en silencio): ~8 mensajes,
+// ~20 reacciones y ~10 typing por ventana de 10s. Sin librerías nuevas.
 const MESSAGE_LIMIT = { max: 8, windowMs: 10_000 };
 const REACTION_LIMIT = { max: 20, windowMs: 10_000 };
+const TYPING_LIMIT = { max: 10, windowMs: 10_000 };
 const MAX_MESSAGE_CHARS = 500;
 const MAX_EMOJI_CHARS = 20;
 const MAX_USERNAME_CHARS = 50;
@@ -60,5 +61,20 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
     };
 
     io.to(cleanRoomId).emit('reaction', reactionPayload);
+  });
+
+  // 8b. Typing ("está escribiendo"): efímero, sin persistencia. Mismo patrón
+  // que send-message/reaction (validación + rate-limit + reenvío a la sala).
+  socket.on('typing', (data: { roomId: string; userName: string } | undefined) => {
+    if (!data) return;
+    const { roomId, userName } = data;
+    if (typeof roomId !== 'string' || !roomId.trim()) return;
+    if (typeof userName !== 'string' || !userName.trim()) return;
+    if (!checkSocketRateLimit(socket.id, 'typing', TYPING_LIMIT.max, TYPING_LIMIT.windowMs)) return;
+    const cleanRoomId = roomId.toUpperCase().trim();
+    const cleanUser = userName.trim().slice(0, MAX_USERNAME_CHARS);
+    if (!cleanUser) return;
+
+    io.to(cleanRoomId).emit('typing', { user: cleanUser, timestamp: Date.now() });
   });
 }

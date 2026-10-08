@@ -25,6 +25,8 @@ export interface ConfirmOptions {
 interface NotificationsContextValue {
   notify: (type: ToastType, message: string, title?: string, onClick?: () => void) => void;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
+  /** Pila actual de toasts (máx 3). Rol B: el player la lee para el espejo en fullscreen. */
+  toasts: ToastItem[];
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -52,6 +54,16 @@ export const useNotifications = (): NotificationsContextValue => {
     throw new Error('useNotifications must be used within NotificationProvider');
   }
   return ctx;
+};
+
+/**
+ * Rol B: lectura segura de los toasts para el espejo dentro del player
+ * (visible en fullscreen nativo, donde el stack del root no se ve).
+ * Fuera del provider devuelve [] en vez de lanzar.
+ */
+export const useToasts = (): ToastItem[] => {
+  const ctx = useContext(NotificationsContext);
+  return ctx?.toasts ?? [];
 };
 
 // ── Provider ───────────────────────────────────────────────────────────────
@@ -152,7 +164,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   return (
-    <NotificationsContext.Provider value={{ notify: notifyFn, confirm: confirmFn }}>
+    <NotificationsContext.Provider value={{ notify: notifyFn, confirm: confirmFn, toasts }}>
       {children}
 
       {/* ── Toast stack (top, right below the nav) ── */}

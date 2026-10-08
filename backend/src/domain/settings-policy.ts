@@ -2,6 +2,8 @@ import type { IRoomSettings } from '../types/room.types.js';
 import { DEMO_TIMER_MAX_MINUTES, DEMO_TIMER_MIN_MINUTES } from '../config/demo-mode.js';
 
 // Claves permitidas para `update-room-settings` (whitelist).
+// Rol B (perf overlays): `dataSaver`, `fullscreenToasts`, `reactionsEnabled`,
+// `visualEffects`, `duckingEnabled` y `duckingLevel` persisten los ajustes de rendimiento.
 const ALLOWED_KEYS = new Set<string>([
   'muteOnEntry',
   'cameraOffOnEntry',
@@ -13,6 +15,12 @@ const ALLOWED_KEYS = new Set<string>([
   'description',
   'timerMinutes',
   'timerEndsAt',
+  'dataSaver',
+  'fullscreenToasts',
+  'reactionsEnabled',
+  'visualEffects',
+  'duckingEnabled',
+  'duckingLevel',
 ]);
 
 const BOOLEAN_KEYS = new Set<string>([
@@ -22,7 +30,16 @@ const BOOLEAN_KEYS = new Set<string>([
   'allowCamReactivation',
   'isTemporary',
   'requireApproval',
+  'dataSaver',
+  'fullscreenToasts',
+  'reactionsEnabled',
+  'visualEffects',
+  'duckingEnabled',
 ]);
+
+/** Rango válido para `duckingLevel` (porcentaje 10–60, default 30 en cliente). */
+export const DUCKING_LEVEL_MIN = 10;
+export const DUCKING_LEVEL_MAX = 60;
 
 export interface SanitizedSettings {
   /** Valores válidos listos para fusionar. Vacío si hubo errores (atómico). */
@@ -114,6 +131,24 @@ export function sanitizeRoomSettings(input: unknown, opts: SanitizeOptions = {})
       }
     } else {
       errors.push('"timerEndsAt" debe ser una fecha válida en formato ISO o null para desactivar.');
+    }
+  }
+
+  // Rol B (ducking dinámico): porcentaje 10–60. Estricto como el resto:
+  // fuera de rango o no numérico → error y nada se aplica (atómico).
+  if ('duckingLevel' in input) {
+    const value = input['duckingLevel'];
+    if (
+      typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      value < DUCKING_LEVEL_MIN ||
+      value > DUCKING_LEVEL_MAX
+    ) {
+      errors.push(
+        `"duckingLevel" debe ser un número entre ${DUCKING_LEVEL_MIN} y ${DUCKING_LEVEL_MAX}.`
+      );
+    } else {
+      (out as Record<string, unknown>)['duckingLevel'] = Math.round(value);
     }
   }
 

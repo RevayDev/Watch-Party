@@ -106,12 +106,12 @@ describe('resolveRoomTime: cluster y mediana', () => {
   it('con cluster par, la mediana es el elemento central superior', () => {
     setPositions(ROOM, [
       { socketId: 's1', userName: 'A', currentTime: 100, isPlaying: false },
-      { socketId: 's2', userName: 'B', currentTime: 101, isPlaying: false },
-      { socketId: 's3', userName: 'C', currentTime: 102, isPlaying: false },
-      { socketId: 's4', userName: 'D', currentTime: 103, isPlaying: false },
+      { socketId: 's2', userName: 'B', currentTime: 100.5, isPlaying: false },
+      { socketId: 's3', userName: 'C', currentTime: 101, isPlaying: false },
+      { socketId: 's4', userName: 'D', currentTime: 101.5, isPlaying: false },
     ]);
-    // times ordenados [100,101,102,103] -> mediana times[floor(4/2)] = 102
-    expect(resolveRoomTime(ROOM, participants())).toEqual({ currentTime: 102, isPlaying: false });
+    // times ordenados [100,100.5,101,101.5] -> mediana times[floor(4/2)] = 101
+    expect(resolveRoomTime(ROOM, participants())).toEqual({ currentTime: 101, isPlaying: false });
   });
 
   it('el subgrupo más numeroso gana aunque no sea el primero', () => {
@@ -125,22 +125,22 @@ describe('resolveRoomTime: cluster y mediana', () => {
     expect(resolveRoomTime(ROOM, participants())).toEqual({ currentTime: 51, isPlaying: false });
   });
 
-  it('reportes a exactamente la tolerancia (3s) siguen en el mismo cluster', () => {
+  it('reportes a exactamente la tolerancia (2s) siguen en el mismo cluster', () => {
     setPositions(ROOM, [
       { socketId: 's1', userName: 'A', currentTime: 100, isPlaying: true },
-      { socketId: 's2', userName: 'B', currentTime: 103, isPlaying: true },
+      { socketId: 's2', userName: 'B', currentTime: 102, isPlaying: true },
     ]);
-    expect(resolveRoomTime(ROOM, participants())).toEqual({ currentTime: 103, isPlaying: true });
+    expect(resolveRoomTime(ROOM, participants())).toEqual({ currentTime: 102, isPlaying: true });
   });
 
   it('reportes fuera de tolerancia forman clusters separados (decide seniority)', () => {
     setPositions(ROOM, [
       { socketId: 's1', userName: 'A', currentTime: 100, isPlaying: true },
-      { socketId: 's2', userName: 'B', currentTime: 103.5, isPlaying: true },
+      { socketId: 's2', userName: 'B', currentTime: 102.5, isPlaying: true },
     ]);
     const res = resolveRoomTime(ROOM, []);
     expect(res).not.toBeNull();
-    expect([100, 103.5]).toContain(res!.currentTime);
+    expect([100, 102.5]).toContain(res!.currentTime);
   });
 });
 

@@ -26,8 +26,11 @@ export interface PositionReport {
 }
 
 export const roomPositions = new Map<string, Map<string, PositionReport>>();
-export const POSITION_TTL_MS = 12_000;
-export const CLUSTER_TOLERANCE_SEC = 3;
+// Comparador rápido (Rol A): TTL 8 s y tolerancia 2 s. Con heartbeats cada
+// 2.5 s, una ventana de 8 s conserva ~3 reportes por miembro: el recién
+// llegado se compara contra posiciones frescas de todos los vivos.
+export const POSITION_TTL_MS = 8_000;
+export const CLUSTER_TOLERANCE_SEC = 2;
 
 export function freshPositions(roomId: string): PositionReport[] {
   const now = Date.now();

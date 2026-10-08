@@ -2999,7 +2999,7 @@ div[id] {
    Block: ⚙ Room settings modal (name, info, save-mode, timer)
    ========================================================================== */
 .modal-card--settings {
-  max-width: 750px;
+  max-width: 1080px;
 }
 
 .room-settings__group {
@@ -3823,7 +3823,7 @@ div[id] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  animation: floatUpAndFade 3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation: floatUpAndFade 3.6s cubic-bezier(0.37, 0.55, 0.45, 1) forwards;
   will-change: transform, opacity;
 }
 
@@ -4055,11 +4055,29 @@ div[id] {
    ========================================================================== */
 .reactions-bar {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
   padding: 0;
   background: transparent;
   border: none;
+}
+.reactions-bar__row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.4rem;
+}
+.reactions-bar__row--featured {
+  justify-content: center;
+}
+.reactions-bar__row--featured .reactions-bar__btn {
+  font-size: 1.6rem;
+}
+.reactions-bar__row--extra {
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.35rem;
 }
 .reactions-bar__btn {
   background: transparent;
@@ -4077,6 +4095,19 @@ div[id] {
 }
 .reactions-bar__btn:active {
   transform: scale(0.9);
+}
+.reactions-bar__more-btn {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.16);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+}
+.reactions-bar__more-btn:hover {
+  transform: scale(1.1);
+  background: rgba(99, 102, 241, 0.28);
 }
 
 /* ==========================================================================
@@ -6857,11 +6888,35 @@ div[id] {
 
 /* Evita que el modal quede demasiado ancho */
 .modal-card--settings {
-  width: min(640px, calc(100vw - 40px));
-  max-width: min(640px, calc(100vw - 40px));
+  width: min(1080px, calc(100vw - 32px));
+  max-width: min(1080px, calc(100vw - 32px));
   max-height: 92vh;
   overflow-y: auto;
   overflow-wrap: anywhere;
+  /* Scroll sutil: track transparente, thumb fino redondeado */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.modal-card--settings::-webkit-scrollbar {
+  width: 8px;
+}
+.modal-card--settings::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal-card--settings::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.modal-card--settings::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+  background-clip: padding-box;
+}
+.modal-card--settings::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
 }
 
 .modal-card--settings :is(
@@ -7074,8 +7129,8 @@ div[id] {
   }
 
   .sheet.modal-card--settings {
-    width: min(640px, calc(100vw - 40px));
-    max-width: min(640px, calc(100vw - 40px));
+    width: min(1080px, calc(100vw - 40px));
+    max-width: min(1080px, calc(100vw - 40px));
     max-height: 95vh;
   }
 }
@@ -7644,5 +7699,260 @@ div[id] {
   }
   .admin-form-row {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Perf overlays ──
+   Rol B: overlays del player + sección Rendimiento. Este bloque (al final del
+   archivo) tiene prioridad sobre las reglas base. Keyframes y tokens viven en
+   styles/animations.css (agente A): aquí solo posicionamiento y tamaños. */
+
+/* 1. Reacciones abajo-derecha DENTRO del contenedor del player (visible en
+   fullscreen nativo: el overlay es descendiente del elemento en fullscreen).
+   Se conserva left:50%→centrado INTERNO para no romper la animación
+   floatUpAndFade; el tamaño escala con el viewport (vmin/clamp) para que en
+   pantallas grandes sigan viéndose. */
+.reactions-overlay {
+  left: auto;
+  right: max(0.75rem, 2vmin);
+  bottom: max(3rem, 7vmin);
+  transform: none;
+  width: clamp(110px, 16vmin, 200px);
+  height: clamp(200px, 36vmin, 320px);
+}
+
+.floating-reaction {
+  font-size: clamp(1.5rem, 1.1rem + 2.4vmin, 2.75rem);
+}
+
+.floating-reaction__user {
+  font-size: clamp(0.55rem, 0.5rem + 0.7vmin, 0.72rem);
+}
+
+/* 2. Espejo de avisos dentro del player (único visible en fullscreen nativo).
+   Arriba-izquierda para no chocar con reacciones (abajo-derecha) ni con el
+   badge de en vivo (abajo-izquierda). 1 visible + contador de ráfaga. */
+.player-fs-toasts {
+  position: absolute;
+  top: 3rem;
+  left: 0.9rem;
+  z-index: 2147483645;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(330px, 62%);
+  pointer-events: none;
+}
+
+.player-fs-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  background: rgba(13, 19, 33, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: toastSlideIn 0.22s ease;
+}
+
+.player-fs-toast--success { border-color: rgba(52, 211, 153, 0.45); }
+.player-fs-toast--error { border-color: rgba(248, 113, 113, 0.5); }
+.player-fs-toast--warning { border-color: rgba(251, 191, 36, 0.5); }
+.player-fs-toast--info { border-color: rgba(96, 165, 250, 0.5); }
+
+.player-fs-toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.player-fs-toast__title {
+  font-size: clamp(0.72rem, 0.68rem + 0.5vmin, 0.82rem);
+  font-weight: 700;
+  color: #f3f4f6;
+}
+
+.player-fs-toast__message {
+  font-size: clamp(0.72rem, 0.68rem + 0.5vmin, 0.82rem);
+  color: #d1d5db;
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.player-fs-toast__more {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.22);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  border-radius: 9999px;
+  padding: 0.15rem 0.5rem;
+  white-space: nowrap;
+}
+
+/* 3. Badge "Atrasado −Xs · Ir al en vivo": abajo-izquierda, seek solo local. */
+.player-live-badge {
+  position: absolute;
+  left: 0.9rem;
+  bottom: max(3rem, 7vmin);
+  z-index: 2147483645;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  font-size: clamp(0.74rem, 0.7rem + 0.6vmin, 0.88rem);
+  font-weight: 700;
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.88);
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  border-radius: 9999px;
+  padding: 0.42rem 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: toastSlideIn 0.22s ease;
+}
+
+.player-live-badge:hover {
+  background: rgba(146, 64, 14, 0.95);
+  border-color: rgba(251, 191, 36, 0.8);
+  color: #fff;
+}
+
+.player-live-badge:focus-visible {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 2px;
+}
+
+/* 4. Sección Rendimiento del modal: fila del deslizador de ducking. */
+.perf-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+/* Rendimiento compacto dentro de la columna: menos aire entre filas */
+.room-settings__box--perf {
+  display: flex;
+  flex-direction: column;
+}
+.room-settings__box--perf .room-settings__box-head {
+  margin-top: 0.55rem;
+}
+.room-settings__box--perf .room-settings__box-head--title {
+  margin-top: 0;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.room-settings__box--perf .room-settings__box-desc {
+  margin-top: 0.1rem;
+}
+
+.perf-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.perf-slider:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.perf-slider-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #c7d2fe;
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 5. Ahorro de datos: cinturón + tirantes por si algún tile remoto conserva
+   su <video> (CameraGrid ya fuerza avatar en este modo; el audio dedicado
+   sigue sonando). */
+.cam-grid--datasaver .cam-tile__video {
+  display: none;
+}
+
+/* 6. Combo Interestellar (solo visual, ~4 s + fade). Translúcido sobre la
+   peli, centrado; no intercepta clics. Sin efectos = no se renderiza. */
+.interstellar-combo {
+  position: absolute;
+  inset: 0;
+  z-index: 2147483644;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  pointer-events: none;
+  animation: interstellarFade 4s ease forwards;
+}
+.interstellar-combo__emojis {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  opacity: 0.55;
+}
+.interstellar-combo__emoji {
+  font-size: clamp(3rem, 8vmin, 5rem);
+  line-height: 1;
+  filter: saturate(1.2);
+}
+.interstellar-combo__title {
+  margin: 0;
+  font-size: clamp(1.2rem, 3vmin, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e0e7ff;
+  text-shadow: 0 0 18px rgba(129, 140, 248, 0.9), 0 0 42px rgba(168, 85, 247, 0.6);
+  animation: interstellarGlow 4s ease forwards;
+}
+/* keyframes → src/styles/animations.css */
+
+/* 7. Sin efectos visuales: reacciones normales siguen pero sin animación larga. */
+.reactions-overlay--static {
+  opacity: 1;
+}
+.floating-reaction--static {
+  animation: none;
+  opacity: 1;
+  position: static;
+  transform: none;
+  flex-direction: row;
+  gap: 0.3rem;
+  font-size: 1.4rem;
+}
+.reactions-overlay--static .floating-reaction--static {
+  margin-bottom: 0.2rem;
+}
+
+/* 8. Respeta prefers-reduced-motion en todo lo animado por este bloque. */
+@media (prefers-reduced-motion: reduce) {
+  .player-fs-toast,
+  .player-live-badge,
+  .interstellar-combo,
+  .interstellar-combo__title {
+    animation: none;
+  }
+  .interstellar-combo {
+    opacity: 0.9;
+  }
+  .floating-reaction {
+    animation-duration: 1.2s;
+    animation-timing-function: linear;
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { IRoomData, ChatMessage, ReactionItem } from '../../../types/room';
+import { IRoomData, IRoomSettings, ChatMessage, ReactionItem, TypingPayload } from '../../../types/room';
 import { ApiService } from '../../../services/api';
 import { getSocket, disconnectSocket } from '../../../services/socket';
 import { removeRecentRoom, updateRecentRoomMeta } from '../../../services/recentRooms';
@@ -10,6 +10,14 @@ import { usePresence } from '../../../hooks/usePresence';
 import { STORAGE_KEYS } from '../../../shared/constants';
 import { buildSocketAuth, resolveJoinRejectedFeedback, saveHostSession } from '../../../shared/utils';
 import { playJoinSound, playLeaveSound, playChatSound } from '../utils/sounds';
+import { clampDuckPct, DUCK_DEFAULT_PCT, heartbeatIntervalMs } from '../../../shared/perf';
+import {
+  INTERSTELLAR_WINDOW_MS,
+  INTERSTELLAR_DURATION_MS,
+  checkInterstellarCombo,
+  isInterstellarEmoji,
+  type InterstellarEvent,
+} from '../../player/interstellar';
 
 export interface UseRoomSocketArgs {
   roomId: string;
@@ -18,8 +26,22 @@ export interface UseRoomSocketArgs {
   onLeave: () => void;
 }
 
+/** Acción remota de playback. `autoplay` = play grupal del handshake video-ready. */
+export interface RemoteSyncAction {
+  action: 'play' | 'pause' | 'seek';
+  currentTime: number;
+  sentAt?: number;
+  timestamp: number;
+  autoplay?: boolean;
+}
+
 let remoteActionSeq = 0;
+/** Timestamps monótonos: dos consensos seguidos nunca comparten timestamp. */
 export const nextRemoteActionTimestamp = (): number => Date.now() + (++remoteActionSeq * 0.001);
+
+/** Indicador "escribiendo": expira a los 4 s sin refresco; emisión máx 1/2 s. */
+export const TYPING_EXPIRE_MS = 4000;
+export const TYPING_THROTTLE_MS = 2000;
 
 /**
  * Toda la lógica socket/estado extraída verbatim de pages/Room.tsx.
@@ -79,13 +101,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   const [showMemberExitModal, setShowMemberExitModal] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
+  // Indicador "escribiendo": mapa userName -> timestamp del último `typing`.
+  // Expira a los 4 s sin refresco (ver efecto de poda más abajo).
+  const [typingMap, setTypingMap] = useState<Record<string, number>>({});
+  // Estado del combo Interestellar: se activa cuando 🪐 + ✨ de usuarios distintos en 5 s.
+  const [interestellarActive, setInterestellarActive] = useState(false);
+  const interstellarHistoryRef = useRef<InterstellarEvent[]>([]);
+  const interstellarSeenRef = useRef<Set<string>>(new Set());
+  const interestellarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [remoteAction, setRemoteAction] = useState<{
-    action: 'play' | 'pause' | 'seek';
-    currentTime: number;
-    sentAt?: number;
-    timestamp: number;
-  } | null>(null);
+  const [remoteAction, setRemoteAction] = useState<RemoteSyncAction | null>(null);
   // Último consenso de playback ya aplicado: `room-state` llega en cada
   // (re)join con la misma posición y reaplicarlo corta el video. Solo se
   // re-aplica si cambia play/pause o el salto supera la tolerancia (2 s).
@@ -210,14 +235,22 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     localStream,
     remotePeers,
     peerMediaStates,
+    peerSignalStates,
+    qualityLevel,
+    lowBandwidth,
     isMicOn,
     isCameraOn,
     mediaError,
-    lowBandwidth,
     toggleMic,
     toggleCamera,
     enableMedia,
   } = useWebRTC(socket, roomId, myName, isHost);
+
+  // Pill "Reconectando…": true entre `disconnect`/`reconnect_attempt` y el
+  // próximo `connect`/`room-state`. NUNCA destruye sala/chat/video ni emite
+  // `leave-room`: las caídas transitorias las cubren la gracia de 20 s del
+  // servidor + el re-join automático en `connect` (ver efecto gigante).
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   // Espejos por ref del estado media/host para el efecto socket gigante.
   // Sin esto, togglear mic/cámara cambiaba isMicOn/isCameraOn (deps del
@@ -228,6 +261,29 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   isMicOnRef.current = isMicOn;
   const isCameraOnRef = useRef(isCameraOn);
   isCameraOnRef.current = isCameraOn;
+
+  // Poda del indicador "escribiendo": entradas con más de 4 s se retiran.
+  // Solo corre el intervalo mientras haya alguien escribiendo.
+  const hasTyping = Object.keys(typingMap).length > 0;
+  useEffect(() => {
+    if (!hasTyping) return;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setTypingMap((prev) => {
+        let changed = false;
+        const next: Record<string, number> = {};
+        for (const [name, at] of Object.entries(prev)) {
+          if (now - at < TYPING_EXPIRE_MS) {
+            next[name] = at;
+          } else {
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [hasTyping]);
 
   // Clears local data only for THIS room (keeps sessions of other rooms intact)
   const clearRoomLocalData = useCallback(() => {
@@ -307,6 +363,8 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       );
       setAwaitingApproval(false);
       setJoined(true);
+      // Re-conexión completada: el servidor confirmó la sala (no se perdió nada).
+      setIsReconnecting(false);
       joinRequestsLenRef.current = state.joinRequests?.length || 0;
       if (state.isHost !== undefined) setIsHost(state.isHost);
 
@@ -425,7 +483,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       ]);
     };
 
-    const handleSyncVideo = (data: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number }) => {
+    const handleSyncVideo = (data: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number; autoplay?: boolean }) => {
       if (data.action === 'play') {
         lastConsensusRef.current = { currentTime: data.currentTime, isPlaying: true };
       } else if (data.action === 'pause') {
@@ -436,11 +494,15 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
           isPlaying: lastConsensusRef.current?.isPlaying ?? false,
         };
       }
+      // Anti-bucle: el play de consenso/autoplay llega como `play` y el
+      // player lo aplica sin re-emitir `sync-video` ni `seek` repetido
+      // (isApplyingRemote + dedup de 500 ms del servidor).
       setRemoteAction({
         action: data.action,
         currentTime: data.currentTime,
         sentAt: data.sentAt,
         timestamp: nextRemoteActionTimestamp(),
+        autoplay: data.autoplay === true,
       });
     };
 
@@ -462,6 +524,50 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       setTimeout(() => {
         setReactions((prev) => prev.filter((r) => r.id !== reaction.id));
       }, 2600);
+
+      // ── Combo Interestellar: 🪐 + ✨ de usuarios DISTINTOS en ≤5 s ──
+      if (!visualEffectsRef.current) return;
+      if (!isInterstellarEmoji(reaction.emoji)) return;
+      const incoming: InterstellarEvent = {
+        emoji: reaction.emoji,
+        user: reaction.user,
+        at: Date.now(),
+      };
+      const history = interstellarHistoryRef.current;
+      // Si ya vimos este id (reemisión/latencia), no lo procesamos de nuevo
+      const lastIds = interstellarSeenRef.current;
+      if (lastIds.has(reaction.id)) return;
+      lastIds.add(reaction.id);
+      if (lastIds.size > 60) {
+        // Podar ids antiguos para no crecer indefinidamente
+        const first = lastIds.values().next().value;
+        if (first !== undefined) lastIds.delete(first);
+      }
+      if (checkInterstellarCombo(history, incoming, true)) {
+        setInterestellarActive(true);
+        if (interestellarTimerRef.current) clearTimeout(interestellarTimerRef.current);
+        interestellarTimerRef.current = setTimeout(
+          () => setInterestellarActive(false),
+          INTERSTELLAR_DURATION_MS
+        );
+        history.length = 0; // reiniciar ventana tras disparar
+      } else {
+        history.push(incoming);
+      }
+      // Limpieza de eventos fuera de ventana (>10 s)
+      interstellarHistoryRef.current = history.filter(
+        (ev) => Date.now() - ev.at <= INTERSTELLAR_WINDOW_MS * 2
+      );
+    };
+
+
+    // Indicador "escribiendo": se registra quién escribe y se refresca el
+    // timestamp. El propio `typing` se ignora (no se muestra uno mismo).
+    const handleTypingEvent = (data: TypingPayload | undefined) => {
+      if (!data || typeof data.user !== 'string' || !data.user.trim()) return;
+      const name = data.user.trim().slice(0, 50);
+      if (!name || name.toLowerCase() === myName.toLowerCase()) return;
+      setTypingMap((prev) => ({ ...prev, [name]: Date.now() }));
     };
 
     // Moderation remote actions
@@ -599,6 +705,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     const handleJoinPending = () => {
       setJoined(false);
       setAwaitingApproval(true);
+      setIsReconnecting(false);
     };
 
     const handleJoinApproved = () => {
@@ -669,6 +776,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     socket.on('upload-progress', handleUploadProgressEvent);
     socket.on('chat-message', handleChatMessage);
     socket.on('reaction', handleReactionEvent);
+    socket.on('typing', handleTypingEvent);
     socket.on('force-mute-user', handleForceMuteUser);
     socket.on('force-disable-camera', handleForceDisableCamera);
     socket.on('force-mute-all', handleForceMuteAll);
@@ -685,6 +793,24 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     socket.on('settings-error', handleSettingsError);
     socket.on('action-denied', handleActionDenied);
 
+    // ── Estado de conexión (pill "Reconectando…", Rol A) ───────────────────
+    // Caída transitoria: SOLO se marca el pill. No se emite `leave-room`,
+    // no se limpia roomData/messages/video ni se desmonta el player: al
+    // reconectar, `connect` re-emite join-room y `room-state` rehidrata sin
+    // cortar la película (la gracia de 20 s del servidor conserva el lugar).
+    const handleSocketDisconnect = () => {
+      setIsReconnecting(true);
+    };
+    const handleReconnectAttempt = () => {
+      setIsReconnecting(true);
+    };
+    const handleSocketReconnect = () => {
+      setIsReconnecting(false);
+    };
+    socket.on('disconnect', handleSocketDisconnect);
+    socket.on('reconnect_attempt', handleReconnectAttempt);
+    socket.on('reconnect', handleSocketReconnect);
+
     return () => {
       isMounted = false;
       socket.off('connect', emitJoin);
@@ -698,6 +824,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       socket.off('upload-progress', handleUploadProgressEvent);
       socket.off('chat-message', handleChatMessage);
       socket.off('reaction', handleReactionEvent);
+      socket.off('typing', handleTypingEvent);
       socket.off('force-mute-user', handleForceMuteUser);
       socket.off('force-disable-camera', handleForceDisableCamera);
       socket.off('force-mute-all', handleForceMuteAll);
@@ -713,6 +840,9 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       socket.off('join-requests-updated', handleJoinRequestsUpdated);
       socket.off('settings-error', handleSettingsError);
       socket.off('action-denied', handleActionDenied);
+      socket.off('disconnect', handleSocketDisconnect);
+      socket.off('reconnect_attempt', handleReconnectAttempt);
+      socket.off('reconnect', handleSocketReconnect);
     };
   }, [roomId, myName, initialIsHost, socket, onLeave, userId, clearRoomLocalData]);
 
@@ -777,6 +907,50 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
         : null
     );
   };
+
+  // ── Rol B: Rendimiento (persistido en ajustes de sala) ────────────────────
+  // Parche parcial por socket; el servidor sanea por whitelist, fusiona y
+  // difunde `room-settings-updated`. Optimista en local para respuesta inmediata.
+  const handleUpdatePerfSettings = useCallback(
+    (patch: Partial<IRoomSettings>) => {
+      if (!isHostRef.current) return;
+      setRoomData((prev) =>
+        prev
+          ? { ...prev, settings: { ...prev.settings, ...patch } as IRoomData['settings'] }
+          : prev
+      );
+      socket.emit('update-room-settings', {
+        roomId,
+        settings: patch,
+        ...buildSocketAuth(roomId, myName),
+      });
+    },
+    [roomId, socket, myName]
+  );
+
+  // Lecturas con defaults (undefined = ON salvo dataSaver y duckingLevel).
+  const perfSettings: IRoomSettings = roomData?.settings ?? ({} as IRoomSettings);
+  const dataSaver = perfSettings.dataSaver === true;
+  const fullscreenToasts = perfSettings.fullscreenToasts !== false;
+  const reactionsEnabled = perfSettings.reactionsEnabled !== false;
+  const visualEffects = perfSettings.visualEffects !== false;
+  // Espejo por ref para que los handlers socket lean el valor vigente.
+  const visualEffectsRef = useRef(visualEffects);
+  visualEffectsRef.current = visualEffects;
+  const duckingEnabled = perfSettings.duckingEnabled !== false;
+  const duckingLevelPct =
+    typeof perfSettings.duckingLevel === 'number'
+      ? clampDuckPct(perfSettings.duckingLevel)
+      : DUCK_DEFAULT_PCT;
+  // Agente A: intervalo efectivo del heartbeat (5 s normal / 15 s en ahorro).
+  // El intervalo interno del player queda intacto; la estrangulación a 15 s
+  // se aplica en handlePlaybackHeartbeat (abajo).
+  const heartbeatInterval = heartbeatIntervalMs(dataSaver);
+
+  // Espejo del modo ahorro para el throttle del heartbeat (sin re-suscribir).
+  const dataSaverRef = useRef(false);
+  dataSaverRef.current = dataSaver;
+  const lastHeartbeatAtRef = useRef(0);
 
   const toggleBarsVisibility = useCallback(() => {
     setUiPinned((prev) => {
@@ -866,9 +1040,27 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   // Callback ESTABLE para el heartbeat del player: el inline anterior
   // recreaba la función en cada render y el efecto del player re-reportaba
   // (spam de playback-heartbeat en cada mensaje/reacción/toggle).
+  // Rol B: en ahorro de datos se estrangula a 1 emisión / 15 s (el intervalo
+  // interno del player —5 s— queda intacto para el agente A).
   const handlePlaybackHeartbeat = useCallback(
     (currentTime: number, isPlaying: boolean) => {
+      if (dataSaverRef.current) {
+        const now = Date.now();
+        if (lastHeartbeatAtRef.current !== 0 && now - lastHeartbeatAtRef.current < 15000) return;
+        lastHeartbeatAtRef.current = now;
+      }
       socket.emit('playback-heartbeat', { roomId, currentTime, isPlaying });
+    },
+    [socket, roomId]
+  );
+
+  // Handshake video-ready (Rol A): el player lo llama una vez por video al
+  // alcanzar `loadeddata` con currentTime≈0. El servidor cuenta presentes y
+  // responde con el `play` grupal (autoplay) o el timeout de 15 s lo hace.
+  const handleVideoReady = useCallback(
+    (fileName: string) => {
+      if (!fileName) return;
+      socket.emit('video-ready', { roomId, fileName });
     },
     [socket, roomId]
   );
@@ -876,6 +1068,22 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   const handleSendMessage = (text: string) => {
     socket.emit('send-message', { roomId, text, userName: myName });
   };
+
+  // Emisión throttled del indicador "escribiendo": máx 1 cada 2 s.
+  // La guarda de "solo con texto" vive en el input del chat (Chat.tsx).
+  const lastTypingEmitRef = useRef(0);
+  const emitTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTypingEmitRef.current < TYPING_THROTTLE_MS) return;
+    lastTypingEmitRef.current = now;
+    socket.emit('typing', { roomId, userName: myName });
+  }, [socket, roomId, myName]);
+
+  // Nombres con actividad reciente (<4 s), ordenados para un render estable.
+  const typingUsers = useMemo(
+    () => Object.keys(typingMap).sort((a, b) => a.localeCompare(b, 'es')),
+    [typingMap]
+  );
 
   const handleReaction = (emoji: string) => {
     socket.emit('send-reaction', { roomId, emoji, userName: myName });
@@ -908,6 +1116,8 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     setShowMemberExitModal,
     messages,
     reactions,
+    typingUsers,
+    emitTyping,
     uploadProgress,
     remoteAction,
     activeSideTab,
@@ -934,15 +1144,27 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     localStream,
     remotePeers,
     peerMediaStates,
+    peerSignalStates,
+    qualityLevel,
+    lowBandwidth,
+    isReconnecting,
     isMicOn,
     isCameraOn,
     mediaError,
-    lowBandwidth,
     toggleMic,
     toggleCamera,
     handleToggleTemporaryMode,
     handleSaveRoomDetails,
     handleSetRoomTimer,
+    handleUpdatePerfSettings,
+    dataSaver,
+    fullscreenToasts,
+    reactionsEnabled,
+    visualEffects,
+    duckingEnabled,
+    duckingLevelPct,
+    interestellarActive,
+    heartbeatInterval,
     handleLeaveClick,
     handleLeaveOnlyMe,
     handleDeleteRoomForAll,
@@ -950,6 +1172,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     handleSetVideoUrl,
     handleSyncAction,
     handlePlaybackHeartbeat,
+    handleVideoReady,
     handleSendMessage,
     handleReaction,
     handleCancelWaiting,

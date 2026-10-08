@@ -12,6 +12,14 @@ function loadHls(): Promise<typeof import('hls.js')> {
 import { BottomSheet } from '../../shared/components/BottomSheet';
 import { isDemoMode } from '../../shared/demo';
 import { VideoUploadPicker } from './VideoUploadPicker';
+import { useToasts } from '../../services/notifications';
+import {
+  anchorFromRemoteAction,
+  behindSeconds,
+  clampDuckPct,
+  resolveLiveEdge,
+  type LiveEdgeAnchor,
+} from '../../shared/perf';
 
 interface VideoPlayerProps {
   roomId: string;
@@ -21,13 +29,27 @@ interface VideoPlayerProps {
   onSetVideoUrl?: (url: string, title?: string) => Promise<void>;
   uploadProgress: number | null;
   onSyncAction: (action: 'play' | 'pause' | 'seek', currentTime: number) => void;
-  remoteAction: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number; timestamp: number } | null;
+  remoteAction: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number; timestamp: number; autoplay?: boolean } | null;
   reactions: ReactionItem[];
   isMicOn?: boolean; // used for auto-duck
   /** Periodic position report so the room can resolve a consensus time for newcomers */
   onPlaybackHeartbeat?: (currentTime: number, isPlaying: boolean) => void;
-  /** Intervalo del heartbeat en ms (sube solo en mala señal para pedir menos). */
+  /** Intervalo del heartbeat en ms: 2.5 s normal, 15 s en mala señal (lo decide Room). */
   heartbeatIntervalMs?: number;
+  /** Handshake video-ready (Rol A): se llama una vez por video al estar listo para auto-play. */
+  onVideoReady?: (fileName: string) => void;
+  /** Rol B: atenuación activa (default ON). */
+  duckingEnabled?: boolean;
+  /** Rol B: nivel de atenuación en % 10–60 (default 30). */
+  duckingLevelPct?: number;
+  /** Rol B: mostrar reacciones flotantes (default ON). */
+  reactionsEnabled?: boolean;
+  /** Efectos visuales: combo Interestellar + animaciones largas (default ON). */
+  visualEffects?: boolean;
+  /** Combo Interestellar activo (lo detecta el padre, useRoomSocket). */
+  interestellarActive?: boolean;
+  /** Rol B: espejo de avisos dentro del player en fullscreen (default ON). */
+  fullscreenToastsEnabled?: boolean;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -42,7 +64,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   reactions,
   isMicOn = false,
   onPlaybackHeartbeat,
-  heartbeatIntervalMs = 5000,
+  heartbeatIntervalMs = 2500,
+  onVideoReady,
+  duckingEnabled = true,
+  duckingLevelPct = 30,
+  reactionsEnabled = true,
+  visualEffects = true,
+  interestellarActive = false,
+  fullscreenToastsEnabled = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +98,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const isApplyingRemote = useRef(false);
+  // Supresión extendida del auto-play grupal: el `play()` es asíncrono y el
+  // evento `play`/`seeked` del elemento puede llegar tras los 300 ms base.
+  const suppressUntilRef = useRef(0);
+  const videoReadySentForRef = useRef<string | null>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Global player keyboard shortcuts (Space, F, M, Arrows) with input protection
@@ -123,15 +156,73 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, []);
 
-  // Auto-duck: lower video volume when mic is on (you're speaking)
+  // Auto-duck dinámico (rol B): baja el volumen del video mientras el micro
+  // está activo. Nivel configurable 10–60 % (default 30 %) que llega por
+  // ajustes de sala; se aplica en vivo sin recargar.
+  const duckPct = clampDuckPct(duckingLevelPct);
   useEffect(() => {
     if (!videoRef.current) return;
-    videoRef.current.volume = isMicOn ? 0.30 : 1.0;
-  }, [isMicOn]);
+    videoRef.current.volume = isMicOn && duckingEnabled ? duckPct / 100 : 1.0;
+  }, [isMicOn, duckingEnabled, duckPct]);
 
-  // Position heartbeat (5s, 15s en mala señal): lets the server resolve the
-  // consensus time a (re)joining member should adopt. Skipped without video
-  // or on error.
+  // ── Rol B: espejo de avisos + badge "Atrasado" ──────────────────────────
+  // Los toasts del root son invisibles en fullscreen nativo: se espeja el
+  // último dentro del contenedor del player (que SÍ es visible en fullscreen).
+  const mirrorToasts = useToasts();
+  const fsToast = mirrorToasts.length > 0 ? mirrorToasts[mirrorToasts.length - 1] : null;
+  const fsToastExtra = Math.max(0, mirrorToasts.length - 1);
+
+  // ── Combo Interestellar (solo visual) ────────────────────────────────
+  // Si llegan 🪐 y ✨ de DOS usuarios distintos en 5 s (ventana por
+  // timestamp de llegada), se muestra el overlay especial ~4 s con fade.
+  // `visualEffects === false` lo apaga; las reacciones normales siguen.
+  // El estado viene del padre (useRoomSocket) a través de la prop
+  // interestellarActive.
+
+  // Borde en vivo = última acción grupal conocida (remoteAction/sentAt que ya
+  // recibe el cliente) + tiempo transcurrido. Ticker local de 1 s que NO
+  // emite nada: solo decide si mostrar el badge.
+  const liveAnchorRef = useRef<LiveEdgeAnchor | null>(null);
+  const [behindSecs, setBehindSecs] = useState(0);
+  useEffect(() => {
+    liveAnchorRef.current = anchorFromRemoteAction(remoteAction);
+    if (!remoteAction) setBehindSecs(0);
+  }, [remoteAction]);
+
+  useEffect(() => {
+    if (!video) return;
+    const iv = window.setInterval(() => {
+      const vid = videoRef.current;
+      if (!vid) return;
+      const live = resolveLiveEdge(liveAnchorRef.current, Date.now());
+      setBehindSecs(behindSeconds(live, vid.currentTime, !vid.paused && !vid.ended));
+    }, 1000);
+    return () => window.clearInterval(iv);
+  }, [video, roomId]);
+
+  // Salto al consenso SIN alterar a los demás: seek puramente local. Se usa
+  // el guardián `isApplyingRemote` existente para que onSeeked/onPlay no
+  // emitan sync (cada uno reproduce su copia). Agente A: revisar al cablear.
+  const seekToLive = useCallback(() => {
+    const vid = videoRef.current;
+    const live = resolveLiveEdge(liveAnchorRef.current, Date.now());
+    if (!vid || live === null) return;
+    isApplyingRemote.current = true;
+    vid.currentTime = Math.max(0, live);
+    if (!vid.paused) {
+      // Ya reproduciendo: basta el seek.
+    } else if (liveAnchorRef.current?.playing) {
+      vid.play().catch(() => {});
+    }
+    setBehindSecs(0);
+    window.setTimeout(() => {
+      isApplyingRemote.current = false;
+    }, 300);
+  }, []);
+
+  // Position heartbeat (2.5 s normal, 15 s en mala señal): lets the server
+  // resolve the consensus time a (re)joining member should adopt. Skipped
+  // without video or on error.
   useEffect(() => {
     if (!video || playbackError || !onPlaybackHeartbeat) return;
     const report = () => {
@@ -295,12 +386,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [videoSourceType, videoDirectUrl, videoFileName, roomId, retryToken]);
 
-  // Apply incoming remote sync actions with latency compensation and smooth tolerance
+  // Apply incoming remote sync actions with latency compensation and smooth tolerance.
+  // Anti-bucle (Rol A): el play de consenso/autoplay SOLO dispara `play`,
+  // nunca `seek` repetido ni re-emite `sync-video` (isApplyingRemote +
+  // supresión extendida para el play asíncrono del auto-play grupal).
   useEffect(() => {
     if (!remoteAction || !videoRef.current) return;
 
     const vid = videoRef.current;
     isApplyingRemote.current = true;
+    if (remoteAction.autoplay === true) {
+      suppressUntilRef.current = Date.now() + 2000;
+    }
 
     const latencyOffset = remoteAction.sentAt
       ? Math.max(0, (Date.now() - remoteAction.sentAt) / 1000)
@@ -352,18 +449,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }, 300);
   }, [remoteAction]);
 
+  const isLocalEchoSuppressed = () =>
+    isApplyingRemote.current || Date.now() < suppressUntilRef.current;
+
   const handlePlay = () => {
-    if (isApplyingRemote.current || !videoRef.current) return;
+    if (isLocalEchoSuppressed() || !videoRef.current) return;
     onSyncAction('play', videoRef.current.currentTime);
   };
 
   const handlePause = () => {
-    if (isApplyingRemote.current || !videoRef.current) return;
+    if (isLocalEchoSuppressed() || !videoRef.current) return;
     onSyncAction('pause', videoRef.current.currentTime);
   };
 
   const handleSeeked = () => {
-    if (isApplyingRemote.current || !videoRef.current) return;
+    if (isLocalEchoSuppressed() || !videoRef.current) return;
     onSyncAction('seek', videoRef.current.currentTime);
   };
 
@@ -456,6 +556,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       (lastLoadKeyRef.current ? lastLoadKeyRef.current.split('::')[0] : '');
     setPlaybackError(`No se pudo cargar el video (${kind}). Verificando el enlace...`);
     diagnoseVideoSrc(src, kind).then(setPlaybackError);
+  };
+
+  // Handshake video-ready (Rol A): al terminar `video-changed`, cada cliente
+  // avisa UNA vez por video cuando loadeddata + currentTime≈0. El servidor
+  // responde con el `play` grupal (autoplay). Nunca pausa ni recarga nada.
+  const handleLoadedData = () => {
+    if (!onVideoReady || !videoRef.current) return;
+    const loadKey = lastLoadKeyRef.current;
+    if (!loadKey || videoReadySentForRef.current === loadKey) return;
+    const atStart = Math.abs(videoRef.current.currentTime) < 1;
+    if (!atStart) return;
+    videoReadySentForRef.current = loadKey;
+    onVideoReady(videoFileName || videoDirectUrl || '');
   };
 
   const openChangePanel = (tab?: 'upload' | 'url') => {
@@ -614,13 +727,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
 
         <div className="player-container__topbar">
-          {/* Volume duck indicator */}
-          {isMicOn && (
+          {/* Volume duck indicator (rol B: muestra el % real configurado) */}
+          {isMicOn && duckingEnabled && (
             <span
               className="player-volume-duck"
               title="Volumen reducido porque el micrófono está activo"
             >
-              <span>Volumen 30%</span>
+              <span>Volumen {duckPct}%</span>
             </span>
           )}
 
@@ -684,19 +797,63 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Floating Reactions Overlay — always pinned bottom-right, visible in fullscreen */}
-      <div className="reactions-overlay">
-        {reactions.map((r) => (
-          <div
-            key={r.id}
-            className="floating-reaction"
-            style={{ '--x-offset': `${r.xOffset ?? 0}px` } as React.CSSProperties}
-          >
-            <span>{r.emoji}</span>
-            {r.user && <span className="floating-reaction__user">{r.user}</span>}
+      {/* Floating Reactions Overlay — rol B: abajo-derecha dentro del
+          contenedor (visible en fullscreen nativo), tamaño que escala con el
+          viewport vía CSS (bloque "Perf overlays"). Ocultable por ajustes.
+          Con visualEffects OFF las reacciones siguen pero sin animación larga. */}
+      {reactionsEnabled && reactions.length > 0 && (
+        <div className={`reactions-overlay${visualEffects ? '' : ' reactions-overlay--static'}`} aria-hidden="true">
+          {reactions.map((r) => (
+            <div
+              key={r.id}
+              className={`floating-reaction${visualEffects ? '' : ' floating-reaction--static'}`}
+              style={{ '--x-offset': `${r.xOffset ?? 0}px` } as React.CSSProperties}
+            >
+              <span>{r.emoji}</span>
+              {r.user && <span className="floating-reaction__user">{r.user}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Combo Interestellar: 🪐 + ✨ de dos usuarios distintos en 5 s.
+          Solo visual (~4 s + fade). visualEffects OFF lo apaga. */}
+      {visualEffects && interestellarActive && (
+        <div className="interstellar-combo" aria-hidden="true">
+          <div className="interstellar-combo__emojis">
+            <span className="interstellar-combo__emoji">🪐</span>
+            <span className="interstellar-combo__emoji">✨</span>
           </div>
-        ))}
-      </div>
+          <p className="interstellar-combo__title">Interestellar</p>
+        </div>
+      )}
+
+      {/* Espejo de avisos en fullscreen (rol B): 1 visible + contador de ráfaga */}
+      {fullscreenToastsEnabled && fsToast && (
+        <div className="player-fs-toasts" role="status" aria-live="polite">
+          <div className={`player-fs-toast player-fs-toast--${fsToast.type}`}>
+            <div className="player-fs-toast__body">
+              {fsToast.title && <strong className="player-fs-toast__title">{fsToast.title}</strong>}
+              <span className="player-fs-toast__message">{fsToast.message}</span>
+            </div>
+            {fsToastExtra > 0 && (
+              <span className="player-fs-toast__more">+{fsToastExtra} más</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Badge "Atrasado −Xs · Ir al en vivo" (rol B): seek local, no emite sync */}
+      {behindSecs > 3 && (
+        <button
+          type="button"
+          className="player-live-badge"
+          onClick={seekToLive}
+          title="Saltar al punto en vivo del grupo (solo te afecta a ti)"
+        >
+          Atrasado −{Math.round(behindSecs)}s · Ir al en vivo
+        </button>
+      )}
 
       {/* Buffering Indicator */}
       {isBuffering && !playbackError && (
@@ -719,6 +876,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => setIsBuffering(false)}
         onCanPlay={() => setIsBuffering(false)}
+        onLoadedData={handleLoadedData}
         onError={handleVideoElementError}
       >
         Tu navegador no soporta reproducción de video HTML5.

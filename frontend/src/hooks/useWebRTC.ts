@@ -2,15 +2,24 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 import {
   assessQuality,
+  assessPeerSignal,
   collectPeerSample,
+  collectPeerReception,
   nextRestartDelayMs,
   stepLevel,
   QUALITY_LADDER,
   MAX_QUALITY_LEVEL,
   MAX_ICE_RESTARTS,
+  REMOTE_FROZEN_AFTER_MS,
+  type PeerSignalState,
   type QualitySample,
   type QualityLevel,
 } from '../shared/webrtc-quality';
+
+// NOTA DE RESILIENCIA (Rol A): este hook SOLO gestiona cámaras/micrófonos
+// WebRTC (pistas getUserMedia + mallas P2P). NUNCA toca el <video> principal
+// de la película (stream HTTP en VideoPlayer): ningún error, ICE restart o
+// desconexión de aquí pausa, desmonta o recarga la película ni su audio.
 
 export interface RemotePeer {
   socketId: string;
@@ -45,9 +54,13 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   // Escalera de calidad ante señal débil (0 normal → 3 solo-audio).
-  // El audio sigue siempre; el video se degrada por pasos, nunca se corta.
+  // El audio sigue siempre; el video propio se degrada por pasos, nunca se corta.
   const [qualityLevel, setQualityLevel] = useState<QualityLevel>(0);
   const lowBandwidth = qualityLevel >= MAX_QUALITY_LEVEL;
+  // Señal por peer remoto (key = socketId): con `weak` el tile muestra avatar
+  // + "señal débil"; con `critical` además se oculta su <video> (audio-only
+  // en recepción; su <audio> nunca se pausa ni desmonta).
+  const [peerSignalStates, setPeerSignalStates] = useState<Record<string, PeerSignalState>>({});
 
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());
@@ -58,6 +71,8 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   // Reintentos de ICE restart por peer + timers de espera en 'disconnected'.
   const restartAttempts = useRef<Map<string, number>>(new Map());
   const disconnectTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Último conteo de frames entrantes por peer (detección de frame congelado).
+  const lastFramesRef = useRef<Map<string, { frames: number; at: number }>>(new Map());
 
   // Master local media tracks (live hardware)
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -191,6 +206,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   }, []);
 
   // ── Libera un peer por completo (usado al fallar tras reintentos o al salir) ──
+  // Solo libera la cámara/mic de ESE peer: jamás toca el <video> principal.
   const cleanupPeer = useCallback((targetSocketId: string) => {
     const pc = peerConnections.current.get(targetSocketId);
     if (pc) {
@@ -203,11 +219,18 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     remoteStreams.current.delete(targetSocketId);
     makingOfferRef.current.delete(targetSocketId);
     restartAttempts.current.delete(targetSocketId);
+    lastFramesRef.current.delete(targetSocketId);
     const timer = disconnectTimers.current.get(targetSocketId);
     if (timer) {
       clearTimeout(timer);
       disconnectTimers.current.delete(targetSocketId);
     }
+    setPeerSignalStates((prev) => {
+      if (!(targetSocketId in prev)) return prev;
+      const next = { ...prev };
+      delete next[targetSocketId];
+      return next;
+    });
     syncRemotePeersState();
   }, [syncRemotePeersState]);
 
@@ -283,7 +306,10 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
         syncRemotePeersState();
       };
 
-      // Monitor connection state
+      // Monitor connection state (resiliente: reintenta antes de soltar).
+      // 'disconnected' puede recuperarse solo (handoff WiFi/datos): se espera
+      // 8 s y se reintenta ICE; 'failed' reintenta con backoff (tope 3).
+      // La película principal no se ve afectada en ningún caso.
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
         console.log(`[WebRTC] Peer ${targetSocketId} state: ${state}`);
@@ -328,7 +354,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
 
       return pc;
     },
-    [socket, attachLocalTracksToPC, setupDataChannel, syncRemotePeersState]
+    [socket, attachLocalTracksToPC, setupDataChannel, syncRemotePeersState, cleanupPeer]
   );
 
   // ── Send Offer (Initial or Renegotiation) ──────────────────────────────────
@@ -531,7 +557,9 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   }, [enableMedia]);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Monitor de calidad: sube/baja UN escalón por evaluación (cada 6 s).
+  // Monitor de calidad propia: sube/baja UN escalón por evaluación (cada 6 s).
+  // Solo degrada la cámara LOCAL (bitrate/resolución/solo-audio). El audio
+  // sigue siempre y la película principal jamás se toca.
   // ──────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let stopped = false;
@@ -623,6 +651,70 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       }
     }
   }, [qualityLevel, isCameraOn]);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Monitor de señal por peer remoto (Rol A, cada 4 s): getStats de recepción
+  // (pérdida/jitter de video) + detección de frame congelado (frames que no
+  // avanzan ≥ REMOTE_FROZEN_AFTER_MS). Con `weak` el tile muestra avatar +
+  // "señal débil"; con `critical` se fuerza audio-only en recepción (se
+  // oculta su <video>; su <audio> sigue sonando siempre).
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const tick = async () => {
+      if (stopped) return;
+      try {
+        const entries = [...peerConnections.current.entries()].filter(
+          ([, pc]) => pc.connectionState !== 'closed' && pc.connectionState !== 'failed'
+        );
+        if (entries.length > 0) {
+          const now = Date.now();
+          const next: Record<string, PeerSignalState> = {};
+          for (const [socketId, pc] of entries) {
+            try {
+              const reception = await collectPeerReception(pc);
+              if (!reception) continue;
+              let frozen = false;
+              if (reception.framesReceived !== null) {
+                const prev = lastFramesRef.current.get(socketId);
+                if (!prev || prev.frames !== reception.framesReceived) {
+                  lastFramesRef.current.set(socketId, { frames: reception.framesReceived, at: now });
+                } else if (now - prev.at >= REMOTE_FROZEN_AFTER_MS) {
+                  frozen = true;
+                }
+              }
+              next[socketId] = assessPeerSignal({
+                videoLossPct: reception.videoLossPct,
+                jitterMs: reception.jitterMs,
+                frozen,
+              });
+            } catch {}
+          }
+          setPeerSignalStates((prev) => {
+            const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+            for (const k of keys) {
+              const a = prev[k];
+              const b = next[k];
+              if (!a || !b || a.weak !== b.weak || a.critical !== b.critical || a.frozen !== b.frozen) {
+                return next;
+              }
+            }
+            return prev;
+          });
+        }
+      } catch {}
+      if (!stopped) {
+        timer = setTimeout(tick, 4000);
+      }
+    };
+    timer = setTimeout(tick, 4000);
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   // ──────────────────────────────────────────────────────────────────────────
   // Socket.IO signaling event listeners
@@ -782,6 +874,19 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       pendingCandidates.current.delete(d.socketId);
       remoteStreams.current.delete(d.socketId);
       makingOfferRef.current.delete(d.socketId);
+      restartAttempts.current.delete(d.socketId);
+      lastFramesRef.current.delete(d.socketId);
+      const timer = disconnectTimers.current.get(d.socketId);
+      if (timer) {
+        clearTimeout(timer);
+        disconnectTimers.current.delete(d.socketId);
+      }
+      setPeerSignalStates((prev) => {
+        if (!(d.socketId in prev)) return prev;
+        const next = { ...prev };
+        delete next[d.socketId];
+        return next;
+      });
       syncRemotePeersState();
 
       setPeerMediaStates((prev) => {
@@ -832,6 +937,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       remoteStreams.current.clear();
       makingOfferRef.current.clear();
       restartAttempts.current.clear();
+      lastFramesRef.current.clear();
       disconnectTimers.current.forEach((timer) => clearTimeout(timer));
       disconnectTimers.current.clear();
     };
@@ -841,10 +947,12 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     localStream,
     remotePeers,
     peerMediaStates,
+    peerSignalStates,
+    qualityLevel,
+    lowBandwidth,
     isMicOn,
     isCameraOn,
     mediaError,
-    lowBandwidth,
     toggleMic,
     toggleCamera,
     enableMedia,

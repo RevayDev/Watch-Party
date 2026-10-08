@@ -7,6 +7,7 @@ import { RoomService } from '../../services/room.service.js';
 import { activeUsers } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 import { checkSocketThrottle, isDuplicateSocketEvent } from '../socket-limits.js';
+import { resetVideoReady } from './video-ready.handler.js';
 
 const VIDEO_HOST_ONLY = 'Solo el anfitrión puede cambiar el video de la sala.';
 
@@ -122,6 +123,8 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       isPlaying: false,
       updatedAt: Date.now(),
     });
+    // El nuevo video abre un conteo `video-ready` fresco (auto-play grupal).
+    resetVideoReady(cleanRoomId);
 
     console.log(`🎬 Nuevo video cargado en sala [${cleanRoomId}]: ${video.originalName}`);
     io.to(cleanRoomId).emit('video-changed', { video });

@@ -3,6 +3,7 @@ import { RoomService } from '../services/room.service.js';
 import { roomPlayback, roomPositions } from '../domain/playback-policy.js';
 import { registerJoinApprovalHandlers } from './handlers/join-approval.handler.js';
 import { registerSyncPlaybackHandlers } from './handlers/sync-playback.handler.js';
+import { registerVideoReadyHandlers, clearVideoReady } from './handlers/video-ready.handler.js';
 import { registerChatReactionsHandlers } from './handlers/chat-reactions.handler.js';
 import { registerModerationHandlers } from './handlers/moderation.handler.js';
 import { registerWebrtcRelayHandlers } from './handlers/webrtc-relay.handler.js';
@@ -29,6 +30,7 @@ export function setupSocketHandlers(io: Server): void {
 
     registerJoinApprovalHandlers(io, socket);
     registerSyncPlaybackHandlers(io, socket);
+    registerVideoReadyHandlers(io, socket);
     registerChatReactionsHandlers(io, socket);
     registerModerationHandlers(io, socket);
     registerWebrtcRelayHandlers(io, socket);
@@ -52,6 +54,7 @@ export function setupSocketHandlers(io: Server): void {
         io.in(cleanRoomId).socketsLeave(cleanRoomId);
         roomPlayback.delete(cleanRoomId);
         roomPositions.delete(cleanRoomId);
+        clearVideoReady(cleanRoomId);
         // Video is only removed when the room is temporary (deleteRoom handles that)
         await RoomService.deleteRoom(cleanRoomId, false);
       }

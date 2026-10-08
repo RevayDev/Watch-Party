@@ -9,6 +9,8 @@ import { RoomService } from '../../services/room.service.js';
 import { findRequesterParticipant, requireModerator } from '../../domain/auth-policy.js';
 import { activeMediaStates, activeUsers } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
+import { dropPosition } from '../../domain/playback-policy.js';
+import { pruneVideoReadySocket } from './video-ready.handler.js';
 
 const MODERATOR_ONLY = 'Solo el anfitrión o un co-anfitrión puede realizar esta acción.';
 
@@ -116,6 +118,19 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
         kickedBy,
         ban,
       });
+
+      // Quien es expulsado/baneado sale del consenso de inmediato (su socket
+      // se cerrará en el cliente, pero el consenso no espera a eso).
+      for (const [sid, u] of activeUsers.entries()) {
+        if (u.roomId !== cleanRoomId) continue;
+        const matches =
+          (targetUserId && u.userId === targetUserId) ||
+          (!targetUserId && u.userName.toLowerCase() === targetUserName.trim().toLowerCase());
+        if (matches) {
+          dropPosition(cleanRoomId, sid);
+          pruneVideoReadySocket(io, cleanRoomId, sid);
+        }
+      }
 
       io.to(cleanRoomId).emit('user-kicked', {
         targetUserName,

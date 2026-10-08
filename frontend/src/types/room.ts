@@ -37,6 +37,19 @@ export interface IRoomSettings {
   description?: string;
   timerMinutes?: number | null;
   timerEndsAt?: string | null;
+  /** Rol B (rendimiento, persistidos en ajustes de sala). */
+  /** Modo ahorro de datos: remotos a audio-only + heartbeat 15 s. */
+  dataSaver?: boolean;
+  /** Mostrar avisos (toasts) dentro del player en pantalla completa. Default ON. */
+  fullscreenToasts?: boolean;
+  /** Mostrar reacciones flotantes sobre el vídeo. Default ON. */
+  reactionsEnabled?: boolean;
+  /** Efectos visuales: combo Interestellar + animaciones largas. Default ON. */
+  visualEffects?: boolean;
+  /** Atenuación del vídeo mientras el micro está activo. Default ON. */
+  duckingEnabled?: boolean;
+  /** Nivel de atenuación en % (10–60, default 30). */
+  duckingLevel?: number;
 }
 
 export interface IVideoMetadata {
@@ -77,5 +90,11 @@ export interface ReactionItem {
   emoji: string;
   user: string;
   xOffset: number;
+}
+
+/** Indicador "está escribiendo": efímero, sin persistencia (expira a los 4 s). */
+export interface TypingPayload {
+  user: string;
+  timestamp: number;
 }
 

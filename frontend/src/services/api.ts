@@ -1,4 +1,4 @@
-import { IRoomData, IVideoMetadata } from '../types/room';
+import { IRoomData, IRoomSettings, IVideoMetadata } from '../types/room';
 import { buildRestAuthHeaders, getStoredUserId } from '../shared/utils';
 import type { DemoAvailability } from '../shared/demo';
 import type { HealthPayload, StatusPayload } from '../features/status/types';
@@ -178,6 +178,34 @@ export class ApiService {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || 'No se pudo canjear el código');
     }
+    return response.json();
+  }
+
+  /**
+   * Actualiza ajustes de sala por REST (`PATCH /api/rooms/:roomId/settings`).
+   * Rol B: la UI en vivo usa socket (difusión en tiempo real); este helper
+   * queda para llamadas sin socket. Requiere anfitrión (el servidor valida
+   * la misma whitelist que por socket).
+   */
+  static async updateRoomSettings(
+    roomId: string,
+    settings: Partial<IRoomSettings>,
+    userName?: string
+  ): Promise<{ message: string; settings: IRoomSettings }> {
+    const response = await fetch(`${API_BASE_URL}/rooms/${roomId}/settings`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildRestAuthHeaders(roomId, userName),
+      },
+      body: JSON.stringify({ settings }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al actualizar la configuración');
+    }
+
     return response.json();
   }
 

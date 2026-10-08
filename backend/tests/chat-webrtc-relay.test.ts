@@ -214,3 +214,58 @@ describe('webrtc relay', () => {
     expect(sock.toEmitted[0]).toMatchObject({ room: 'ABC123', event: 'peer-media-state' });
   });
 });
+
+describe('chat: typing', () => {
+  it('typing válido se reenvía a la sala con user + timestamp', () => {
+    const { io, roomEmits } = makeIo();
+    const sock = makeSocket('s-typing');
+    registerChatReactionsHandlers(io, sock.socket);
+
+    (sock.handlers.get('typing') as any)({ roomId: 'abc123', userName: 'Ana' });
+
+    expect(roomEmits).toHaveLength(1);
+    expect(roomEmits[0].room).toBe('ABC123');
+    expect(roomEmits[0].event).toBe('typing');
+    expect((roomEmits[0].payload as any).user).toBe('Ana');
+    expect(typeof (roomEmits[0].payload as any).timestamp).toBe('number');
+  });
+
+  it('typing sin sala o sin usuario se descarta', () => {
+    const { io, roomEmits } = makeIo();
+    const sock = makeSocket('s-typing');
+    registerChatReactionsHandlers(io, sock.socket);
+
+    (sock.handlers.get('typing') as any)(undefined);
+    (sock.handlers.get('typing') as any)({ userName: 'Ana' });
+    (sock.handlers.get('typing') as any)({ roomId: 'ABC123' });
+    (sock.handlers.get('typing') as any)({ roomId: '   ', userName: 'Ana' });
+
+    expect(roomEmits).toHaveLength(0);
+  });
+
+  it('typing con usuario vacío solo espacios no llega a emitir', () => {
+    const { io, roomEmits } = makeIo();
+    const sock = makeSocket('s-typing');
+    registerChatReactionsHandlers(io, sock.socket);
+
+    (sock.handlers.get('typing') as any)({ roomId: 'ABC123', userName: '   ' });
+
+    expect(roomEmits).toHaveLength(0);
+  });
+
+  it('resuelve el rate-limit: muchos typing seguidos se silencian en exceso', () => {
+    const { io, roomEmits } = makeIo();
+    const sock = makeSocket('s-typing');
+    registerChatReactionsHandlers(io, sock.socket);
+
+    for (let i = 0; i < 20; i++) {
+      (sock.handlers.get('typing') as any)({ roomId: 'ABC123', userName: 'Ana' });
+    }
+
+    // El límite (10/10s) descarta el excedente en silencio: llegan varias pero
+    // nunca las 20. La cifra exacta depende de la ventana temporal.
+    expect(roomEmits.length).toBeLessThan(20);
+    expect(roomEmits.length).toBeGreaterThan(0);
+    expect(roomEmits.every((e) => e.event === 'typing')).toBe(true);
+  });
+});

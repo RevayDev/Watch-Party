@@ -15,6 +15,8 @@ interface RoomDrawerProps {
   setActiveSideTab: React.Dispatch<React.SetStateAction<'chat' | 'participants' | null>>;
   messages: ChatMessage[];
   handleSendMessage: (text: string) => void;
+  typingUsers: string[];
+  onTyping: () => void;
   myName: string;
   roomData: IRoomData;
   userId: string;
@@ -34,6 +36,8 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   setActiveSideTab,
   messages,
   handleSendMessage,
+  typingUsers,
+  onTyping,
   myName,
   roomData,
   userId,
@@ -65,6 +69,8 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             messages={messages}
             onSendMessage={handleSendMessage}
             currentUserName={myName}
+            typingUsers={typingUsers}
+            onTyping={onTyping}
             onClose={() => setActiveSideTab(null)}
           />
         )}

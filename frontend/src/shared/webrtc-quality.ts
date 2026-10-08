@@ -143,3 +143,110 @@ export async function collectPeerSample(pc: StatsCapable): Promise<QualitySample
   if (rttMs === null && audioLossPct === null && videoLossPct === null) return null;
   return { rttMs, audioLossPct, videoLossPct };
 }
+
+/* ── Señal por peer remoto (Rol A) ──────────────────────────────────────
+ * El monitor propio (assessQuality/stepLevel) degrada la cámara LOCAL.
+ * Este segundo veredicto es por PEER REMOTO y solo afecta a su tile en
+ * CameraGrid: `weak` → avatar + "señal débil"; `critical` → además se
+ * oculta su <video> (audio-only en recepción; su <audio> nunca se toca).
+ * La película principal jamás se ve afectada por ninguno de los dos.
+ */
+
+/** Sin frames entrantes durante este tiempo el remoto cuenta como congelado. */
+export const REMOTE_FROZEN_AFTER_MS = 6000;
+/** Pérdida de video (%) para marcar débil / crítica en recepción. */
+export const WEAK_VIDEO_LOSS_PCT = 5;
+export const CRITICAL_VIDEO_LOSS_PCT = 15;
+/** Jitter de video (ms) para marcar débil / crítica en recepción. */
+export const WEAK_JITTER_MS = 300;
+export const CRITICAL_JITTER_MS = 600;
+
+export interface PeerSignalState {
+  weak: boolean;
+  critical: boolean;
+  frozen: boolean;
+}
+
+export interface PeerSignalInput {
+  videoLossPct: number | null;
+  jitterMs: number | null;
+  frozen: boolean;
+}
+
+/**
+ * Veredicto puro por peer remoto. `frozen` (frames que no avanzan) siempre
+ * es crítico; si no, mandan los umbrales de pérdida/jitter de video.
+ */
+export function assessPeerSignal(input: PeerSignalInput): PeerSignalState {
+  const { videoLossPct, jitterMs, frozen } = input;
+  const critical =
+    frozen === true ||
+    (videoLossPct !== null && videoLossPct > CRITICAL_VIDEO_LOSS_PCT) ||
+    (jitterMs !== null && jitterMs > CRITICAL_JITTER_MS);
+  const weak =
+    critical ||
+    (videoLossPct !== null && videoLossPct > WEAK_VIDEO_LOSS_PCT) ||
+    (jitterMs !== null && jitterMs > WEAK_JITTER_MS);
+  return { weak, critical, frozen };
+}
+
+export interface PeerReception {
+  videoLossPct: number | null;
+  jitterMs: number | null;
+  framesReceived: number | null;
+}
+
+interface ReceptionStatsReport {
+  type: string;
+  kind?: string;
+  packetsLost?: number;
+  packetsReceived?: number;
+  jitter?: number;
+  framesReceived?: number;
+}
+
+/**
+ * Lee la recepción de video desde `RTCPeerConnection.getStats()`. Acepta el
+ * RTCStatsReport real (forEach), un Map o un array (testeable con fakes).
+ * `null` si no hay datos útiles de video.
+ */
+export async function collectPeerReception(pc: StatsCapable): Promise<PeerReception | null> {
+  let report: Iterable<ReceptionStatsReport>;
+  try {
+    const raw: unknown = await pc.getStats();
+    if (Array.isArray(raw)) {
+      report = raw as ReceptionStatsReport[];
+    } else if (raw instanceof Map) {
+      report = (raw as Map<string, ReceptionStatsReport>).values();
+    } else if (
+      raw &&
+      typeof (raw as { forEach?: unknown }).forEach === 'function'
+    ) {
+      const items: ReceptionStatsReport[] = [];
+      (raw as { forEach(cb: (value: ReceptionStatsReport) => void): void }).forEach((v) => {
+        items.push(v);
+      });
+      report = items;
+    } else {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  let videoLossPct: number | null = null;
+  let jitterMs: number | null = null;
+  let framesReceived: number | null = null;
+  for (const s of report) {
+    if (s.type === 'inbound-rtp' && (s.kind === 'video' || s.kind === undefined)) {
+      if (typeof s.packetsLost === 'number' && typeof s.packetsReceived === 'number') {
+        const total = s.packetsLost + s.packetsReceived;
+        if (total > 0) videoLossPct = (s.packetsLost / total) * 100;
+      }
+      // jitter de WebRTC viene en segundos → ms.
+      if (typeof s.jitter === 'number') jitterMs = s.jitter * 1000;
+      if (typeof s.framesReceived === 'number') framesReceived = s.framesReceived;
+    }
+  }
+  if (videoLossPct === null && jitterMs === null && framesReceived === null) return null;
+  return { videoLossPct, jitterMs, framesReceived };
+}

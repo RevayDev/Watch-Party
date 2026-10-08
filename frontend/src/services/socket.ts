@@ -21,7 +21,8 @@ export function getSocket(): Socket {
       transports: ['websocket', 'polling'],
       withCredentials: false,
       // Reconexión resiliente ante señal intermitente: reintentos con
-      // backoff y timeout generoso (la sala tolera 20 s de gracia).
+      // backoff y timeout generoso (la sala tolera 20 s de gracia y la
+      // película nunca se pausa por un fallo del socket).
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,

@@ -409,4 +409,86 @@ describe('useRoomSocket (eventos socket críticos)', () => {
     expect(result.current.handlePlaybackHeartbeat).toBe(first);
     webRTCStubs.isMicOn = false;
   });
+
+  it('disconnect transitorio marca isReconnecting SIN leave-room ni limpiar sala/video', async () => {
+    const { mockSocket, result, onLeave } = setup(false);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    const video = { originalName: 'noche.mp4', fileName: 'abc.mp4', mimeType: 'video/mp4', sizeBytes: 1000 };
+    act(() => {
+      mockSocket._fire('room-state', { video, participants: [], joinRequests: [] });
+    });
+    expect(result.current.joined).toBe(true);
+    expect(result.current.isReconnecting).toBe(false);
+
+    act(() => {
+      mockSocket._fire('disconnect');
+    });
+    expect(result.current.isReconnecting).toBe(true);
+    // Ni leave-room, ni salida, ni limpieza de la sala o del video
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('leave-room', expect.anything());
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(disconnectSocket).not.toHaveBeenCalled();
+    expect(result.current.roomData?.video).toMatchObject({ originalName: 'noche.mp4' });
+    expect(result.current.joined).toBe(true);
+
+    act(() => {
+      mockSocket._fire('reconnect_attempt');
+    });
+    expect(result.current.isReconnecting).toBe(true);
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('leave-room', expect.anything());
+  });
+
+  it('reconnect + room-state limpia isReconnecting (re-join sin corte)', async () => {
+    const { mockSocket, result, onLeave } = setup(true);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    act(() => {
+      mockSocket._fire('disconnect');
+    });
+    expect(result.current.isReconnecting).toBe(true);
+    act(() => {
+      mockSocket._fire('reconnect');
+    });
+    expect(result.current.isReconnecting).toBe(false);
+    act(() => {
+      mockSocket._fire('disconnect');
+    });
+    act(() => {
+      mockSocket._fire('connect');
+    });
+    // connect re-emite join-room (re-join automático)
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'join-room',
+      expect.objectContaining({ roomId: 'ABC123', userName: 'Beto' })
+    );
+    const video = { originalName: 'noche.mp4', fileName: 'abc.mp4', mimeType: 'video/mp4', sizeBytes: 1000 };
+    act(() => {
+      mockSocket._fire('room-state', { video, participants: [], joinRequests: [] });
+    });
+    expect(result.current.isReconnecting).toBe(false);
+    expect(result.current.joined).toBe(true);
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('sync-video con autoplay guarda la marca (play grupal, sin seek repetido)', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      mockSocket._fire('sync-video', { action: 'play', currentTime: 0, sentAt: Date.now(), autoplay: true });
+    });
+    expect(result.current.remoteAction).toMatchObject({ action: 'play', currentTime: 0, autoplay: true });
+    // Sin re-emisión de sync-video por aplicar un remoto
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('sync-video', expect.anything());
+  });
+
+  it('handleVideoReady emite video-ready con roomId y fileName', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      result.current.handleVideoReady('abc.mp4');
+    });
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'video-ready',
+      expect.objectContaining({ roomId: 'ABC123', fileName: 'abc.mp4' })
+    );
+  });
 });
