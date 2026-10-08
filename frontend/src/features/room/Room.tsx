@@ -112,9 +112,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             onSetVideoUrl={r.handleSetVideoUrl}
             uploadProgress={r.uploadProgress}
             onSyncAction={r.handleSyncAction}
-            onPlaybackHeartbeat={(currentTime, isPlaying) => {
-              r.socket.emit('playback-heartbeat', { roomId, currentTime, isPlaying });
-            }}
+            onPlaybackHeartbeat={r.handlePlaybackHeartbeat}
             remoteAction={r.remoteAction}
             reactions={r.reactions}
             isMicOn={r.isMicOn}

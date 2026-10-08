@@ -211,7 +211,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [video, roomId, retryToken]);
 
-  // Apply incoming remote sync actions with latency compensation
+  // Apply incoming remote sync actions with latency compensation and smooth tolerance
   useEffect(() => {
     if (!remoteAction || !videoRef.current) return;
 
@@ -228,18 +228,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const diff = Math.abs(vid.currentTime - targetTime);
 
-    if (diff > 0.5 || remoteAction.action === 'seek') {
-      vid.currentTime = targetTime;
-    }
-
     if (remoteAction.action === 'play') {
+      if (diff > 2.0) {
+        // Desfase grande (>2s): salto directo para alinearse a la escena
+        vid.currentTime = targetTime;
+        vid.playbackRate = 1.0;
+      } else if (diff > 0.8) {
+        // Desfase leve (0.8s - 2s): micro-ajuste de velocidad para emparejar suavemente sin cortes
+        vid.playbackRate = vid.currentTime < targetTime ? 1.05 : 0.95;
+        setTimeout(() => {
+          if (videoRef.current) videoRef.current.playbackRate = 1.0;
+        }, 2000);
+      } else {
+        vid.playbackRate = 1.0;
+      }
+
       if (vid.paused) {
         vid.play().catch(() => {});
       }
     } else if (remoteAction.action === 'pause') {
+      vid.playbackRate = 1.0;
+      if (diff > 2.0) {
+        vid.currentTime = targetTime;
+      }
       if (!vid.paused) {
         vid.pause();
       }
+    } else if (remoteAction.action === 'seek') {
+      vid.playbackRate = 1.0;
+      vid.currentTime = targetTime;
     }
 
     setTimeout(() => {

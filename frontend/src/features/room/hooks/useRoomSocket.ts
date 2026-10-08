@@ -18,6 +18,9 @@ export interface UseRoomSocketArgs {
   onLeave: () => void;
 }
 
+let remoteActionSeq = 0;
+export const nextRemoteActionTimestamp = (): number => Date.now() + (++remoteActionSeq * 0.001);
+
 /**
  * Toda la lógica socket/estado extraída verbatim de pages/Room.tsx.
  * El componente queda como composición (sin lógica de negocio aquí alterada).
@@ -83,6 +86,10 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     sentAt?: number;
     timestamp: number;
   } | null>(null);
+  // Último consenso de playback ya aplicado: `room-state` llega en cada
+  // (re)join con la misma posición y reaplicarlo corta el video. Solo se
+  // re-aplica si cambia play/pause o el salto supera la tolerancia (2 s).
+  const lastConsensusRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
 
   // Active side panel tab: null | 'chat' | 'participants'
   const [activeSideTab, setActiveSideTab] = useState<'chat' | 'participants' | null>(null);
@@ -211,6 +218,15 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     enableMedia,
   } = useWebRTC(socket, roomId, myName, isHost);
 
+  // Espejos por ref del estado media/host para el efecto socket.
+  // Evita que togglear mic/cámara recree listeners ni provoque recargas de sala.
+  const enableMediaRef = useRef(enableMedia);
+  enableMediaRef.current = enableMedia;
+  const isMicOnRef = useRef(isMicOn);
+  isMicOnRef.current = isMicOn;
+  const isCameraOnRef = useRef(isCameraOn);
+  isCameraOnRef.current = isCameraOn;
+
   // Clears local data only for THIS room (keeps sessions of other rooms intact)
   const clearRoomLocalData = useCallback(() => {
     try {
@@ -297,17 +313,25 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
         applyMediaOnJoinRef.current = false;
         const { micOn, camOn } = pendingMediaPrefRef.current;
         if (micOn || camOn) {
-          enableMedia(micOn, camOn);
+          enableMediaRef.current(micOn, camOn);
         }
       }
 
       if (state.playback && state.video) {
-        setRemoteAction({
-          action: state.playback.isPlaying ? 'play' : 'seek',
-          currentTime: state.playback.currentTime,
-          sentAt: Date.now(),
-          timestamp: Date.now(),
-        });
+        const nextPlaying = state.playback.isPlaying;
+        const prev = lastConsensusRef.current;
+        const timeJump = prev ? Math.abs(state.playback.currentTime - prev.currentTime) : Infinity;
+        // Solo seeks redundantes verificados se filtran: primer estado,
+        // cambio play/pause o salto >2 s siempre se aplican.
+        if (!prev || prev.isPlaying !== nextPlaying || timeJump > 2) {
+          lastConsensusRef.current = { currentTime: state.playback.currentTime, isPlaying: nextPlaying };
+          setRemoteAction({
+            action: state.playback.isPlaying ? 'play' : 'seek',
+            currentTime: state.playback.currentTime,
+            sentAt: Date.now(),
+            timestamp: nextRemoteActionTimestamp(),
+          });
+        }
       }
     };
 
@@ -400,11 +424,21 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     };
 
     const handleSyncVideo = (data: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number }) => {
+      if (data.action === 'play') {
+        lastConsensusRef.current = { currentTime: data.currentTime, isPlaying: true };
+      } else if (data.action === 'pause') {
+        lastConsensusRef.current = { currentTime: data.currentTime, isPlaying: false };
+      } else {
+        lastConsensusRef.current = {
+          currentTime: data.currentTime,
+          isPlaying: lastConsensusRef.current?.isPlaying ?? false,
+        };
+      }
       setRemoteAction({
         action: data.action,
         currentTime: data.currentTime,
         sentAt: data.sentAt,
-        timestamp: Date.now(),
+        timestamp: nextRemoteActionTimestamp(),
       });
     };
 
@@ -431,27 +465,27 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     // Moderation remote actions
     const handleForceMuteUser = (data: { targetSocketId?: string; targetUserName: string }) => {
       if (data.targetUserName.toLowerCase() === myName.toLowerCase() || data.targetSocketId === socket.id) {
-        enableMedia(false, isCameraOn);
+        enableMediaRef.current(false, isCameraOnRef.current);
         notify('warning', 'El anfitrión o co-anfitrión ha silenciado tu micrófono.', 'Micro silenciado');
       }
     };
 
     const handleForceDisableCamera = (data: { targetSocketId?: string; targetUserName: string }) => {
       if (data.targetUserName.toLowerCase() === myName.toLowerCase() || data.targetSocketId === socket.id) {
-        enableMedia(isMicOn, false);
+        enableMediaRef.current(isMicOnRef.current, false);
         notify('warning', 'El anfitrión o co-anfitrión ha apagado tu cámara.', 'Cámara apagada');
       }
     };
 
     const handleForceMuteAll = () => {
-      if (!isHost) {
-        enableMedia(false, isCameraOn);
+      if (!isHostRef.current) {
+        enableMediaRef.current(false, isCameraOnRef.current);
       }
     };
 
     const handleForceDisableAllCameras = () => {
-      if (!isHost) {
-        enableMedia(isMicOn, false);
+      if (!isHostRef.current) {
+        enableMediaRef.current(isMicOnRef.current, false);
       }
     };
 
@@ -678,7 +712,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       socket.off('settings-error', handleSettingsError);
       socket.off('action-denied', handleActionDenied);
     };
-  }, [roomId, myName, initialIsHost, socket, onLeave, enableMedia, userId, clearRoomLocalData, isCameraOn, isMicOn, isHost]);
+  }, [roomId, myName, initialIsHost, socket, onLeave, userId, clearRoomLocalData]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -846,6 +880,13 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     }, 120);
   };
 
+  const handlePlaybackHeartbeat = useCallback(
+    (currentTime: number, isPlaying: boolean) => {
+      socket.emit('playback-heartbeat', { roomId, currentTime, isPlaying });
+    },
+    [roomId, socket]
+  );
+
   return {
     userId,
     myName,
@@ -902,6 +943,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     handleUploadVideo,
     handleSetVideoUrl,
     handleSyncAction,
+    handlePlaybackHeartbeat,
     handleSendMessage,
     handleReaction,
     handleCancelWaiting,
