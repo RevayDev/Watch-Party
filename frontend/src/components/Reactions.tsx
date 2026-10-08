@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 
-/** Primera fila: pareja Interestellar, centrada y junta. */
-export const FEATURED_EMOJIS = ['✨', '🪐'];
-/** Principales restantes (segunda fila). */
-export const MAIN_EMOJIS = ['🩷', '🌹', '🌸', '🌷', '🎀'];
-/** Fila plegable tras el botón + (compatibilidad con los 6 clásicos). */
-export const EXTRA_EMOJIS = ['❤️', '😂', '😮', '👏', '🔥', '🍿'];
+/** Emojis principales (incluye chispa ✨ y saturno 🪐 en la misma fila + clásicos). */
+export const MAIN_EMOJIS = ['✨', '🪐', '❤️', '😂', '😮', '👏', '🔥', '🍿'];
+/** Fila desplegable / invertida (temáticos florales/rosas). */
+export const EXTRA_EMOJIS = ['🩷', '🌹', '🌸', '🌷', '🎀'];
 
 interface ReactionsProps {
   onReact: (emoji: string) => void;
@@ -16,20 +14,6 @@ export const Reactions: React.FC<ReactionsProps> = ({ onReact }) => {
 
   return (
     <div className="reactions-bar" role="toolbar" aria-label="Reacciones">
-      <div className="reactions-bar__row reactions-bar__row--featured">
-        {FEATURED_EMOJIS.map((emoji) => (
-          <button
-            key={emoji}
-            type="button"
-            className="reactions-bar__btn"
-            onClick={() => onReact(emoji)}
-            title={`Reaccionar con ${emoji}`}
-            aria-label={`Reaccionar con ${emoji}`}
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
       <div className="reactions-bar__row">
         {MAIN_EMOJIS.map((emoji) => (
           <button
@@ -73,3 +57,4 @@ export const Reactions: React.FC<ReactionsProps> = ({ onReact }) => {
     </div>
   );
 };
+

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Video, Hash, Link as LinkIcon, Share2, Users, Settings } from 'lucide-react';
+import { Video, Hash, Link as LinkIcon, Share2, Users, Settings, Clock, Hourglass } from 'lucide-react';
 import { usePresence } from '../hooks/usePresence';
 import { useSwipeDown } from '../shared/hooks/useSheetDrag';
 import { formatRemaining } from '../shared/utils';
@@ -9,6 +9,7 @@ interface RoomHeaderProps {
   roomId: string;
   participantCount: number;
   isHost: boolean;
+  createdAt?: string;
   roomName?: string;
   roomDescription?: string;
   timerEndsAt?: string | null;
@@ -30,6 +31,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   roomId,
   participantCount,
   isHost,
+  createdAt,
   roomName,
   roomDescription,
   timerEndsAt,
@@ -43,28 +45,45 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
 }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const sharePresence = usePresence(showShareMenu, 160);
-  // Same swipe-down-to-close as the phone sheets
   const shareSheetRef = useSwipeDown<HTMLDivElement>(
     () => setShowShareMenu(false),
     showShareMenu
   );
+
+  const [showClockMenu, setShowClockMenu] = useState(false);
+  const clockPresence = usePresence(showClockMenu, 160);
+  const clockSheetRef = useSwipeDown<HTMLDivElement>(
+    () => setShowClockMenu(false),
+    showClockMenu
+  );
+
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
+  const [totalTimerDurationMs, setTotalTimerDurationMs] = useState<number | null>(null);
+
   const shareRef = useRef<HTMLDivElement>(null);
+  const clockRef = useRef<HTMLDivElement>(null);
 
   const fullUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
 
-  // Close the share menu on outside click / Escape
+  // Close menus on outside click / Escape
   useEffect(() => {
-    if (!showShareMenu) return;
+    if (!showShareMenu && !showClockMenu) return;
     const onDocClick = (e: MouseEvent) => {
-      if (shareRef.current && !shareRef.current.contains(e.target as Node)) {
+      if (showShareMenu && shareRef.current && !shareRef.current.contains(e.target as Node)) {
         setShowShareMenu(false);
+      }
+      if (showClockMenu && clockRef.current && !clockRef.current.contains(e.target as Node)) {
+        setShowClockMenu(false);
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowShareMenu(false);
+      if (e.key === 'Escape') {
+        setShowShareMenu(false);
+        setShowClockMenu(false);
+      }
     };
     document.addEventListener('mousedown', onDocClick);
     document.addEventListener('keydown', onKey);
@@ -72,22 +91,31 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
       document.removeEventListener('mousedown', onDocClick);
       document.removeEventListener('keydown', onKey);
     };
-  }, [showShareMenu]);
+  }, [showShareMenu, showClockMenu]);
 
-  // Room auto-close countdown (seconds tick)
+  // Elapsed time and timer countdown tick
   useEffect(() => {
-    if (!timerEndsAt) {
-      setRemainingMs(null);
-      return;
-    }
     const tick = () => {
-      const ms = new Date(timerEndsAt).getTime() - Date.now();
-      setRemainingMs(ms > 0 ? ms : 0);
+      const now = Date.now();
+      let createdMs = now;
+      if (createdAt) {
+        createdMs = new Date(createdAt).getTime();
+        setElapsedMs(Math.max(0, now - createdMs));
+      }
+      if (timerEndsAt) {
+        const endsMs = new Date(timerEndsAt).getTime();
+        const ms = endsMs - now;
+        setRemainingMs(ms > 0 ? ms : 0);
+        setTotalTimerDurationMs(Math.max(1, endsMs - createdMs));
+      } else {
+        setRemainingMs(null);
+        setTotalTimerDurationMs(null);
+      }
     };
     tick();
     const iv = window.setInterval(tick, 1000);
     return () => window.clearInterval(iv);
-  }, [timerEndsAt]);
+  }, [createdAt, timerEndsAt]);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomId);
@@ -102,13 +130,45 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   };
 
   const hasRoomName = Boolean(roomName && roomName.trim());
-
-  // Demo gratuita: cupo visible X/5 (participants incluye al host; las
-  // solicitudes en espera NO consumen cupo). Con VITE_DEMO_MODE=false se
-  // muestra el conteo original sin capacidad.
   const demo = isDemoMode();
-  const statusLabel =
-    roomStatus === 'waiting' ? 'En espera' : roomStatus === 'active' ? 'En curso' : roomStatus === 'closed' ? 'Cerrada' : null;
+
+  const formattedCloseTime = timerEndsAt
+    ? new Date(timerEndsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  // Estado del temporizador:
+  // waiting → muestra tiempo transcurrido ("En espera", neutro)
+  // active  → muestra cuenta regresiva con colores:
+  //   - normalito por defecto
+  //   - amarillo cuando va por la mitad
+  //   - rojo cuando quedan ≤50 min
+  const isWaiting = roomStatus === 'waiting';
+  let timerToneClass = 'header__timer-pill--normal';
+  let timerIconColor = '#94a3b8'; // color neutro por defecto
+
+  if (!isWaiting && remainingMs !== null) {
+    const fiftyMinutesMs = 50 * 60 * 1000;
+    const isHalfWay = totalTimerDurationMs !== null && remainingMs <= totalTimerDurationMs / 2;
+
+    if (remainingMs <= fiftyMinutesMs) {
+      timerToneClass = 'header__timer-pill--urgent';
+      timerIconColor = '#f87171'; // rojo
+    } else if (isHalfWay) {
+      timerToneClass = 'header__timer-pill--warning';
+      timerIconColor = '#fbbf24'; // amarillo
+    }
+  }
+
+  // Texto y tooltip del pill
+  const timerPillText = isWaiting
+    ? `En espera · ${formatRemaining(elapsedMs)}`
+    : remainingMs !== null
+      ? formatRemaining(remainingMs)
+      : formatRemaining(elapsedMs);
+
+  const timerPillTitle = isWaiting
+    ? 'Esperando a que alguien entre — el temporizador inicia al unirse un participante'
+    : 'Tiempo restante de la sala (ver detalles)';
 
   return (
     <header className={`header ${className} ${hasRoomName ? 'header--has-name' : ''}`}>
@@ -191,16 +251,6 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           )}
         </div>
 
-        {/* Room auto-close countdown (set from ⚙ Configuración de sala) */}
-        {remainingMs !== null && (
-          <div
-            className={`header__room-pill header__timer-pill ${remainingMs <= 60000 ? 'header__timer-pill--urgent' : ''}`}
-            title="El temporizador cerrará la sala automáticamente"
-          >
-            <span className="header__timer-pill__label">{formatRemaining(remainingMs)}</span>
-          </div>
-        )}
-
         {/* Participant count: abre el panel igual que el botón de abajo */}
         <button
           type="button"
@@ -227,16 +277,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           </div>
         )}
 
-        {/* Demo: estado de la sala y duración del vídeo (si hay) */}
-        {demo && statusLabel && (
-          <div
-            className="header__room-pill"
-            title={`Estado de la sala: ${statusLabel}`}
-            data-testid="room-status"
-          >
-            <span className="header__pill-label">{statusLabel}</span>
-          </div>
-        )}
+
         {demo && videoDurationSeconds !== null && videoDurationSeconds !== undefined && (
           <div
             className="header__room-pill"
@@ -246,6 +287,75 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
             <span className="header__pill-label">{formatRemaining(videoDurationSeconds * 1000)}</span>
           </div>
         )}
+
+        {/* Clock Pill: Penúltimo elemento (antes de Configuración) */}
+        <div className="header__share-wrap" ref={clockRef}>
+          <button
+            onClick={() => setShowClockMenu((v) => !v)}
+            className={`header__room-pill header__timer-pill ${timerToneClass}`}
+            title={timerPillTitle}
+            type="button"
+          >
+            {isWaiting ? <Hourglass size={13} color={timerIconColor} /> : <Clock size={13} color={timerIconColor} />}
+            <span className="header__timer-pill__label">{timerPillText}</span>
+          </button>
+
+          {clockPresence.shown && (
+            <div
+              className={`header-share-menu ${clockPresence.closing ? 'header-share-menu--closing' : ''}`}
+              ref={clockSheetRef}
+            >
+              {/* Estado de espera o tiempo transcurrido */}
+              <div className="header-share-menu__row">
+                <div className="header-share-menu__info">
+                  <span className="header-share-menu__label">
+                    {isWaiting ? <Hourglass size={12} /> : <Clock size={12} />}
+                    {isWaiting ? ' Esperando participantes' : ' Tiempo en sala'}
+                  </span>
+                  <span className="header-share-menu__value">
+                    {isWaiting
+                      ? `Esperando… ${formatRemaining(elapsedMs)}`
+                      : `Llevan ${formatRemaining(elapsedMs)}`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Info extra para waiting */}
+              {isWaiting && (
+                <div className="header-share-menu__row">
+                  <div className="header-share-menu__info">
+                    <span className="header-share-menu__label">
+                      <Clock size={12} /> Temporizador
+                    </span>
+                    <span className="header-share-menu__value">Inicia cuando alguien entre</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Tiempo restante hasta el cierre si hay temporizador (solo activo) */}
+              {!isWaiting && remainingMs !== null && (
+                <div className="header-share-menu__row">
+                  <div className="header-share-menu__info">
+                    <span className="header-share-menu__label">
+                      <Hourglass size={12} /> Tiempo restante
+                    </span>
+                    <span className="header-share-menu__value">Quedan {formatRemaining(remainingMs)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Hora estimada de cierre (solo activo) */}
+              {!isWaiting && formattedCloseTime && (
+                <div className="header-share-menu__row">
+                  <div className="header-share-menu__info">
+                    <span className="header-share-menu__label">Hora de cierre</span>
+                    <span className="header-share-menu__value">Cierra a las {formattedCloseTime}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* ⚙ Room settings (host only): name, info, save-mode, approval, timer */}
         {isHost && onOpenSettings && (

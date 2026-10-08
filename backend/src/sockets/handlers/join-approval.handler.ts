@@ -193,6 +193,8 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
           userName: cleanName,
           isHost: socketUser.isHost,
           participants: room?.participants || [],
+          settings: room?.settings,
+          status: room?.status || 'waiting',
         });
       }
 

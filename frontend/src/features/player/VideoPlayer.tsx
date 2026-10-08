@@ -185,7 +185,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const liveAnchorRef = useRef<LiveEdgeAnchor | null>(null);
   const [behindSecs, setBehindSecs] = useState(0);
   useEffect(() => {
-    liveAnchorRef.current = anchorFromRemoteAction(remoteAction);
+    const prevPlaying = liveAnchorRef.current?.playing ?? false;
+    liveAnchorRef.current = anchorFromRemoteAction(remoteAction, prevPlaying);
     if (!remoteAction) setBehindSecs(0);
   }, [remoteAction]);
 
@@ -207,13 +208,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const vid = videoRef.current;
     const live = resolveLiveEdge(liveAnchorRef.current, Date.now());
     if (!vid || live === null) return;
+    const targetTime = Math.max(0, live);
+    const willPlay = !vid.paused || Boolean(liveAnchorRef.current?.playing);
     isApplyingRemote.current = true;
-    vid.currentTime = Math.max(0, live);
+    vid.currentTime = targetTime;
     if (!vid.paused) {
       // Ya reproduciendo: basta el seek.
     } else if (liveAnchorRef.current?.playing) {
       vid.play().catch(() => {});
     }
+    liveAnchorRef.current = {
+      timeSecs: targetTime,
+      atMs: Date.now(),
+      playing: willPlay,
+    };
     setBehindSecs(0);
     window.setTimeout(() => {
       isApplyingRemote.current = false;

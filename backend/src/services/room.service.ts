@@ -226,6 +226,8 @@ export class RoomService {
         allowMicReactivation: true,
         allowCamReactivation: true,
         isTemporary,
+        // timerEndsAt se establece cuando entra el primer participante no-host
+        // (disparador: waiting → active). Ver joinRoomLocked.
       },
       createdAt: now,
       updatedAt: now,
@@ -325,6 +327,17 @@ export class RoomService {
         joinedAt: new Date(),
         device,
       });
+
+      // ── Disparador: primer miembro (no-host) → waiting → active + timer ──
+      // Cuando entra el primer participante que no es el host y la sala aún
+      // está en estado 'waiting', se activa el temporizador de 3 h 30 min.
+      if (!isHost && room.status === 'waiting') {
+        room.status = 'active';
+        if (room.settings && !room.settings.timerEndsAt) {
+          room.settings.timerEndsAt = new Date(Date.now() + 210 * 60 * 1000).toISOString();
+        }
+      }
+
       room.updatedAt = new Date();
       await roomRepository.save(room);
     } else if (userId && !room.participants[existingIndex].userId) {

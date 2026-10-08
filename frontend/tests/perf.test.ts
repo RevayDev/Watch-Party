@@ -24,12 +24,16 @@ describe('perf helpers (rol B)', () => {
     expect(clampDuckPct(27.4)).toBe(27);
   });
 
-  it('anchorFromRemoteAction prefiere sentAt y detecta play/pause', () => {
+  it('anchorFromRemoteAction prefiere sentAt y detecta play/pause y seek con playing previo', () => {
     expect(anchorFromRemoteAction(null)).toBeNull();
     const play = anchorFromRemoteAction({ action: 'play', currentTime: 100, sentAt: 1000, timestamp: 1500 });
     expect(play).toMatchObject({ timeSecs: 100, atMs: 1000, playing: true });
     const pause = anchorFromRemoteAction({ action: 'pause', currentTime: 42, timestamp: 2000 });
     expect(pause).toMatchObject({ timeSecs: 42, atMs: 2000, playing: false });
+    const seekPlaying = anchorFromRemoteAction({ action: 'seek', currentTime: 80, timestamp: 2500 }, true);
+    expect(seekPlaying).toMatchObject({ timeSecs: 80, atMs: 2500, playing: true });
+    const seekPaused = anchorFromRemoteAction({ action: 'seek', currentTime: 80, timestamp: 2500 }, false);
+    expect(seekPaused).toMatchObject({ timeSecs: 80, atMs: 2500, playing: false });
   });
 
   it('resolveLiveEdge avanza el borde solo si el grupo reproduce', () => {

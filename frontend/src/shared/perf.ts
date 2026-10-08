@@ -37,18 +37,25 @@ export interface LiveEdgeAnchor {
  * de red; sin él se usa `timestamp` (recepción local).
  */
 export function anchorFromRemoteAction(
-  remoteAction: { currentTime: number; sentAt?: number; timestamp: number; action: 'play' | 'pause' | 'seek' } | null
+  remoteAction: { currentTime: number; sentAt?: number; timestamp: number; action: 'play' | 'pause' | 'seek' } | null,
+  previousPlaying: boolean = false
 ): LiveEdgeAnchor | null {
   if (!remoteAction || !Number.isFinite(remoteAction.currentTime)) return null;
   const at = typeof remoteAction.sentAt === 'number' && Number.isFinite(remoteAction.sentAt)
     ? remoteAction.sentAt
     : remoteAction.timestamp;
+  const isPlaying = remoteAction.action === 'play'
+    ? true
+    : remoteAction.action === 'seek'
+    ? previousPlaying
+    : false;
   return {
     timeSecs: remoteAction.currentTime,
     atMs: at,
-    playing: remoteAction.action === 'play',
+    playing: isPlaying,
   };
 }
+
 
 /** Borde en vivo estimado = consenso + tiempo transcurrido (si reproduce). */
 export function resolveLiveEdge(anchor: LiveEdgeAnchor | null, nowMs: number): number | null {

@@ -90,6 +90,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         roomId={r.roomData.roomId}
         participantCount={r.roomData.participants.length}
         isHost={r.isHost}
+        createdAt={r.roomData.createdAt}
         roomName={r.roomData.settings?.name}
         roomDescription={r.roomData.settings?.description}
         timerEndsAt={r.roomData.settings?.timerEndsAt}

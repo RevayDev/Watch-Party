@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   Video,
   Check,
@@ -10,37 +10,34 @@ import {
   ExternalLink,
   ArrowRight,
   Activity,
-} from 'lucide-react';
-import exampleImg from '../../Example.png';
-import { ApiService } from '../../services/api';
+} from "lucide-react";
+import exampleImg from "../../Example.png";
+import { ApiService } from "../../services/api";
 import {
   getRecentRooms,
   removeRecentRoom,
   getLastUsername,
   RecentRoom,
-} from '../../services/recentRooms';
+} from "../../services/recentRooms";
 import {
   navLinks,
   techStack,
   roadmapItems,
   timelineEvents,
   donationCards,
-  SUPPORT_PLANS,
-  planPaymentUrl,
   features,
   faqs,
   KOFI_URL,
   PAYPAL_URL,
   TimelineEvent,
-} from './homeData';
-import { RecentRooms } from './RecentRooms';
-import { PremiumPurchase } from './PremiumPurchase';
-import { CreateRoomModal, JoinRoomModal, TimelineModal } from './HomeModals';
+} from "./homeData";
+import { RecentRooms } from "./RecentRooms";
+import { CreateRoomModal, JoinRoomModal, TimelineModal } from "./HomeModals";
 import {
   formatDemoAvailability,
   isDemoMode,
   type DemoAvailability,
-} from '../../shared/demo';
+} from "../../shared/demo";
 
 interface HomeProps {
   initialRoomCode?: string | null;
@@ -59,9 +56,9 @@ export const Home: React.FC<HomeProps> = ({
   onReconnectHost,
 }) => {
   // Join Room Form state
-  const [roomCode, setRoomCode] = useState(initialRoomCode || '');
-  const [userName, setUserName] = useState('');
-  const [error, setError] = useState('');
+  const [roomCode, setRoomCode] = useState(initialRoomCode || "");
+  const [userName, setUserName] = useState("");
+  const [error, setError] = useState("");
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
   const [isUrlInvite, setIsUrlInvite] = useState(Boolean(initialRoomCode));
 
@@ -70,17 +67,18 @@ export const Home: React.FC<HomeProps> = ({
   const [showJoinModal, setShowJoinModal] = useState(Boolean(initialRoomCode));
 
   // Create room modal form state
-  const [createHostName, setCreateHostName] = useState('');
+  const [createHostName, setCreateHostName] = useState("");
   const [isTemporary, setIsTemporary] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
-  const [createError, setCreateError] = useState('');
+  const [createError, setCreateError] = useState("");
 
   // Demo gratuita: tras VITE_DEMO_MODE (default true en `demo-free`).
   // Con `false` todo lo demo (badge, contador, avisos) desaparece.
   const demo = isDemoMode();
   // Solo conteos (roomsUsed/roomsTotal/roomsAvailable). Si la lectura falla,
   // queda en null y el contador se oculta sin romper el Home.
-  const [demoAvailability, setDemoAvailability] = useState<DemoAvailability | null>(null);
+  const [demoAvailability, setDemoAvailability] =
+    useState<DemoAvailability | null>(null);
 
   const refreshDemoAvailability = async () => {
     try {
@@ -129,7 +127,7 @@ export const Home: React.FC<HomeProps> = ({
   }, []);
 
   const handleEnterRecentRoom = (room: RecentRoom) => {
-    if (room.role === 'host') {
+    if (room.role === "host") {
       onReconnectHost(room.roomId, room.hostName);
       return;
     }
@@ -151,10 +149,10 @@ export const Home: React.FC<HomeProps> = ({
   const handleJoinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomCode.trim() || !userName.trim()) {
-      setError('Ingresa tu nombre y el código de la sala');
+      setError("Ingresa tu nombre y el código de la sala");
       return;
     }
-    setError('');
+    setError("");
     setShowJoinModal(false);
     onJoinRoom(roomCode.trim().toUpperCase(), userName.trim());
     // Demo: re-lee la disponibilidad tras unirse (si falla, se oculta solo).
@@ -166,13 +164,13 @@ export const Home: React.FC<HomeProps> = ({
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createHostName.trim()) {
-      setCreateError('Por favor ingresa tu nombre');
+      setCreateError("Por favor ingresa tu nombre");
       return;
     }
 
     try {
       setCreateLoading(true);
-      setCreateError('');
+      setCreateError("");
       const data = await ApiService.createRoom(
         createHostName.trim(),
         isTemporary,
@@ -186,7 +184,7 @@ export const Home: React.FC<HomeProps> = ({
       }
       onRoomCreated(data.roomId, data.hostName, data.hostSecret);
     } catch (err: any) {
-      setCreateError(err.message || 'Error al conectar con el servidor.');
+      setCreateError(err.message || "Error al conectar con el servidor.");
     } finally {
       setCreateLoading(false);
     }
@@ -196,13 +194,15 @@ export const Home: React.FC<HomeProps> = ({
     setOpenFaq(openFaq === index ? null : index);
   };
 
-  const handleRoadmapShortcut = (event: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleRoadmapShortcut = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
     event.preventDefault();
-    const roadmap = document.getElementById('roadmap');
+    const roadmap = document.getElementById("roadmap");
     if (!roadmap) return;
 
-    roadmap.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    roadmap.setAttribute('tabindex', '-1');
+    roadmap.scrollIntoView({ behavior: "smooth", block: "start" });
+    roadmap.setAttribute("tabindex", "-1");
     roadmap.focus({ preventScroll: true });
   };
 
@@ -233,7 +233,7 @@ export const Home: React.FC<HomeProps> = ({
               onClick={() => {
                 setShowJoinModal(true);
                 setIsUrlInvite(false);
-                setError('');
+                setError("");
               }}
             >
               Unirse
@@ -243,7 +243,7 @@ export const Home: React.FC<HomeProps> = ({
               className="home-nav__btn home-nav__btn--primary"
               onClick={() => {
                 setShowCreateModal(true);
-                setCreateError('');
+                setCreateError("");
               }}
             >
               Crear sala
@@ -256,19 +256,6 @@ export const Home: React.FC<HomeProps> = ({
       <div className="home-hero-grid">
         {/* Left Column: Title, Subtitle, Reconnect banner & Action Buttons */}
         <div className="home-hero-left">
-          <div className="home-hero-badge" aria-label="Plataforma libre y en tiempo real">
-            <span className="home-hero-badge__dot" aria-hidden="true" />
-            <span>100% Libre • Sin registros • Audio y Video HD en vivo</span>
-          </div>
-
-          {demo && (
-            <span
-              className="home-section__badge home-demo-badge"
-              data-testid="demo-badge"
-            >
-              Demo gratuita
-            </span>
-          )}
           {/* Demo: los vídeos van por enlace externo (Drive); la subida de
               archivos está deshabilitada. Entrada por código sin cambios. */}
           {demo && (
@@ -279,7 +266,7 @@ export const Home: React.FC<HomeProps> = ({
             >
               <ExternalLink size={18} strokeWidth={2.2} aria-hidden="true" />
               <p>
-                En esta demo los vídeos se comparten con un{' '}
+                En esta demo los vídeos se comparten con un{" "}
                 <strong>enlace externo (por ejemplo, Google Drive)</strong>:
                 pega el enlace en la sala para reproducirlo juntos.
               </p>
@@ -303,7 +290,7 @@ export const Home: React.FC<HomeProps> = ({
               type="button"
               onClick={() => {
                 setShowCreateModal(true);
-                setCreateError('');
+                setCreateError("");
               }}
               className="home-hero-btn home-hero-btn--primary"
             >
@@ -315,7 +302,7 @@ export const Home: React.FC<HomeProps> = ({
               onClick={() => {
                 setShowJoinModal(true);
                 setIsUrlInvite(false);
-                setError('');
+                setError("");
               }}
               className="home-hero-btn home-hero-btn--secondary"
             >
@@ -338,19 +325,6 @@ export const Home: React.FC<HomeProps> = ({
               <span>Aprobación de entrada</span>
             </div>
           </div>
-
-          {/* Demo: contador de salas (solo conteos, sin códigos ni lista).
-              Si la lectura falla, no se renderiza nada (no rompe el Home). */}
-          {demo && demoAvailability && (
-            <p
-              className="home-demo-counter"
-              role="status"
-              data-testid="demo-availability"
-            >
-              <Activity size={16} strokeWidth={2.4} aria-hidden="true" />
-              <span>{formatDemoAvailability(demoAvailability)}</span>
-            </p>
-          )}
         </div>
 
         {/* Right Column: Reference Showcase Frame (Example.png) */}
@@ -363,8 +337,21 @@ export const Home: React.FC<HomeProps> = ({
               loading="lazy"
               decoding="async"
             />
+
             <div className="home-showcase-overlay" />
           </div>
+          {/* Demo: contador de salas (solo conteos, sin códigos ni lista).
+              Si la lectura falla, no se renderiza nada (no rompe el Home). */}
+          {demo && demoAvailability && (
+            <p
+              className="home-demo-counter"
+              role="status"
+              data-testid="demo-availability"
+            >
+              <Activity size={16} strokeWidth={2.4} aria-hidden="true" />
+              <span>{formatDemoAvailability(demoAvailability)}</span>
+            </p>
+          )}
         </div>
       </div>
 
@@ -493,9 +480,9 @@ export const Home: React.FC<HomeProps> = ({
             {timelineEvents.map((event) => (
               <li
                 className={`home-timeline__item ${
-                  event.tone === 'wip'
-                    ? 'home-timeline__item--now'
-                    : 'home-timeline__item--past'
+                  event.tone === "wip"
+                    ? "home-timeline__item--now"
+                    : "home-timeline__item--past"
                 }`}
                 key={event.title}
               >
@@ -554,7 +541,7 @@ export const Home: React.FC<HomeProps> = ({
                   <td className="home-table__name">{item.title}</td>
                   <td>
                     <span
-                      className={`home-status ${item.status === 'En estudio' ? 'home-status--wip' : ''}`}
+                      className={`home-status ${item.status === "En estudio" ? "home-status--wip" : ""}`}
                     >
                       {item.status}
                     </span>
@@ -572,7 +559,7 @@ export const Home: React.FC<HomeProps> = ({
                 <div className="home-roadmap-card__top">
                   <h4 className="home-roadmap-card__title">{item.title}</h4>
                   <span
-                    className={`home-status ${item.status === 'En estudio' ? 'home-status--wip' : ''}`}
+                    className={`home-status ${item.status === "En estudio" ? "home-status--wip" : ""}`}
                   >
                     {item.status}
                   </span>
@@ -601,7 +588,7 @@ export const Home: React.FC<HomeProps> = ({
             return (
               <div
                 key={idx}
-                className={`home-faq-item ${isOpen ? 'home-faq-item--open' : ''}`}
+                className={`home-faq-item ${isOpen ? "home-faq-item--open" : ""}`}
                 onClick={() => toggleFaq(idx)}
               >
                 <div className="home-faq-question">
@@ -634,7 +621,7 @@ export const Home: React.FC<HomeProps> = ({
               type="button"
               onClick={() => {
                 setShowCreateModal(true);
-                setCreateError('');
+                setCreateError("");
               }}
               className="home-hero-btn home-hero-btn--primary"
             >
@@ -644,7 +631,7 @@ export const Home: React.FC<HomeProps> = ({
               type="button"
               onClick={() => {
                 setShowJoinModal(true);
-                setError('');
+                setError("");
               }}
               className="home-hero-btn home-hero-btn--secondary"
             >
@@ -668,7 +655,7 @@ export const Home: React.FC<HomeProps> = ({
         <div className="home-donate-grid">
           {donationCards.map((card) => {
             const Icon = card.icon;
-            const isExternal = card.url.startsWith('http');
+            const isExternal = card.url.startsWith("http");
             const isReady = Boolean(card.url);
 
             const content = (
@@ -682,7 +669,7 @@ export const Home: React.FC<HomeProps> = ({
                 <span className="home-donate-card__title">{card.title}</span>
                 <span className="home-donate-card__desc">{card.desc}</span>
                 <span className="home-donate-card__cta">
-                  {isReady ? card.cta : 'Próximamente'}
+                  {isReady ? card.cta : "Próximamente"}
                   {isReady &&
                     (isExternal ? (
                       <ExternalLink size={14} />
@@ -710,82 +697,17 @@ export const Home: React.FC<HomeProps> = ({
                 key={card.id}
                 className="home-donate-card"
                 href={card.url}
-                onClick={card.id === 'roadmap' ? handleRoadmapShortcut : undefined}
-                target={isExternal ? '_blank' : undefined}
-                rel={isExternal ? 'noopener noreferrer' : undefined}
+                onClick={
+                  card.id === "roadmap" ? handleRoadmapShortcut : undefined
+                }
+                target={isExternal ? "_blank" : undefined}
+                rel={isExternal ? "noopener noreferrer" : undefined}
               >
                 {content}
               </a>
             );
           })}
         </div>
-      </section>
-
-      {/* ── SECTION: Planes de apoyo (pago único) ── */}
-      <section className="home-section home-plans" id="planes">
-        <div className="home-section__header">
-          <span className="home-section__badge">Planes de apoyo</span>
-          <h2 className="home-section__title">Impulsa Watch Party con un pago único</h2>
-          <p className="home-section__subtitle">
-            Sin suscripciones ni anuncios. Eliges un plan, pagas una sola vez
-            por PayPal y lo recaudado cubre servidor, almacenamiento y desarrollo.
-          </p>
-        </div>
-
-        <div className="home-plans-grid">
-          {SUPPORT_PLANS.map((plan) => {
-            const Icon = plan.icon;
-            const url = planPaymentUrl(plan);
-            const isReady = Boolean(url);
-            return (
-              <article
-                key={plan.id}
-                className={`home-plan-card${plan.highlighted ? ' home-plan-card--highlighted' : ''}${!isReady ? ' home-plan-card--pending' : ''}`}
-              >
-                {plan.badge && (
-                  <span className="home-plan-card__badge">{plan.badge}</span>
-                )}
-                <span
-                  className={`home-donate-card__icon home-donate-card__icon--${plan.tone}`}
-                  aria-hidden="true"
-                >
-                  <Icon size={20} strokeWidth={2} />
-                </span>
-                <h3 className="home-plan-card__name">{plan.name}</h3>
-                <p className="home-plan-card__price">
-                  ${plan.amount}
-                  <span className="home-plan-card__currency"> {plan.currency} · pago único</span>
-                </p>
-                <p className="home-donate-card__desc">{plan.tagline}</p>
-                <ul className="home-plan-card__perks">
-                  {plan.perks.map((perk) => (
-                    <li key={perk}>
-                      <Check size={14} className="text-primary-color" aria-hidden="true" />
-                      <span>{perk}</span>
-                    </li>
-                  ))}
-                </ul>
-                {isReady ? (
-                  <a
-                    className="home-hero-btn home-hero-btn--primary home-plan-card__cta"
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <span>{plan.cta}</span>
-                    <ExternalLink size={14} />
-                  </a>
-                ) : (
-                  <span className="home-plan-card__cta-pending">
-                    Próximamente — configura VITE_PAYPAL_URL
-                  </span>
-                )}
-              </article>
-            );
-          })}
-        </div>
-
-        <PremiumPurchase />
       </section>
 
       {/* ── Modal Pop-up: Crear Nueva Sala ── */}
@@ -881,8 +803,8 @@ export const Home: React.FC<HomeProps> = ({
 
             <div className="home-footer__col">
               <h4 className="home-footer__heading">Comunidad</h4>
-              <a className="home-footer__link" href="#planes">
-                Planes de apoyo
+              <a className="home-footer__link" href="#donaciones">
+                Donaciones
               </a>
               <a className="home-footer__link" href="#roadmap">
                 Lo que viene
@@ -905,7 +827,7 @@ export const Home: React.FC<HomeProps> = ({
                 className="home-footer__action"
                 onClick={() => {
                   setShowCreateModal(true);
-                  setCreateError('');
+                  setCreateError("");
                 }}
               >
                 Crear una sala
@@ -916,7 +838,7 @@ export const Home: React.FC<HomeProps> = ({
                 onClick={() => {
                   setShowJoinModal(true);
                   setIsUrlInvite(false);
-                  setError('');
+                  setError("");
                 }}
               >
                 Unirse con código

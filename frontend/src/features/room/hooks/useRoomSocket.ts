@@ -151,6 +151,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
 
   // Auto-hide toolbar and header on inactivity (like YouTube / Netflix / Google Meet)
   const [isBarVisible, setIsBarVisible] = useState(true);
+  const notified10mRef = useRef(false);
   // When true, the header + bottom bar are ALWAYS visible (user chose "Mostrar interfaz")
   // When false, they auto-hide and only the bottom bar reappears on touch/move
   const [uiPinned, setUiPinned] = useState(true);
@@ -423,8 +424,14 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       onLeave();
     };
 
-    const handleUserJoined = (data: { socketId?: string; userName: string; participants: any[] }) => {
-      setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
+    const handleUserJoined = (data: { socketId?: string; userName: string; participants: any[]; settings?: any; status?: string }) => {
+      setRoomData((prev) => {
+        if (!prev) return null;
+        const patch = { participants: data.participants };
+        if (data.settings) Object.assign(patch, { settings: data.settings });
+        if (data.status) Object.assign(patch, { status: data.status });
+        return { ...prev, ...patch };
+      });
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last && last.user === 'Sistema' && last.text.includes(data.userName) && last.text.includes('se ha unido')) {
@@ -845,6 +852,22 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       socket.off('reconnect', handleSocketReconnect);
     };
   }, [roomId, myName, initialIsHost, socket, onLeave, userId, clearRoomLocalData]);
+
+  // Aviso de 10 minutos restantes (solo 1 vez por sesión)
+  useEffect(() => {
+    const timerEndsAt = roomData?.settings?.timerEndsAt;
+    if (!timerEndsAt) return;
+    const check10m = () => {
+      const ms = new Date(timerEndsAt).getTime() - Date.now();
+      if (ms > 0 && ms <= 10 * 60 * 1000 && !notified10mRef.current) {
+        notified10mRef.current = true;
+        notify('warning', 'Quedan 10 minutos para el cierre automático de la sala.', 'La sala se cierra pronto');
+      }
+    };
+    check10m();
+    const iv = window.setInterval(check10m, 5000);
+    return () => window.clearInterval(iv);
+  }, [roomData?.settings?.timerEndsAt, notify]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 

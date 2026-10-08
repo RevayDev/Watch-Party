@@ -64,7 +64,7 @@ describe('RoomHeader en demo', () => {
     onLeaveClick: vi.fn(),
   };
 
-  it('muestra capacidad X/5, estado y duración del vídeo', async () => {
+  it('muestra capacidad X/5 y duración del vídeo', async () => {
     await act(async () => {
       render(<RoomHeader {...baseProps} />);
     });
@@ -74,7 +74,6 @@ describe('RoomHeader en demo', () => {
       'title',
       '3 de 5 participantes — ver lista',
     );
-    expect(screen.getByTestId('room-status')).toHaveTextContent('En curso');
     // 125 s → formato m:ss reutilizado (2:05)
     expect(screen.getByTestId('video-duration')).toHaveTextContent('2:05');
   });
