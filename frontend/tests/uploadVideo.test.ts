@@ -86,7 +86,7 @@ describe('ApiService.uploadVideo (XHR tests)', () => {
     const result = await promise;
     expect(result.message).toBe('Video subido con éxito');
     expect(result.video.originalName).toBe('video.mp4');
-    expect(xhr.open).toHaveBeenCalledWith('POST', '/api/rooms/ABC123/video');
+    expect(xhr.open).toHaveBeenCalledWith('POST', expect.stringContaining('/api/rooms/ABC123/video'));
     expect(xhr.send).toHaveBeenCalled();
   });
 

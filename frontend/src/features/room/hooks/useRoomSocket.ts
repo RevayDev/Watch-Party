@@ -18,6 +18,9 @@ export interface UseRoomSocketArgs {
   onLeave: () => void;
 }
 
+let remoteActionSeq = 0;
+export const nextRemoteActionTimestamp = (): number => Date.now() + (++remoteActionSeq * 0.001);
+
 /**
  * Toda la lógica socket/estado extraída verbatim de pages/Room.tsx.
  * El componente queda como composición (sin lógica de negocio aquí alterada).
@@ -210,6 +213,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     isMicOn,
     isCameraOn,
     mediaError,
+    lowBandwidth,
     toggleMic,
     toggleCamera,
     enableMedia,
@@ -327,7 +331,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
             action: state.playback.isPlaying ? 'play' : 'seek',
             currentTime: state.playback.currentTime,
             sentAt: Date.now(),
-            timestamp: Date.now(),
+            timestamp: nextRemoteActionTimestamp(),
           });
         }
       }
@@ -436,7 +440,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
         action: data.action,
         currentTime: data.currentTime,
         sentAt: data.sentAt,
-        timestamp: Date.now(),
+        timestamp: nextRemoteActionTimestamp(),
       });
     };
 
@@ -933,6 +937,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     isMicOn,
     isCameraOn,
     mediaError,
+    lowBandwidth,
     toggleMic,
     toggleCamera,
     handleToggleTemporaryMode,

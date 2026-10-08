@@ -94,6 +94,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         roomDescription={r.roomData.settings?.description}
         timerEndsAt={r.roomData.settings?.timerEndsAt}
         roomStatus={r.roomData.status}
+        roomPlan={r.roomData.plan}
         videoDurationSeconds={r.roomData.video?.durationSeconds ?? null}
         onOpenSettings={() => r.setShowRoomSettings(true)}
         onOpenParticipants={() => r.setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
@@ -115,6 +116,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
             uploadProgress={r.uploadProgress}
             onSyncAction={r.handleSyncAction}
             onPlaybackHeartbeat={r.handlePlaybackHeartbeat}
+            heartbeatIntervalMs={r.lowBandwidth ? 15000 : 5000}
             remoteAction={r.remoteAction}
             reactions={r.reactions}
             isMicOn={r.isMicOn}
@@ -186,6 +188,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       />
 
       {r.mediaError && <div className="meet-error-banner">⚠️ {r.mediaError}</div>}
+      {r.lowBandwidth && (
+        <div className="meet-error-banner">📶 Señal débil: video pausado, seguís con audio</div>
+      )}
 
       <HostExitModal
         isOpen={r.showHostExitModal}

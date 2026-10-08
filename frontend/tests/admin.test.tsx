@@ -58,6 +58,7 @@ function stubFetch(handler: (url: string) => { ok: boolean; status: number; body
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -115,6 +116,60 @@ describe('/admin privado', () => {
     });
     await waitFor(() =>
       expect(screen.getByTestId('admin-login-error')).toHaveTextContent(/ADMIN_TOKEN/)
+    );
+  });
+
+  it('pestaña de códigos: etiquetas visibles y botón de copiar por código', async () => {
+    const CODES = {
+      codes: [
+        {
+          code: 'WATCH-AAAA-BBBB',
+          type: 'PREMIUM_ROOM',
+          uses: 1,
+          maxUses: 10,
+          status: 'active',
+          expiresAt: null,
+        },
+      ],
+    };
+    stubFetch((url) => {
+      if (url.includes('/api/admin/gift-codes')) return { ok: true, status: 200, body: CODES };
+      if (url.includes('/api/admin/audit')) return { ok: true, status: 200, body: { entries: [] } };
+      if (url.includes('/api/admin/payments')) return { ok: true, status: 200, body: PAYMENTS };
+      return { ok: true, status: 200, body: SUMMARY };
+    });
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    await act(async () => {
+      render(<AdminPage onBack={() => undefined} />);
+    });
+    fireEvent.change(screen.getByTestId('admin-token-input'), { target: { value: 'tok-123' } });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Entrar'));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'GiftCodes' }));
+    });
+
+    // Etiquetas visibles en cada campo (el th "Tipo" de la tabla también coincide)
+    await waitFor(() => expect(screen.getAllByText('Tipo').length).toBeGreaterThanOrEqual(1));
+    const form = document.querySelector('.admin-gift-form');
+    expect(form?.textContent).toContain('Tipo');
+    expect(form?.textContent).toContain('Usos máximos');
+    expect(form?.textContent).toContain('Expira en días');
+
+    // Copiar código al portapapeles
+    await waitFor(() => expect(screen.getByText('WATCH-AAAA-BBBB')).toBeDefined());
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Copiar código WATCH-AAAA-BBBB'));
+    });
+    expect(writeText).toHaveBeenCalledWith('WATCH-AAAA-BBBB');
+    await waitFor(() =>
+      expect(screen.getByLabelText('¡Copiado!')).toBeDefined()
     );
   });
 });

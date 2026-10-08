@@ -55,6 +55,8 @@ export interface IRoomData {
   hostSecret?: string;
   status: 'waiting' | 'active' | 'closed';
   isTemporary?: boolean;
+  /** Plan de la sala (ausente = 'free'). Las premium heredan el acceso del creador. */
+  plan?: 'free' | 'premium';
   video?: IVideoMetadata | null;
   participants: IParticipant[];
   joinRequests?: IJoinRequest[];

@@ -89,7 +89,7 @@ describe('ApiService.getDemoAvailability', () => {
     expect(out).toEqual({ roomsUsed: 2, roomsTotal: 5, roomsAvailable: 3 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit?];
-    expect(url).toBe('/api/demo/availability');
+    expect(url).toContain('/api/demo/availability');
   });
 
   it('propaga el error del backend y usa genérico sin JSON útil', async () => {

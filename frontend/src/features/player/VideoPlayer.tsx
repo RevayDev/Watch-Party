@@ -26,6 +26,8 @@ interface VideoPlayerProps {
   isMicOn?: boolean; // used for auto-duck
   /** Periodic position report so the room can resolve a consensus time for newcomers */
   onPlaybackHeartbeat?: (currentTime: number, isPlaying: boolean) => void;
+  /** Intervalo del heartbeat en ms (sube solo en mala señal para pedir menos). */
+  heartbeatIntervalMs?: number;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -40,6 +42,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   reactions,
   isMicOn = false,
   onPlaybackHeartbeat,
+  heartbeatIntervalMs = 5000,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -64,8 +67,50 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const isApplyingRemote = useRef(false);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Global player keyboard shortcuts (Space, F, M, Arrows) with input protection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      const isEditable = (document.activeElement as HTMLElement)?.isContentEditable;
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select' || isEditable) {
+        return;
+      }
+      const vid = videoRef.current;
+      if (!vid) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (vid.paused) {
+          vid.play().catch(() => {});
+        } else {
+          vid.pause();
+        }
+      } else if (e.code === 'KeyF') {
+        e.preventDefault();
+        if (!document.fullscreenElement) {
+          containerRef.current?.requestFullscreen?.().catch(() => {});
+        } else {
+          document.exitFullscreen?.().catch(() => {});
+        }
+      } else if (e.code === 'KeyM') {
+        e.preventDefault();
+        vid.muted = !vid.muted;
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        vid.currentTime = Math.max(0, vid.currentTime - 5);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        vid.currentTime = Math.min(vid.duration || vid.currentTime + 5, vid.currentTime + 5);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Monitor fullscreen change events
   useEffect(() => {
@@ -84,8 +129,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     videoRef.current.volume = isMicOn ? 0.30 : 1.0;
   }, [isMicOn]);
 
-  // Position heartbeat (5s): lets the server resolve the consensus time
-  // a (re)joining member should adopt. Skipped without video or on error.
+  // Position heartbeat (5s, 15s en mala señal): lets the server resolve the
+  // consensus time a (re)joining member should adopt. Skipped without video
+  // or on error.
   useEffect(() => {
     if (!video || playbackError || !onPlaybackHeartbeat) return;
     const report = () => {
@@ -94,9 +140,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onPlaybackHeartbeat(vid.currentTime, !vid.paused && !vid.ended);
     };
     report();
-    const iv = window.setInterval(report, 5000);
+    const iv = window.setInterval(report, heartbeatIntervalMs);
     return () => window.clearInterval(iv);
-  }, [video, playbackError, onPlaybackHeartbeat, roomId]);
+  }, [video, playbackError, onPlaybackHeartbeat, roomId, heartbeatIntervalMs]);
 
   // Auto-hide overlay top bar (filename + "Cambiar") after mouse idle — always, not just fullscreen
   const resetHideTimer = useCallback(() => {
@@ -249,7 +295,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [videoSourceType, videoDirectUrl, videoFileName, roomId, retryToken]);
 
-  // Apply incoming remote sync actions with latency compensation
+  // Apply incoming remote sync actions with latency compensation and smooth tolerance
   useEffect(() => {
     if (!remoteAction || !videoRef.current) return;
 
@@ -271,13 +317,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     if (remoteAction.action === 'play') {
+      if (diff > 2.0) {
+        // Desfase grande (>2s): salto directo para alinearse a la escena
+        vid.currentTime = targetTime;
+        vid.playbackRate = 1.0;
+      } else if (diff > 0.8) {
+        // Desfase leve (0.8s - 2s): micro-ajuste de velocidad para emparejar suavemente sin cortes
+        vid.playbackRate = vid.currentTime < targetTime ? 1.05 : 0.95;
+        setTimeout(() => {
+          if (videoRef.current) videoRef.current.playbackRate = 1.0;
+        }, 2000);
+      } else {
+        vid.playbackRate = 1.0;
+      }
+
       if (vid.paused) {
         vid.play().catch(() => {});
       }
     } else if (remoteAction.action === 'pause') {
+      vid.playbackRate = 1.0;
+      if (diff > 2.0) {
+        vid.currentTime = targetTime;
+      }
       if (!vid.paused) {
         vid.pause();
       }
+    } else if (remoteAction.action === 'seek') {
+      vid.playbackRate = 1.0;
+      vid.currentTime = targetTime;
     }
 
     setTimeout(() => {
@@ -631,6 +698,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         ))}
       </div>
 
+      {/* Buffering Indicator */}
+      {isBuffering && !playbackError && (
+        <div className="player-buffering-indicator">
+          <Loader2 size={32} className="player-buffering-indicator__spinner" />
+          <span>Sincronizando...</span>
+        </div>
+      )}
+
       <video
         ref={videoRef}
         key={video.fileName || video.directUrl}
@@ -641,6 +716,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onPlay={handlePlay}
         onPause={handlePause}
         onSeeked={handleSeeked}
+        onWaiting={() => setIsBuffering(true)}
+        onPlaying={() => setIsBuffering(false)}
+        onCanPlay={() => setIsBuffering(false)}
         onError={handleVideoElementError}
       >
         Tu navegador no soporta reproducción de video HTML5.

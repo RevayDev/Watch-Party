@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ArrowLeft,
   BadgeDollarSign,
+  Check,
+  Copy,
   Gift,
   LayoutDashboard,
   LogOut,
@@ -60,16 +62,61 @@ const TABS: Array<{ id: AdminTab; label: string; icon: React.ComponentType<{ siz
 ];
 
 /**
- * Ruta privada `/admin` (token SOLO en memoria React, jamás localStorage).
- * Ingresos y PII solo aquí: lo público (`/status`, Home) nunca los consulta.
+ * Ruta privada `/admin`. El token se guarda solo en `sessionStorage`: sobrevive
+ * recargas dentro de la misma pestaña pero se pierde al cerrarla (nunca
+ * `localStorage`, para no dejar la llave en el disco de forma permanente).
  */
+const ADMIN_TOKEN_SESSION_KEY = 'wp_admin_token';
+
+function readStoredToken(): string | null {
+  try {
+    const value = sessionStorage.getItem(ADMIN_TOKEN_SESSION_KEY);
+    return value && value.trim() !== '' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeToken(token: string | null): void {
+  try {
+    if (token) sessionStorage.setItem(ADMIN_TOKEN_SESSION_KEY, token);
+    else sessionStorage.removeItem(ADMIN_TOKEN_SESSION_KEY);
+  } catch {
+    // sessionStorage no disponible (modo privado estricto): sigue en memoria.
+  }
+}
+
 export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
-  // Token en memoria: se pierde al recargar/salir (a propósito, sin persistir).
+  // Token en memoria + sessionStorage (misma pestaña). "Salir" lo borra todo.
   const [token, setToken] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [tab, setTab] = useState<AdminTab>('overview');
+
+  // Restaura la sesión de la pestaña validándola contra el backend.
+  useEffect(() => {
+    let cancelled = false;
+    const stored = readStoredToken();
+    if (!stored) {
+      setRestoring(false);
+      return;
+    }
+    fetchSummary(stored)
+      .then(() => {
+        if (!cancelled) setToken(stored);
+      })
+      .catch(() => {
+        storeToken(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +131,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
       // Valida el token contra el backend (401/503 con mensaje claro).
       await fetchSummary(candidate);
       setToken(candidate);
+      storeToken(candidate);
       setDraft('');
     } catch (err) {
       setLoginError(adminErrorMessage(err));
@@ -94,6 +142,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
 
   const handleLogout = () => {
     setToken(null);
+    storeToken(null);
     setDraft('');
     setLoginError(null);
     setTab('overview');
@@ -123,12 +172,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
       </nav>
 
       <div className="admin-page__inner">
-        {!token ? (
+        {restoring ? (
+          <section className="admin-login" aria-label="Restaurando sesión">
+            <h1 className="admin-login__title">Verificando sesión…</h1>
+          </section>
+        ) : !token ? (
           <section className="admin-login" aria-label="Acceso de administración">
             <h1 className="admin-login__title">Acceso restringido</h1>
             <p className="admin-login__desc">
-              Ingresa el <code>ADMIN_TOKEN</code> del servidor. El token vive solo en la memoria de
-              esta pestaña: no se guarda en el navegador.
+              Ingresa el <code>ADMIN_TOKEN</code> del servidor. La sesión se
+              mantiene solo en esta pestaña (se olvida al cerrarla o al salir).
             </p>
             <form className="admin-login__form" onSubmit={handleLogin}>
               <label className="form-group__label" htmlFor="admin-token">
@@ -401,7 +454,7 @@ const RoomsSection: React.FC<{ token: string }> = ({ token }) => {
       </div>
       {error && <p className="admin-login__error" role="alert">{error}</p>}
       <form className="admin-form-row" onSubmit={lookup}>
-        <input className="form-group__input" value={roomId} onChange={(e) => setRoomId(e.target.value.toUpperCase())} placeholder="?roomId=XXX para el detalle sanitizado" aria-label="Código de sala" />
+        <input className="form-group__input" value={roomId} onChange={(e) => setRoomId(e.target.value.toUpperCase())} placeholder="Código de sala (p. ej. AB12CD)" aria-label="Código de sala" />
         <button type="submit" className="btn btn--secondary">Buscar sala</button>
       </form>
       {room && (
@@ -516,6 +569,7 @@ const GiftCodesSection: React.FC<{ token: string }> = ({ token }) => {
   const [maxUses, setMaxUses] = useState('10');
   const [expiresInDays, setExpiresInDays] = useState('30');
   const [busy, setBusy] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     setError(null);
@@ -576,15 +630,36 @@ const GiftCodesSection: React.FC<{ token: string }> = ({ token }) => {
 
   const historyFor = (code: string) => history.filter((h) => (h.detail ?? '').includes(code));
 
+  const handleCopyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      window.setTimeout(() => {
+        setCopiedCode((current) => (current === code ? null : current));
+      }, 2000);
+    } catch {
+      setError('No se pudo copiar al portapapeles en este navegador.');
+    }
+  };
+
   return (
     <section aria-label="Códigos de regalo">
-      <form className="admin-form-row" onSubmit={handleCreate}>
-        <select className="form-group__input" value={type} onChange={(e) => setType(e.target.value)} aria-label="Tipo">
-          <option value="PREMIUM_ROOM">PREMIUM_ROOM</option>
-          <option value="FREE_ROOM">FREE_ROOM</option>
-        </select>
-        <input className="form-group__input" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="maxUses" aria-label="Usos máximos" inputMode="numeric" />
-        <input className="form-group__input" value={expiresInDays} onChange={(e) => setExpiresInDays(e.target.value)} placeholder="expira en días (vacío = sin expiración)" aria-label="Expira en días" inputMode="numeric" />
+      <form className="admin-gift-form" onSubmit={handleCreate}>
+        <label className="admin-field">
+          <span>Tipo</span>
+          <select className="form-group__input" value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="PREMIUM_ROOM">PREMIUM_ROOM</option>
+            <option value="FREE_ROOM">FREE_ROOM</option>
+          </select>
+        </label>
+        <label className="admin-field">
+          <span>Usos máximos</span>
+          <input className="form-group__input" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="10" inputMode="numeric" />
+        </label>
+        <label className="admin-field">
+          <span>Expira en días (vacío = sin expiración)</span>
+          <input className="form-group__input" value={expiresInDays} onChange={(e) => setExpiresInDays(e.target.value)} placeholder="30" inputMode="numeric" />
+        </label>
         <button type="submit" className="btn btn--primary" disabled={busy === 'create'}>Crear código</button>
       </form>
       {error && <p className="admin-login__error" role="alert">{error}</p>}
@@ -594,7 +669,20 @@ const GiftCodesSection: React.FC<{ token: string }> = ({ token }) => {
           <tbody>
             {codes.map((c) => (
               <tr key={c.code}>
-                <td><code>{c.code}</code></td>
+                <td>
+                  <span className="admin-code-cell">
+                    <code>{c.code}</code>
+                    <button
+                      type="button"
+                      className="admin-code-copy"
+                      onClick={() => handleCopyCode(c.code)}
+                      title={copiedCode === c.code ? '¡Copiado!' : 'Copiar código'}
+                      aria-label={copiedCode === c.code ? '¡Copiado!' : `Copiar código ${c.code}`}
+                    >
+                      {copiedCode === c.code ? <Check size={13} /> : <Copy size={13} />}
+                    </button>
+                  </span>
+                </td>
                 <td>{c.type}</td>
                 <td>{c.uses}/{c.maxUses}</td>
                 <td><span className={`admin-pill admin-pill--${c.status}`}>{c.status}</span></td>

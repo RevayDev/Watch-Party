@@ -1,4 +1,7 @@
-# Plan de endurecimiento del `/api/admin` (pendiente)
+# Plan de endurecimiento del `/api/admin` — IMPLEMENTADO 2026-10-06
+
+> Verificación: `tsc` limpio, `lint` 0 errores, `tests/admin-hardening.test.ts`
+> 8/8 en verde. Login del frontend sin cambios de protocolo: sigue `x-admin-token`.
 
 > Estado actual (rama `demo-free`, verificado 2026-10-06): el admin usa
 > `ADMIN_TOKEN` en env + `requireAdmin` con `timingSafeEqual` sobre SHA-256
@@ -12,24 +15,21 @@ solo admin es el mismo secreto compartido con más complejidad; solo compensa
 con múltiples administradores, y el actor ya se distingue con `x-admin-actor`).
 Endurecer el token en su lugar.
 
-## Tareas
+## Tareas (todas aplicadas)
 
-1. **Límite estricto propio para `/api/admin`** (`middleware/rate-limit.middleware.ts`, `app.ts`)
-   - Ej.: 60 req/min general por IP + bloqueo temporal (~15 min) tras ~10
-     `401` consecutivos de la misma IP.
-   - No debe molestar el uso legítimo (el panel hace pocas peticiones).
-
-2. **Auditoría de intentos fallidos** (`payments/audit.service.ts`)
-   - Registrar cada `401` de `requireAdmin` (IP, hora, ruta). Verlos en la
-     pestaña de auditoría del panel.
-
-3. **Exigir secreto fuerte al arrancar** (`config/` o `server.ts`)
-   - Si `ADMIN_TOKEN` tiene menos de 32 caracteres: aviso en desarrollo,
-     negarse a arrancar (o 503 permanente) en producción.
-
-4. **HTTPS en producción**
-   - Render/Vercel lo dan por defecto; documentar que el token/contraseña sin
-     TLS viaja legible igual. Sin acción de código.
+1. **Límite estricto propio para `/api/admin`** ✅ — `adminLimiter`
+   (60 req/min/IP, `ADMIN_RATE_MAX`/`ADMIN_RATE_WINDOW_MS`) + `adminRateLimit`
+   (bloqueo ~15 min tras ~10 `401` de la misma IP, `ADMIN_AUTH_MAX_FAILS`/
+   `ADMIN_AUTH_BLOCK_MINUTES`; login válido limpia). Montado en `app.ts`
+   antes de `globalLimiter`.
+2. **Auditoría de intentos fallidos** ✅ — cada `401` registra
+   `admin.auth-failed` (IP, método, ruta) vía `logAudit`, visible en la
+   pestaña de auditoría.
+3. **Secreto fuerte al arrancar** ✅ — `checkAdminTokenStrength()` en
+   `requireAdmin.ts`; `server.ts` rechaza el arranque en producción con
+   token < 32 caracteres, avisa en desarrollo; sin token arranca (admin 503).
+4. **HTTPS en producción** ✅ — Render/Vercel lo dan por defecto; sin acción
+   de código (documentado en `server.ts`).
 
 ## Verificación al implementar
 

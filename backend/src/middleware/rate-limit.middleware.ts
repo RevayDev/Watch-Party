@@ -145,3 +145,10 @@ export const webhookLimiter = createRateLimiter({
   ...parseRateLimitEnv('PAYMENT_WEBHOOK_RATE_LIMIT', 60, 60 * 1000),
   message: 'Demasiadas notificaciones de pago, por favor inténtalo de nuevo más tarde.',
 });
+
+// Administración: paraguas estricto propio (el panel hace pocas peticiones).
+// El bloqueo temporal tras 401s vive en requireAdmin.ts (adminRateLimit).
+export const adminLimiter = createRateLimiter({
+  ...parseRateLimitEnv('ADMIN_RATE_LIMIT', 60, 60 * 1000),
+  message: 'Demasiadas solicitudes administrativas, por favor inténtalo de nuevo más tarde.',
+});

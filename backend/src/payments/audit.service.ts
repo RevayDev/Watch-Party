@@ -16,6 +16,7 @@ export const AUDIT_ACTIONS = [
   'payments.confirmed',
   'payments.webhook-rejected',
   'payments.refunded',
+  'admin.auth-failed',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number] | string;

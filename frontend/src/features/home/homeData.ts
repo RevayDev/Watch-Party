@@ -113,8 +113,8 @@ export const timelineEvents = [
   },
   {
     date: 'Oct 2026',
-    title: 'PWA, subtítulos y planes de mantenimiento',
-    desc: 'Evolución a Progressive Web App (PWA) instalable, soporte para subtítulos externos .srt y definición de planes de apoyo para servidores y almacenamiento.',
+    title: 'PWA, subtítulos y optimización continua',
+    desc: 'Evolución a Progressive Web App (PWA) instalable, soporte para subtítulos externos .srt y mejoras continuas de baja latencia y compresión.',
     status: 'En curso',
     tone: 'wip' as const,
   },

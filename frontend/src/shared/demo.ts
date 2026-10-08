@@ -16,6 +16,8 @@
 
 export const DEMO_MAX_ROOMS = 5;
 export const DEMO_MAX_USERS_PER_ROOM = 5;
+/** Cupo de salas premium (debe coincidir con PREMIUM_ROOM_MAX_USERS del backend). */
+export const PREMIUM_MAX_USERS_PER_ROOM = 10;
 
 /** Mensaje EXACTO al alcanzar el tope de salas (contrato con backend). */
 export const DEMO_ROOM_LIMIT_MESSAGE =

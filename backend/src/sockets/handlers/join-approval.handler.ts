@@ -1,8 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { RoomService } from '../../services/room.service.js';
-import { DemoCapacityError } from '../../services/room.service.js';
+import { DemoCapacityError, maxUsersForRoom } from '../../services/room.service.js';
 import {
-  DEMO_MAX_USERS_PER_ROOM,
   DEMO_ROOM_FULL_MESSAGE,
   isDemoMode,
 } from '../../config/demo-mode.js';
@@ -90,13 +89,14 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         (existingRoom && existingRoom.hostName.toLowerCase() === cleanName.toLowerCase()) ||
         Boolean(participantMatch?.isHost);
 
-      // ── Cuota demo: sala llena (≥5 participantes) → `join-rejected` con el
+      // ── Cuota demo: sala llena (según plan) → `join-rejected` con el
       // mensaje exacto. Rejoin/merge (alreadyParticipant) no consumen cupo.
       // Va antes de la lista de espera: una sala llena tampoco encola.
       if (
         !alreadyParticipant &&
         isDemoMode() &&
-        (existingRoom?.participants?.length ?? 0) >= DEMO_MAX_USERS_PER_ROOM
+        existingRoom &&
+        (existingRoom.participants?.length ?? 0) >= maxUsersForRoom(existingRoom)
       ) {
         activeUsers.delete(socket.id);
         socket.emit('join-rejected', {

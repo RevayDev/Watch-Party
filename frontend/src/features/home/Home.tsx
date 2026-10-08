@@ -34,6 +34,7 @@ import {
   TimelineEvent,
 } from './homeData';
 import { RecentRooms } from './RecentRooms';
+import { PremiumPurchase } from './PremiumPurchase';
 import { CreateRoomModal, JoinRoomModal, TimelineModal } from './HomeModals';
 import {
   formatDemoAvailability,
@@ -255,6 +256,11 @@ export const Home: React.FC<HomeProps> = ({
       <div className="home-hero-grid">
         {/* Left Column: Title, Subtitle, Reconnect banner & Action Buttons */}
         <div className="home-hero-left">
+          <div className="home-hero-badge" aria-label="Plataforma libre y en tiempo real">
+            <span className="home-hero-badge__dot" aria-hidden="true" />
+            <span>100% Libre • Sin registros • Audio y Video HD en vivo</span>
+          </div>
+
           {demo && (
             <span
               className="home-section__badge home-demo-badge"
@@ -779,14 +785,7 @@ export const Home: React.FC<HomeProps> = ({
           })}
         </div>
 
-        <aside className="home-donate__note" aria-label="Nota sobre los planes">
-          <Lightbulb size={16} strokeWidth={2.2} aria-hidden="true" />
-          <p>
-            <strong>Pago único, sin cuenta.</strong> Los botones abren PayPal en
-            una pestaña nueva con el monto del plan. Si aún no hay enlace de
-            cobro configurado, las tarjetas muestran «Próximamente».
-          </p>
-        </aside>
+        <PremiumPurchase />
       </section>
 
       {/* ── Modal Pop-up: Crear Nueva Sala ── */}

@@ -26,10 +26,18 @@ function authHeaders(token: string): Record<string, string> {
 }
 
 async function request<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${ADMIN_BASE}${path}`, {
-    ...init,
-    headers: { ...(init?.headers ?? {}), ...authHeaders(token) },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${ADMIN_BASE}${path}`, {
+      ...init,
+      headers: { ...(init?.headers ?? {}), ...authHeaders(token) },
+    });
+  } catch {
+    const where = BACKEND_BASE || 'mismo origen (proxy local)';
+    throw new Error(
+      `No se pudo contactar con el servidor (${where}). Verifica que el backend esté corriendo.`
+    );
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     const message =

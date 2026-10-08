@@ -116,7 +116,7 @@ adminRouter.get('/rooms', (req, res) => {
     // conteo + lookup puntual por código.
     RoomService.countLiveRooms()
       .then((liveRooms) =>
-        res.json({ liveRooms, rooms: [], note: 'Indica ?roomId=XXX para el detalle sanitizado de una sala.' })
+        res.json({ liveRooms, rooms: [], note: 'Escribe el código de la sala abajo para ver su detalle.' })
       )
       .catch((err: unknown) => sendError(res, err));
     return;
