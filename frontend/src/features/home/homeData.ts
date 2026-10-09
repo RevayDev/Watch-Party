@@ -54,7 +54,7 @@ export const techStack = [
   { icon: MonitorPlay, name: 'hls.js', role: 'Streaming HLS adaptativo' },
   { icon: FolderUp, name: 'Multer', role: 'Subida de archivos' },
   { icon: BookOpen, name: 'OpenAPI + Swagger UI', role: 'API documentada en /api/docs' },
-  { icon: FlaskConical, name: 'Vitest', role: '492 tests automatizados' },
+  { icon: FlaskConical, name: 'Vitest', role: '535 tests automatizados' },
 ];
 
 export const roadmapItems = [
@@ -122,7 +122,7 @@ export const timelineEvents = [
   {
     date: 'Oct 2026',
     title: 'API documentada y ORM intercambiable',
-    desc: 'Swagger UI en /api/docs para probar cada endpoint, Prisma como tercer adaptador de datos (misma Mongo, migrable a Postgres) y mapa de tests al día: 492 en total.',
+    desc: 'Swagger UI en /api/docs para probar cada endpoint, Prisma como tercer adaptador de datos (misma Mongo, migrable a Postgres) y mapa de tests al día: 535 en total.',
     status: 'Completado',
     tone: 'done' as const,
   },

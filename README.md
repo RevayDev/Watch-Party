@@ -160,8 +160,8 @@ Antes de refactorizar, lee `docs/architecture/IMPACT_MAP.md` (qué se rompe si t
 
 ```bash
 # En backend/ y en frontend/:
-npx tsc --noEmit   # tipos
-npm run test       # vitest (326 backend + 207 frontend)
+npx tsc --noEmit   # tipos (0 errores)
+npm run test       # vitest (328 backend + 207 frontend = 535 tests OK)
 npm run build      # build de producción
 ```
 

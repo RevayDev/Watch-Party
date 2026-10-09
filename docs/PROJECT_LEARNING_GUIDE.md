@@ -69,7 +69,8 @@ frontend/src/
 │   ├── VideoPlayer.tsx       # <video>/HLS, sync entrante con compensación, upload, URL externa
 │   ├── Chat.tsx / Participants.tsx / Reactions.tsx / CameraGrid.tsx / MediaControls.tsx
 │   ├── RoomHeader.tsx        # Botón único "Compartir" (código + link + copiar)
-│   ├── RoomSettingsModal.tsx / HostExitModal.tsx / WaitingApproval.tsx / BottomSheet.tsx
+│   ├── RoomSettingsModal.tsx / LeaderExitModal.tsx / MemberExitModal.tsx / WaitingApproval.tsx
+│   ├── shared/components/BottomSheet.tsx
 ├── hooks/
 │   ├── useWebRTC.ts          # Malla P2P completa (~620 líneas, ver §8)
 │   ├── useSwipeDown.ts       # Cierre de sheets con gesto touch

@@ -1,12 +1,9 @@
 # TEST_RISK_MAP — flujos críticos → módulos → tests a correr
 
 > Estado 2026-10-09: `npm run test` frontend **19 ficheros / 207 tests OK**,
-> backend **32 ficheros / 326 tests OK** (ver §3: `sync-hostonly` 7, `moderation-host` 12). Control de reproducción (`hostOnlySync`), roles solo-host y `transfer-host` cubiertos.
-> borrados los tests de pagos/premium/admin/status (código eliminado) y
-> añadidos `docs-openapi`, `useRoomSocket`, `room-header`, `chat-typing`,
-> `interstellar`, `perf`, `webrtc-quality`, `video-ready`,
-> `approve-join-full-socket`. Regla de organización: **1 módulo → 1 fichero
-> de test** (por eso hay muchos: es orden, no duplicación).
+> backend **32 ficheros / 328 tests OK** (Total: **535 tests en verde**). Control de reproducción (`hostOnlySync`), roles solo-host, `transfer-host`,
+> modales de confirmación de salida, estados de carga de URL y reacciones de helio cubiertos.
+> Regla de organización: **1 módulo → 1 fichero de test** (por eso hay muchos: es orden, no duplicación).
 > Este mapa dice **qué correr al tocar cada módulo**. No sustituye verificación
 > en navegador real / MongoDB real (ver LIMITACIONES abajo).
 
@@ -16,7 +13,7 @@
 |---|---|---|---|---|
 | F1 | Crear sala (REST) | `routes/room.routes.ts`, `controllers/room.controller.ts`, `services/room.service.ts`, `middleware/rate-limit` | `services/api.ts` (createRoom), `features/home/Home.tsx`, `features/home/HomeModals.tsx` | BE `room.validations` + `room.service` + `rest-security`; FE `api` |
 | F2 | Unirse a sala (REST + socket) | `room.service.joinRoom`, `domain/room.entity` (`isNameTaken`, `findBannedEntry`), `sockets/handlers/join-approval.handler` | `services/api.ts` (joinRoom), `features/room/hooks/useRoomSocket.ts` (emitJoin, join-pending/approved/rejected) | BE `name-collision` + `room.service` + `socket-guards` + `rest-security`; FE `api` + `WaitingApproval` |
-| F3 | Salir de sala / transferencia host | `room.service.removeParticipantAndTransferHost`, `disconnect-grace.ts`, `socket-state.ts` | `useRoomSocket` (handleLeaveOnlyMe, host-changed), `HostExitModal`, `MemberExitModal` | BE `room.service` + `socket-guards` (H3) + `disconnect-grace`; FE `socket-singleton` |
+| F3 | Salir de sala / transferencia host | `room.service.removeParticipantAndTransferHost`, `disconnect-grace.ts`, `socket-state.ts` | `useRoomSocket` (handleLeaveOnlyMe, host-changed), `LeaderExitModal`, `MemberExitModal` | BE `room.service` + `socket-guards` (H3) + `disconnect-grace`; FE `socket-singleton` |
 | F4 | Approval (requireApproval) | `room.service` (joinRequests), `application/approve-join.usecase.ts`, `join-approval.handler` | `useRoomSocket` (join-requests-updated), `Participants/RequestsTab`, `WaitingApproval` | BE `room.service` + `socket-guards` (approve-join denegado); FE `WaitingApproval` |
 | F5 | Chat + reacciones | `sockets/handlers/chat-reactions.handler.ts` ⚠️ **sin guards de payload (bugs B1)** | `features/chat/Chat.tsx`, `components/Reactions.tsx`, `useRoomSocket` (chat-message/reaction, unreadCount) | BE `chat-webrtc-relay` (incluye 1 `it.fails` == bug abierto); FE `shared-utils` |
 | F6 | Sync video (play/pause/seek + heartbeat) | `domain/playback-policy.ts`, `application/sync-playback.usecase.ts` ⚠️ **sin validación en vía sync (bug B3)**, `handlers/sync-playback.handler.ts` | `features/player/VideoPlayer.tsx`, `useRoomSocket` (remoteAction, handleSyncAction) | BE `resolveRoomTime` + `sync-usecases` + `socket-guards` (sync-video); FE sin cobertura del player ⚠️ |
