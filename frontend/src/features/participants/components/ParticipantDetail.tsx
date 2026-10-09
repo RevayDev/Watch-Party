@@ -1,5 +1,5 @@
 import React from 'react';
-import { Ban, Pencil, UserX } from 'lucide-react';
+import { Ban, Crown, Pencil, Shield, ShieldOff, UserX } from 'lucide-react';
 import { IParticipant } from '../../../types/room';
 import { confirmAction } from '../../../services/notifications';
 import { BottomSheet } from '../../../shared/components/BottomSheet';
@@ -12,6 +12,9 @@ export interface ParticipantDetailProps {
   isSameUser: (p: IParticipant) => boolean;
   canModerateTarget: (p: IParticipant) => boolean;
   canModerate: boolean;
+  /** Solo el host gestiona roles (promover/degradar cohost, pasar sala). */
+  canManageRoles?: boolean;
+  isHost?: boolean;
   isRenaming: boolean;
   newNameVal: string;
   setNewNameVal: (v: string) => void;
@@ -20,6 +23,8 @@ export interface ParticipantDetailProps {
   saveRename: () => void;
   onKickUser?: (targetUserName: string, targetUserId?: string) => void;
   onBanUser?: (targetUserName: string, targetUserId?: string) => void;
+  onToggleCoHost?: (targetUserName: string, makeCoHost: boolean) => void;
+  onTransferHost?: (targetUserName: string, targetUserId?: string) => void;
   onSelectNone: () => void;
 }
 
@@ -31,6 +36,8 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
   isSameUser,
   canModerateTarget,
   canModerate,
+  canManageRoles = false,
+  isHost = false,
   isRenaming,
   newNameVal,
   setNewNameVal,
@@ -39,8 +46,12 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
   saveRename,
   onKickUser,
   onBanUser,
+  onToggleCoHost,
+  onTransferHost,
   onSelectNone,
 }) => {
+  const isTargetHost = detailView.isHost || detailView.role === 'host';
+  const isTargetCoHost = !isTargetHost && detailView.role === 'cohost';
   return (
     <BottomSheet
       open={open}
@@ -169,6 +180,39 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
             <Pencil size={14} />
             <span>Renombrar</span>
           </button>
+          {canManageRoles && !isSameUser(detailView) && !isTargetHost && (
+            <div className="part-detail-modrow">
+              <button
+                type="button"
+                className="part-outline-action-btn"
+                onClick={() => {
+                  onToggleCoHost?.(detailView.name, !isTargetCoHost);
+                }}
+              >
+                {isTargetCoHost ? <ShieldOff size={14} /> : <Shield size={14} />}
+                <span>{isTargetCoHost ? 'Quitar cohost' : 'Hacer cohost'}</span>
+              </button>
+              {isHost && (
+                <button
+                  type="button"
+                  className="part-outline-action-btn"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `¿Pasar la sala a ${detailView.name}? Perderás el control de anfitrión.`
+                      )
+                    ) {
+                      onTransferHost?.(detailView.name, detailView.userId);
+                      onSelectNone();
+                    }
+                  }}
+                >
+                  <Crown size={14} />
+                  <span>Pasar sala</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

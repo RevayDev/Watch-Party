@@ -2,7 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { IVideoMetadata } from '../../types/room.types.js';
 import { RecordHeartbeatUseCase, SyncPlaybackUseCase } from '../../application/sync-playback.usecase.js';
 import { roomPlayback } from '../../domain/playback-policy.js';
-import { requireHost } from '../../domain/auth-policy.js';
+import { requireHost, requireModerator } from '../../domain/auth-policy.js';
 import { RoomService } from '../../services/room.service.js';
 import { activeUsers } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
@@ -27,7 +27,8 @@ function isSyncAction(value: unknown): value is SyncAction {
 /** Handler de sincronización / playback. Nombres de eventos y payloads idénticos al original. */
 export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
   // 5. Video Playback Synchronization (play, pause, seek with latency compensation)
-  // Decisión explícita: cualquier participante puede sincronizar (sin restricción al host).
+  // Por defecto cualquier participante puede sincronizar; con
+  // `settings.hostOnlySync === true` solo host/cohost (moderadores).
   socket.on(
     'sync-video',
     async (
@@ -50,6 +51,15 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       // ajeno desincronice la sala; cualquier participante sí puede).
       const member = activeUsers.get(socket.id);
       if (!member || member.roomId !== cleanRoomId || member.pending) return;
+
+      // `hostOnlySync` (default OFF): bloqueado → solo moderadores
+      // (host o cohost) pueden sincronizar; el resto recibe `action-denied`.
+      if (room.settings?.hostOnlySync === true) {
+        if (!requireModerator(room, resolveSocketClaim(socket, data))) {
+          denySocket(socket, 'sync-video', 'Solo el anfitrión controla la reproducción.');
+          return;
+        }
+      }
 
       // ── Update in-memory playback state (vía caso de uso) ──────────────────
       const payload = SyncPlaybackUseCase.execute({ roomId: cleanRoomId, action, currentTime });

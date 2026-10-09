@@ -3,7 +3,7 @@ import type { IRoom } from '../types/room.types.js';
 /**
  * Puerto de persistencia de salas (hexagonal).
  * El servicio de aplicación programa contra esta interfaz; los adaptadores
- * Mongo / Memoria la implementan. Opera sobre IRoom plano.
+ * Mongo / Memoria / Prisma la implementan. Opera sobre IRoom plano.
  */
 export interface RoomRepository {
   /** ¿Existe una sala con este roomId (normalizado)? */

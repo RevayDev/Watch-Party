@@ -21,7 +21,9 @@ export async function waitForHealth(baseUrl, { timeoutMs = 30000, intervalMs = 5
   for (;;) {
     try {
       const { status, json } = await fetchJson(`${baseUrl}/api/health`);
-      if (status === 200 && json && (json.status === 'ok' || json.status === 'degraded')) return json;
+      // Liveness mínimo: { ok: true, uptimeSec } (se acepta el formato
+      // antiguo { status: 'ok'|'degraded' } por compatibilidad).
+      if (status === 200 && json && (json.ok === true || json.status === 'ok' || json.status === 'degraded')) return json;
     } catch {
       // reintenta hasta el timeout
     }
@@ -32,19 +34,14 @@ export async function waitForHealth(baseUrl, { timeoutMs = 30000, intervalMs = 5
   }
 }
 
-/** Foto del servidor vía endpoint admin (requiere LOAD_ADMIN_TOKEN). Null si no hay token. */
-export async function adminMetrics(baseUrl) {
-  const token = process.env.LOAD_ADMIN_TOKEN;
-  if (!token) return null;
-  try {
-    const { status, json } = await fetchJson(`${baseUrl}/api/admin/metrics`, {
-      headers: { 'x-admin-token': token },
-    });
-    if (status !== 200) return null;
-    return json;
-  } catch {
-    return null;
-  }
+/**
+ * Foto del servidor (antes vía `/api/admin/metrics`, eliminado en la
+ * limpieza: ya no hay panel admin). Hoy siempre `null`: las columnas
+ * heapUsed/wsPeak de los reportes salen como `n/a`. Se conserva la función
+ * para no romper los imports de `ramp.mjs` / `rooms-scenarios.mjs`.
+ */
+export async function adminMetrics(_baseUrl) {
+  return null;
 }
 
 export function fmtMb(v) {

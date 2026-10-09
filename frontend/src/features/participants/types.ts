@@ -30,6 +30,7 @@ export interface ParticipantsProps {
   onBanUser?: (targetUserName: string, targetUserId?: string) => void;
   onUnbanUser?: (targetUserName: string, targetUserId?: string) => void;
   onToggleCoHost?: (targetUserName: string, makeCoHost: boolean) => void;
+  onTransferHost?: (targetUserName: string, targetUserId?: string) => void;
   onRenameUser?: (
     oldName: string,
     newName: string,

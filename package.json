@@ -3,11 +3,22 @@
   "version": "1.0.0",
   "description": "Watch Party - Plataforma para ver videos en sincronía en tiempo real",
   "scripts": {
+    "dev": "concurrently -n backend,frontend -c magenta,cyan \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
-    "build": "npm --prefix backend run build && npm --prefix frontend run build"
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "test": "npm --prefix backend run test && npm --prefix frontend run test"
   },
-  "keywords": ["watchparty", "video", "sync", "socketio", "webrtc"],
+  "keywords": [
+    "watchparty",
+    "video",
+    "sync",
+    "socketio",
+    "webrtc"
+  ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
 }

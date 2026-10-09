@@ -21,6 +21,7 @@ const ALLOWED_KEYS = new Set<string>([
   'visualEffects',
   'duckingEnabled',
   'duckingLevel',
+  'hostOnlySync',
 ]);
 
 const BOOLEAN_KEYS = new Set<string>([
@@ -35,6 +36,7 @@ const BOOLEAN_KEYS = new Set<string>([
   'reactionsEnabled',
   'visualEffects',
   'duckingEnabled',
+  'hostOnlySync',
 ]);
 
 /** Rango válido para `duckingLevel` (porcentaje 10–60, default 30 en cliente). */

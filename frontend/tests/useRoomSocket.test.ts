@@ -492,3 +492,127 @@ describe('useRoomSocket (eventos socket críticos)', () => {
     );
   });
 });
+
+describe('useRoomSocket (hostOnlySync + host-secret)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function lockRoom(mockSocket: MockSocket, patch: Record<string, unknown>) {
+    act(() => {
+      mockSocket._fire('room-state', {
+        video: null,
+        participants: [],
+        joinRequests: [],
+        ...patch,
+      });
+    });
+  }
+
+  it('handleSyncAction bloquea con toast cuando locked y no privilegiado', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { mockSocket, result } = setup(false);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    lockRoom(mockSocket, {
+      participants: [
+        { name: 'Beto', isHost: false, role: 'member', joinedAt: new Date().toISOString() },
+      ],
+      settings: { hostOnlySync: true },
+    });
+    mockSocket.emit.mockClear();
+    act(() => {
+      result.current.handleSyncAction('play', 10);
+    });
+    expect(mockSocket.emit).not.toHaveBeenCalledWith('sync-video', expect.anything());
+    expect(logSpy).toHaveBeenCalledWith(
+      '[notify:warning]',
+      'Solo el anfitrión controla la reproducción.'
+    );
+  });
+
+  it('handleSyncAction emite cuando el usuario es host aunque esté locked', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    lockRoom(mockSocket, { isHost: true, settings: { hostOnlySync: true } });
+    expect(result.current.isHost).toBe(true);
+    mockSocket.emit.mockClear();
+    act(() => {
+      result.current.handleSyncAction('pause', 12);
+    });
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'sync-video',
+      expect.objectContaining({ roomId: 'ABC123', action: 'pause', currentTime: 12 })
+    );
+  });
+
+  it('handleSyncAction emite cuando el usuario es cohost aunque esté locked', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    lockRoom(mockSocket, {
+      participants: [
+        { name: 'Beto', isHost: false, role: 'cohost', joinedAt: new Date().toISOString() },
+      ],
+      settings: { hostOnlySync: true },
+    });
+    mockSocket.emit.mockClear();
+    act(() => {
+      result.current.handleSyncAction('seek', 30);
+    });
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'sync-video',
+      expect.objectContaining({ roomId: 'ABC123', action: 'seek', currentTime: 30 })
+    );
+  });
+
+  it('handleSyncAction emite sin bloqueo cuando hostOnlySync está off', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitFor(() => expect(result.current.roomData).not.toBeNull());
+    lockRoom(mockSocket, { settings: { hostOnlySync: false } });
+    mockSocket.emit.mockClear();
+    act(() => {
+      result.current.handleSyncAction('play', 5);
+    });
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'sync-video',
+      expect.objectContaining({ action: 'play', currentTime: 5 })
+    );
+  });
+
+  it("host-secret guarda la sesión y notifica 'Ahora eres el anfitrión'", async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { mockSocket } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      mockSocket._fire('host-secret', { hostSecret: 'nuevo-secreto' });
+    });
+    expect(JSON.parse(localStorage.getItem('watchparty_host_session') ?? '{}')).toMatchObject({
+      roomId: 'ABC123',
+      hostSecret: 'nuevo-secreto',
+    });
+    expect(logSpy).toHaveBeenCalledWith('[notify:success]', 'Ahora eres el anfitrión de la sala.');
+  });
+
+  it('host-secret sin secreto no toca la sesión ni notifica', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { mockSocket } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      mockSocket._fire('host-secret', {});
+    });
+    expect(localStorage.getItem('watchparty_host_session')).toBeNull();
+    expect(logSpy).not.toHaveBeenCalledWith('[notify:success]', expect.anything());
+  });
+
+  it("limpia el listener 'host-secret' (socket.off) al desmontar", async () => {
+    const { mockSocket, unmount } = setup(false);
+    await waitForSubscribed(mockSocket);
+    expect(mockSocket.on).toHaveBeenCalledWith('host-secret', expect.any(Function));
+    unmount();
+    expect(mockSocket.off).toHaveBeenCalledWith('host-secret', expect.any(Function));
+  });
+});

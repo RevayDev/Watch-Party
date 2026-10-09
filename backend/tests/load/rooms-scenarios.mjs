@@ -8,17 +8,13 @@
  *  - N sockets socket.io-client por sala: join-room + heartbeat cada 5 s +
  *    3 × sync-video, ventana de observación 20 s,
  *  - medición: joins OK/429, WS conectados, errores de conexión, desconexiones
- *    observadas, latencia de join (p50/p95 medidas en cliente), foto del
- *    servidor antes/después (/api/admin/metrics con LOAD_ADMIN_TOKEN),
+ *    observadas, latencia de join (p50/p95 medidas en cliente),
  *  - limpieza: leave-room + DELETE de cada sala (con su hostSecret).
  *
- * FREE vs PREMIUM: con DEMO_MODE=true (default de la rama) el servidor impone
- * 5 salas y 5 usuarios/sala → los escenarios ×10 registrarán 429/room-full
- * ESPERADOS (no es un fallo: es la cuota FREE medida). Con DEMO_MODE=false y
- * PREMIUM_ROOM_MAX_USERS=10 el mismo script mide el techo "premium"
- * (ojo: hoy los planes son contrato futuro — src/config/plans.ts —; el
- * runtime en non-demo NO limita usuarios, así que 10×10 mide Node+Socket.IO,
- * no una cuota premium real).
+ * DEMO vs NON-DEMO: con DEMO_MODE=true el servidor impone 5 salas y
+ * 5 usuarios/sala — los escenarios ×10 registrarán 429/room-full
+ * ESPERADOS (no es un fallo: es la cuota demo medida). Con DEMO_MODE=false
+ * NO hay límite de usuarios, así que 10×10 mide Node+Socket.IO puro.
  *
  * Uso:
  *   node tests/load/rooms-scenarios.mjs [--base URL] [--scenario 1x10] [--observe 20]

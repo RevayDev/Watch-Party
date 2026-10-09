@@ -18,6 +18,11 @@ import {
   Heart,
   Wallet,
   WandSparkles,
+  Layers,
+  BookOpen,
+  FlaskConical,
+  Wifi,
+  Radio,
 } from 'lucide-react';
 
 /**
@@ -46,8 +51,11 @@ export const techStack = [
   { icon: Radio, name: 'Socket.IO', role: 'Eventos en tiempo real' },
   { icon: Network, name: 'WebRTC', role: 'Audio y video P2P' },
   { icon: Database, name: 'MongoDB + Mongoose', role: 'Persistencia de salas' },
+  { icon: Layers, name: 'Prisma ORM', role: 'Adaptador de datos intercambiable' },
   { icon: MonitorPlay, name: 'hls.js', role: 'Streaming HLS adaptativo' },
   { icon: FolderUp, name: 'Multer', role: 'Subida de archivos' },
+  { icon: BookOpen, name: 'OpenAPI + Swagger UI', role: 'API documentada en /api/docs' },
+  { icon: FlaskConical, name: 'Vitest', role: '492 tests automatizados' },
 ];
 
 export const roadmapItems = [
@@ -74,6 +82,11 @@ export const roadmapItems = [
   {
     title: 'Moderación avanzada',
     desc: 'Silencios globales, expulsión rápida y desactivación de reacciones.',
+    status: 'En estudio',
+  },
+  {
+    title: 'PostgreSQL vía Prisma',
+    desc: 'Cambiar el proveedor de la base de datos sin tocar las reglas: el puerto ya admite otro adaptador.',
     status: 'En estudio',
   },
 ];
@@ -104,6 +117,13 @@ export const timelineEvents = [
     date: 'Oct 2026',
     title: 'Rediseño del Home',
     desc: 'Renovación completa de la página principal: catálogo de tecnologías, línea de tiempo histórica, roadmap interactivo de funciones, vías de donación y pie de página completo.',
+    status: 'Completado',
+    tone: 'done' as const,
+  },
+  {
+    date: 'Oct 2026',
+    title: 'API documentada y ORM intercambiable',
+    desc: 'Swagger UI en /api/docs para probar cada endpoint, Prisma como tercer adaptador de datos (misma Mongo, migrable a Postgres) y mapa de tests al día: 492 en total.',
     status: 'Completado',
     tone: 'done' as const,
   },
@@ -189,16 +209,46 @@ export const features = [
     title: 'Control del Anfitrión',
     desc: 'Gestiona permisos, silencia participantes, transfiere el rol y define un temporizador de cierre automático para la sala.',
   },
+  {
+    icon: Wifi,
+    title: 'Ahorro de Datos',
+    desc: 'Modo ahorro: cámaras en audio, menos tráfico y atenuación inteligente del video mientras hablas. Ideal con datos móviles.',
+  },
+  {
+    icon: Radio,
+    title: 'En Vivo, Siempre al Día',
+    desc: 'Consenso de posición en tiempo real, reconexión automática si se cae tu internet y botón para saltar al en vivo si te atrasas.',
+  },
 ];
 
-export const faqs = [
+/**
+ * Respuesta del FAQ: texto plano o segmentos con resaltado.
+ * - tone 'backend' → marcador morado (partes del servidor/API).
+ * - tone 'frontend' → marcador azul (partes del navegador/cliente).
+ * - href '@docs' / '@docs-json' → el renderer los resuelve a la URL del
+ *   backend (`BACKEND_BASE`), porque en producción el front y el back viven
+ *   en dominios distintos y un link relativo se rompería.
+ */
+export interface FaqSegment {
+  text: string;
+  tone?: 'backend' | 'frontend';
+  href?: string;
+}
+
+export type FaqAnswer = string | FaqSegment[];
+
+export const faqs: Array<{ q: string; a: FaqAnswer }> = [
   {
     q: '¿Cómo funciona la sincronización de video?',
     a: 'El anfitrión tiene el control del reproductor. Cada vez que reproduce, pausa o adelanta el archivo, se envía una señal en milisegundos mediante WebSockets para que todos los espectadores vean exactamente el mismo frame sin desfases.',
   },
   {
     q: '¿Necesito instalar algún programa o extensión?',
-    a: 'No, Watch Party funciona 100% en el navegador web (Chrome, Firefox, Edge, Safari y navegadores móviles) sin extensiones, descargas ni registros obligatorios.',
+    a: [
+      { text: 'No, Watch Party funciona 100% en el ' },
+      { text: 'navegador web', tone: 'frontend' },
+      { text: ' (Chrome, Firefox, Edge, Safari y navegadores móviles) sin extensiones, descargas ni registros obligatorios.' },
+    ],
   },
   {
     q: '¿Qué formatos de video son compatibles?',
@@ -207,5 +257,21 @@ export const faqs = [
   {
     q: '¿Cómo funcionan la voz y las cámaras?',
     a: 'Utilizamos tecnología WebRTC punto a punto (P2P), lo que garantiza audio y video en tiempo real de baja latencia sin saturar servidores externos.',
+  },
+  {
+    q: '¿Hay documentación para programadores?',
+    a: [
+      { text: 'Sí. La ' },
+      { text: 'API REST', tone: 'backend' },
+      { text: ' está documentada con OpenAPI y Swagger UI: abre ' },
+      { text: '/api/docs', tone: 'backend', href: '@docs' },
+      { text: ' en la URL del ' },
+      { text: 'backend', tone: 'backend' },
+      { text: ' para ver y probar cada endpoint desde el ' },
+      { text: 'navegador', tone: 'frontend' },
+      { text: ', o descarga el spec en ' },
+      { text: '/api/docs/json', tone: 'backend', href: '@docs-json' },
+      { text: ' para Postman e Insomnia.' },
+    ],
   },
 ];

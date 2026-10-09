@@ -13,8 +13,7 @@
  * El último escalón sano es el resultado (no se insiste hasta caer el server).
  *
  * Métricas por escalón: conexiones, duración, req/s, latencia p50/p95≈/p99,
- * errores, timeouts + foto del servidor (heap MB, load1m, ws peak) vía
- * /api/admin/metrics cuando LOAD_ADMIN_TOKEN está definido.
+ * errores y timeouts. (Antes se sumaba foto del servidor vía admin, eliminado.)
  *
  * Uso:
  *   node tests/load/ramp.mjs [--base http://127.0.0.1:4100] [--steps 10,25,50,100] [--secs 15]
@@ -57,7 +56,6 @@ const SECS = Number(args.secs || 15);
 
 const REQUESTS = [
   { method: 'GET', path: '/api/health' },
-  { method: 'GET', path: '/api/status' },
   { method: 'GET', path: '/api/demo/availability' },
 ];
 

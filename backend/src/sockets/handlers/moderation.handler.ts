@@ -6,7 +6,8 @@ import {
   UnbanUserUseCase,
 } from '../../application/moderate-user.usecase.js';
 import { RoomService } from '../../services/room.service.js';
-import { findRequesterParticipant, requireModerator } from '../../domain/auth-policy.js';
+import { findRequesterParticipant, requireHost, requireModerator } from '../../domain/auth-policy.js';
+import { isHostParticipant } from '../../domain/room.entity.js';
 import { activeMediaStates, activeUsers } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 import { dropPosition } from '../../domain/playback-policy.js';
@@ -108,6 +109,19 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
         return;
       }
 
+      // El host no puede ser expulsado por un cohost: solo el propio host
+      // (secreto válido o participante host) puede expulsar al anfitrión.
+      const targetIsHost = (room?.participants || []).some((p) => {
+        if (targetUserId && p.userId) return p.userId === targetUserId && isHostParticipant(p);
+        return (
+          p.name.toLowerCase() === targetUserName.trim().toLowerCase() && isHostParticipant(p)
+        );
+      });
+      if (targetIsHost && !requireHost(room, resolveSocketClaim(socket, data))) {
+        denySocket(socket, 'kick-user', 'No puedes expulsar al anfitrión.');
+        return;
+      }
+
       console.log(
         `${ban ? '⛔ Baneado' : '🚫 Expulsado'} ${targetUserName} por ${kickedBy} en sala [${cleanRoomId}]`
       );
@@ -179,8 +193,8 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
       const cleanRoomId = roomId.toUpperCase().trim();
 
       const room = await RoomService.getRoomById(cleanRoomId);
-      if (!requireModerator(room, resolveSocketClaim(socket, data))) {
-        denySocket(socket, 'set-role', MODERATOR_ONLY);
+      if (!requireHost(room, resolveSocketClaim(socket, data))) {
+        denySocket(socket, 'set-role', 'Solo el anfitrión puede dar o quitar roles.');
         return;
       }
 
@@ -191,6 +205,89 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
         targetUserName,
         role,
         participants: updatedRoom?.participants || [],
+      });
+    }
+  );
+
+  // Transferencia de sala: solo el host actual puede regalar la sala.
+  socket.on(
+    'transfer-host',
+    async (
+      data: { roomId: string; targetUserName?: string; targetUserId?: string } & PrivilegedPayload
+    ) => {
+      if (!data || !data.roomId) return;
+      const { roomId, targetUserName, targetUserId } = data;
+      if (!targetUserName && !targetUserId) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+
+      const room = await RoomService.getRoomById(cleanRoomId);
+      if (!requireHost(room, resolveSocketClaim(socket, data))) {
+        denySocket(socket, 'transfer-host', 'Solo el anfitrión puede transferir la sala.');
+        return;
+      }
+
+      // ¿Está el nuevo host conectado? (misma sala, no pending; userId o nombre lower)
+      let targetSocketId: string | undefined;
+      for (const [sid, u] of activeUsers.entries()) {
+        if (u.roomId !== cleanRoomId || u.pending) continue;
+        const matches =
+          (targetUserId && u.userId === targetUserId) ||
+          (!targetUserId &&
+            targetUserName &&
+            u.userName.toLowerCase() === targetUserName.trim().toLowerCase());
+        if (matches) {
+          targetSocketId = sid;
+          break;
+        }
+      }
+
+      const previousHostName = room?.hostName;
+      let result: Awaited<ReturnType<typeof RoomService.transferHost>>;
+      if (!targetSocketId) {
+        console.warn(
+          `⚠️ transfer-host: nuevo anfitrión sin socket activo en sala [${cleanRoomId}]; no se rota el secreto.`
+        );
+        result = await RoomService.transferHost(
+          cleanRoomId,
+          { userId: targetUserId, name: targetUserName },
+          { rotateSecret: false }
+        );
+      } else {
+        result = await RoomService.transferHost(cleanRoomId, {
+          userId: targetUserId,
+          name: targetUserName,
+        });
+      }
+      if (!result.room || !result.newHostName) {
+        denySocket(socket, 'transfer-host', 'No se encontró al participante.');
+        return;
+      }
+
+      // Sincroniza flags isHost del directorio efímero (misma sala).
+      for (const [, u] of activeUsers.entries()) {
+        if (u.roomId !== cleanRoomId || u.pending) continue;
+        const isNewHost =
+          (targetUserId && u.userId === targetUserId) ||
+          u.userName.toLowerCase() === result.newHostName.toLowerCase();
+        if (isNewHost) {
+          u.isHost = true;
+        } else if (
+          previousHostName &&
+          u.userName.toLowerCase() === previousHostName.trim().toLowerCase()
+        ) {
+          u.isHost = false;
+        }
+      }
+
+      // Entrega el secreto rotado solo al nuevo host conectado.
+      if (targetSocketId && result.hostSecret) {
+        io.to(targetSocketId).emit('host-secret', { hostSecret: result.hostSecret });
+      }
+
+      console.log(`👑 Sala [${cleanRoomId}] transferida a ${result.newHostName}`);
+      io.to(cleanRoomId).emit('host-changed', {
+        newHostName: result.newHostName,
+        participants: result.room.participants || [],
       });
     }
   );

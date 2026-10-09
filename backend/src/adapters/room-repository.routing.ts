@@ -1,17 +1,22 @@
 import type { RoomRepository } from '../ports/room.repository.js';
 import type { IRoom } from '../types/room.types.js';
-import { getIsMongoConnected } from '../config/database.js';
+import { getIsMongoConnected, getIsPrismaConnected, isPrismaStore } from '../config/database.js';
 import { memoryRoomRepository } from './memory-room.repository.js';
 import { mongoRoomRepository } from './mongo-room.repository.js';
+import { prismaRoomRepository } from './prisma-room.repository.js';
 
 /**
- * Repositorio de enrutado: un único punto de acceso que delega en Mongo o en
- * memoria según el estado de la conexión (evaluado en cada llamada, ya que
- * `getIsMongoConnected()` refleja el estado real de la conexión de Mongoose).
+ * Repositorio de enrutado: un único punto de acceso que delega según el
+ * estado de la conexión (evaluado en cada llamada).
+ * - `ROOM_STORE=prisma` → Prisma (si conectó) o memoria (fallback).
+ * - default (`auto`) → Mongoose (si conectó) o memoria (fallback).
  * Esto elimina la duplicación `if (isMongoConnected) / else` del servicio.
  */
 class RoutingRoomRepository implements RoomRepository {
   private active(): RoomRepository {
+    if (isPrismaStore()) {
+      return getIsPrismaConnected() ? prismaRoomRepository : memoryRoomRepository;
+    }
     return getIsMongoConnected() ? mongoRoomRepository : memoryRoomRepository;
   }
 

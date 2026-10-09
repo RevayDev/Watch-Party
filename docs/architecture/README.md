@@ -13,14 +13,16 @@ en el entorno — no hay `rg` ni `git` en el PATH del shell).
 | `SOCKET_EVENTS.md` | Tabla completa evento / emisor / receptor / datos / validación / auth / limpieza + duplicados e inconsistencias. |
 | `SEQUENCES.md` | 8 flujos: crear sala, unirse, approval, reconexión, chat, sync video, moderación, persistencia. |
 | `IMPACT_MAP.md` | Módulos centrales y qué se rompería al tocarlos. |
+| `HEXAGONAL.md` | Hexagonal explicada simple para juniors + receta para código nuevo. |
 | `README.md` | Este archivo. |
 
 ## Cómo leer
 
-1. Empezar por `ARCHITECTURE.md` (visión estática: quién importa a quién).
-2. Seguir por `SOCKET_EVENTS.md` (contrato real cliente↔servidor).
-3. Usar `SEQUENCES.md` para entender flujos temporales.
-4. Consultar `IMPACT_MAP.md` antes de cualquier refactor.
+1. Si eres nuevo: `HEXAGONAL.md` (15 min, con receta para programar).
+2. Seguir por `ARCHITECTURE.md` (visión estática: quién importa a quién).
+3. Seguir por `SOCKET_EVENTS.md` (contrato real cliente↔servidor).
+4. Usar `SEQUENCES.md` para entender flujos temporales.
+5. Consultar `IMPACT_MAP.md` antes de cualquier refactor.
 
 ## Cómo actualizar (solo lectura de código, sin herramientas de grafo)
 

@@ -2,9 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   createRateLimiter,
   parseRateLimitEnv,
-  checkoutLimiter,
-  redeemLimiter,
-  webhookLimiter,
 } from '../src/middleware/rate-limit.middleware.js';
 
 const savedNodeEnv = process.env.NODE_ENV;
@@ -144,13 +141,4 @@ describe('rate-limit de pagos: parseo por entorno y limitadores', () => {
     expect(parseRateLimitEnv('X_TMP_LIMIT', 5, 1000)).toEqual({ windowMs: 1000, max: 5 });
   });
 
-  it('checkout/redeem/webhook tienen limitadores definidos (no agresivos por defecto)', () => {
-    for (const limiter of [checkoutLimiter, redeemLimiter, webhookLimiter]) {
-      expect(typeof limiter).toBe('function');
-      const m = mockHttp('10.20.30.40');
-      limiter(m.req as never, m.res as never, m.next as never);
-      expect(m.next).toHaveBeenCalledTimes(1);
-      expect(m.res.statusCode).toBe(200);
-    }
-  });
 });

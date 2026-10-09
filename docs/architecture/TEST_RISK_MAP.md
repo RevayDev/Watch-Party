@@ -1,8 +1,12 @@
 # TEST_RISK_MAP — flujos críticos → módulos → tests a correr
 
-> QA 2026-10-04. Estado medido: `npx tsc --noEmit` OK en frontend y backend
-> (exit 0, 0 errores); `npm run test` frontend **8 ficheros / 78 tests OK**,
-> backend **12 ficheros / 148 OK + 2 `it.fails` documentando bugs** (exit 0).
+> Estado 2026-10-09: `npm run test` frontend **19 ficheros / 207 tests OK**,
+> backend **32 ficheros / 326 tests OK** (ver §3: `sync-hostonly` 7, `moderation-host` 12). Control de reproducción (`hostOnlySync`), roles solo-host y `transfer-host` cubiertos.
+> borrados los tests de pagos/premium/admin/status (código eliminado) y
+> añadidos `docs-openapi`, `useRoomSocket`, `room-header`, `chat-typing`,
+> `interstellar`, `perf`, `webrtc-quality`, `video-ready`,
+> `approve-join-full-socket`. Regla de organización: **1 módulo → 1 fichero
+> de test** (por eso hay muchos: es orden, no duplicación).
 > Este mapa dice **qué correr al tocar cada módulo**. No sustituye verificación
 > en navegador real / MongoDB real (ver LIMITACIONES abajo).
 
@@ -40,26 +44,51 @@
   2026-10-04 (`chat-webrtc-relay.test.ts`: 10 OK + 2 `it.fails` = bugs B1/B2).
 - `backend/src/services/proxy.service.ts` → `proxy-utils` (10, nuevo 2026-10-04).
   `proxyFetch` con red real sigue sin cobertura (ver LIMITACIONES).
-- `backend/src/middleware/*`, `adapters/*`, `config/*`, `routes/*` → **0 tests** ⚠️
-  (rate-limit se auto-desactiva con `NODE_ENV=test`; upload/error/formatos de
-  `rooms.json` sin red de seguridad).
-- `frontend/src/features/room/hooks/useRoomSocket.ts` (912 lín, 25 listeners) →
-  **0 tests** ⚠️. Solo cobertura indirecta (`api`, `WaitingApproval`,
-  `socket-singleton`). Cualquier cambio de nombre de evento rompe en silencio
-  (socket.io no tipa). Tocar aquí exige prueba manual en 2 navegadores.
-- `frontend/src/hooks/useWebRTC.ts`, `features/player/VideoPlayer.tsx`,
-  `features/chat/Chat.tsx`, `features/participants/*` → **0 tests** ⚠️.
-- `frontend/src/services/socket.ts` → `socket-singleton` (4, nuevo).
-  `frontend/src/hooks/usePresence.ts` → `usePresence` (4, nuevo).
-  `frontend/src/shared/utils.ts` → `shared-utils` (23).
+- `backend/src/middleware/*`, `adapters/*`, `config/*`, `routes/*` →
+  cubiertos por: `rate-limit` + `rate-limit-extra`, `upload-middleware`,
+  `error-middleware`, `adapters-memory`, `cors-config` + `cors-strict`,
+  `docs-openapi` (cada path documentado responde de verdad).
+- `backend/src/sockets/handlers/video-ready` → `video-ready` (handshake +
+  auto-play grupal). `disconnect-grace` → `disconnect-grace`.
+- `backend/src/adapters/prisma-room.repository` → `prisma-room` (mapeo puro +
+  fallback a memoria; sin DB viva). Cambiar el schema exige
+  `npm run prisma:generate` + correr este test.
+- Anti-raid: `chat-webrtc-relay` (miembro obligatorio, anti-suplantación) +
+  `socket-limits` (helpers + flood de joins frenado antes de la DB) +
+  `rate-limit` (spam de chat). Regla: **ningún evento que escriba o emita a
+  la sala puede confiar en el payload sin verificar membresía en
+  `activeUsers`** (ver `memberNameOf` en `chat-reactions.handler.ts`).
+- Legacy y colisiones: `anonymous-legacy` (merge de anónimos),
+  `name-collision` (H8), `approve-join-full-socket` (cupo bajo mutex),
+  `video-change-guard` (cambio de video), `room.validations` (crear/sala).
+- `frontend/src/features/room/hooks/useRoomSocket.ts` → `useRoomSocket` (20:
+  listeners, chat/unread, typing, interestellar, heartbeat). Los nombres de
+  evento siguen sin tipar (socket.io): si renombras un evento, actualiza test
+  + `SOCKET_EVENTS.md` y prueba en 2 navegadores.
+- `frontend/src/hooks/useWebRTC.ts` → calidad/estrategia en `webrtc-quality`;
+  el hook vivo sigue sin test de integración ⚠️ (mocks de PeerConnection).
+- `features/player/VideoPlayer.tsx`, `features/chat/Chat.tsx`,
+  `features/participants/*` → sin test directo ⚠️ (solo indirecta vía
+  `useRoomSocket` + `WaitingApproval` + `demo-visual`).
+- `frontend/src/services/socket.ts` → `socket-singleton`.
+  `frontend/src/hooks/usePresence.ts` → `usePresence`.
+  `frontend/src/shared/utils.ts` → `shared-utils` + `auth`
+  (hostSecret/sesiones/headers).
+- `frontend/src/services/api.ts` → `api` (rooms) + `uploadVideo` (XHR progreso)
+  + `demo-mode` (`getDemoAvailability` y contrato de mensajes exactos).
+- Demo en 3 capas (no duplicadas): `demo-mode` (lógica pura + contrato),
+  `demo-home` (componente Home), `demo-visual` (Header/picker/modal).
+- Extras UI: `room-header` (pill timer), `chat-typing` (indicador 4 s),
+  `reactions-picker` (+ combo interestellar en `interstellar` + `perf`),
+  `recentRooms`, `WaitingApproval`.
 
 ## 3. Cobertura antes/después (esta sesión QA, sin tocar `src/`)
 
-| Proyecto | Antes | Después | Delta |
-|---|---|---|---|
-| backend | 9 fich. / 119 tests | 12 fich. / 148 OK + 2 `it.fails` | +`sync-usecases` (9), +`proxy-utils` (10), +`chat-webrtc-relay` (10+2 fails) |
-| frontend | 6 fich. / 70 tests | 8 fich. / 78 tests | +`socket-singleton` (4), +`usePresence` (4) |
-| jsdom nuevo / paquetes instalados | — | **0** (jsdom y `@testing-library/react` ya eran deps) | — |
+| Proyecto | Antes (2026-10-04) | Ahora (2026-10-09) |
+|---|---|---|
+| backend | 12 fich. / 148 OK + 2 `it.fails` | **32 fich. / 326 OK** (dentro `sync-hostonly`, `moderation-host` + anti-raid previo) |
+| frontend | 8 fich. / 78 tests | **19 fich. / 193 OK** (dentro `useRoomSocket` 20, `demo-*`, `room-header`, `chat-typing`, `interstellar`, `perf`, `webrtc-quality`) |
+| jsdom nuevo / paquetes instalados | **0** | **0** (solo `swagger-ui-express` en backend, para `/api/docs`) |
 
 ## 4. ESLint
 

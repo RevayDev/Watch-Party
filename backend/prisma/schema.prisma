@@ -1,0 +1,28 @@
+// Prisma ORM (adaptador opcional): misma base Mongo que Mongoose.
+// Se usa SOLO si ROOM_STORE=prisma (ver src/adapters/room-repository.routing.ts).
+// Las listas van como Json para mapear 1:1 con IRoom (igual que .lean() de Mongoose).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+}
+
+model Room {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  roomId       String   @unique
+  hostName     String
+  hostSecret   String
+  status       String   @default("waiting")
+  isTemporary  Boolean?
+  plan         String?
+  video        Json?
+  participants Json     // IParticipant[]
+  joinRequests Json?    // IJoinRequest[]
+  kickedUsers  Json?    // IKickedParticipant[]
+  settings     Json?    // IRoomSettings
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

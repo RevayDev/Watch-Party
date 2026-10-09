@@ -127,28 +127,4 @@ export const proxyLimiter = createRateLimiter({
   message: 'Límite de solicitudes de streaming/proxy excedido.',
 });
 
-// Pagos: límites configurables por entorno (nunca agresivos por defecto).
-// - checkout: por usuario/IP.
-// - redeem: por usuario/IP/código (anti fuerza bruta, con margen para typos).
-// - webhook: laxo para no bloquear reintentos legítimos del proveedor.
-export const checkoutLimiter = createRateLimiter({
-  ...parseRateLimitEnv('PAYMENT_CHECKOUT_RATE_LIMIT', 30, 60 * 1000),
-  message: 'Demasiadas compras iniciadas, por favor inténtalo de nuevo más tarde.',
-});
 
-export const redeemLimiter = createRateLimiter({
-  ...parseRateLimitEnv('PAYMENT_REDEEM_RATE_LIMIT', 20, 60 * 1000),
-  message: 'Demasiados intentos de canje, por favor inténtalo de nuevo más tarde.',
-});
-
-export const webhookLimiter = createRateLimiter({
-  ...parseRateLimitEnv('PAYMENT_WEBHOOK_RATE_LIMIT', 60, 60 * 1000),
-  message: 'Demasiadas notificaciones de pago, por favor inténtalo de nuevo más tarde.',
-});
-
-// Administración: paraguas estricto propio (el panel hace pocas peticiones).
-// El bloqueo temporal tras 401s vive en requireAdmin.ts (adminRateLimit).
-export const adminLimiter = createRateLimiter({
-  ...parseRateLimitEnv('ADMIN_RATE_LIMIT', 60, 60 * 1000),
-  message: 'Demasiadas solicitudes administrativas, por favor inténtalo de nuevo más tarde.',
-});

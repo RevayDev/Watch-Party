@@ -28,10 +28,8 @@ function mockRes(statusCode: number): EventEmitter & { statusCode: number } {
 }
 
 describe('metrics.service (observabilidad en memoria)', () => {
-  it('excluye /api/health y /api/status/stream, cuenta /api/status', () => {
+  it('excluye /api/health y cuenta el resto', () => {
     expect(isMetricsExcluded('/api/health')).toBe(true);
-    expect(isMetricsExcluded('/api/status/stream')).toBe(true);
-    expect(isMetricsExcluded('/api/status')).toBe(false);
     expect(isMetricsExcluded('/api/rooms')).toBe(false);
   });
 

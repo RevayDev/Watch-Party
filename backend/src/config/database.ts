@@ -20,6 +20,34 @@ export function getIsMongoConnected(): boolean {
   return mongoConnected && mongoose.connection.readyState === 1;
 }
 
+/** ¿El operador pidió Prisma? `ROOM_STORE=prisma` (default `auto`). */
+export function isPrismaStore(): boolean {
+  return (process.env.ROOM_STORE || 'auto').trim().toLowerCase() === 'prisma';
+}
+
+let prismaConnected = false;
+
+export function getIsPrismaConnected(): boolean {
+  return prismaConnected;
+}
+
+/**
+ * Conecta Prisma (solo se llama con `ROOM_STORE=prisma`). Si falla, se avisa
+ * y el routing cae a memoria, igual que el fallback de Mongoose.
+ */
+export async function connectPrisma(): Promise<void> {
+  try {
+    const { getPrismaClient } = await import('../adapters/prisma-room.repository.js');
+    await getPrismaClient().$connect();
+    prismaConnected = true;
+    console.log('✅ Prisma conectado (ROOM_STORE=prisma). Mongoose queda inactivo.');
+  } catch (error: any) {
+    prismaConnected = false;
+    console.warn(`⚠️ No se pudo conectar Prisma (${error.message}).`);
+    console.log('⚡ Fallback: usando almacén en memoria.');
+  }
+}
+
 export async function connectDatabase(uri: string): Promise<void> {
   try {
     await mongoose.connect(uri, {

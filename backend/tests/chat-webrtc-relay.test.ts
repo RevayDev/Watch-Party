@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { registerChatReactionsHandlers } from '../src/sockets/handlers/chat-reactions.handler.js';
 import { registerWebrtcRelayHandlers } from '../src/sockets/handlers/webrtc-relay.handler.js';
 import { activeUsers } from '../src/sockets/socket-state.js';
+import { __resetSocketLimitsForTests } from '../src/sockets/socket-limits.js';
 import { clearAllPendingGraces } from '../src/sockets/disconnect-grace.js';
 
 function makeSocket(id: string) {
@@ -39,15 +40,21 @@ function makeIo() {
   return { io, roomEmits };
 }
 
+function joinMember(socketId: string, roomId = 'ABC123', userName = 'Ana', pending = false) {
+  activeUsers.set(socketId, { socketId, roomId, userName, isHost: false, pending });
+}
+
 beforeEach(() => {
   activeUsers.clear();
   clearAllPendingGraces();
+  __resetSocketLimitsForTests();
 });
 
 describe('chat: send-message', () => {
   it('mensaje válido se emite a la sala con texto recortado', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s1');
+    joinMember('s1');
     registerChatReactionsHandlers(io, sock.socket);
 
     (sock.handlers.get('send-message') as any)({ roomId: 'abc123', text: '  hola  ', userName: 'Ana' });
@@ -58,19 +65,49 @@ describe('chat: send-message', () => {
     expect(roomEmits[0].payload).toMatchObject({ user: 'Ana', text: 'hola' });
   });
 
-  it('sin userName usa "Anónimo"', () => {
+  it('el userName del cliente se ignora: manda el nombre del servidor (anti-suplantación)', () => {
     const { io, roomEmits } = makeIo();
-    const sock = makeSocket('s1');
+    const sock = makeSocket('s-spoof');
+    joinMember('s-spoof', 'ABC123', 'Ana');
     registerChatReactionsHandlers(io, sock.socket);
 
-    (sock.handlers.get('send-message') as any)({ roomId: 'ABC123', text: 'hola' });
+    (sock.handlers.get('send-message') as any)({ roomId: 'ABC123', text: 'hola, soy el host', userName: 'Anfitrión' });
 
-    expect(roomEmits[0].payload).toMatchObject({ user: 'Anónimo' });
+    expect(roomEmits).toHaveLength(1);
+    expect(roomEmits[0].payload).toMatchObject({ user: 'Ana' });
+  });
+
+  it('quien no es miembro no puede hablar (anti-raid)', () => {
+    const { io, roomEmits } = makeIo();
+    const sock = makeSocket('s-outsider');
+    registerChatReactionsHandlers(io, sock.socket);
+
+    (sock.handlers.get('send-message') as any)({ roomId: 'ABC123', text: 'spam', userName: 'Raid' });
+    (sock.handlers.get('send-reaction') as any)({ roomId: 'ABC123', emoji: '❤️', userName: 'Raid' });
+    (sock.handlers.get('typing') as any)({ roomId: 'ABC123', userName: 'Raid' });
+
+    expect(roomEmits).toHaveLength(0);
+  });
+
+  it('en espera (pending) o de otra sala tampoco habla', () => {
+    const { io, roomEmits } = makeIo();
+    const pending = makeSocket('s-pending');
+    joinMember('s-pending', 'ABC123', 'Eva', true);
+    const other = makeSocket('s-other');
+    joinMember('s-other', 'OTRA99', 'Bob');
+    registerChatReactionsHandlers(io, pending.socket);
+    registerChatReactionsHandlers(io, other.socket);
+
+    (pending.handlers.get('send-message') as any)({ roomId: 'ABC123', text: 'déjenme entrar', userName: 'Eva' });
+    (other.handlers.get('send-message') as any)({ roomId: 'ABC123', text: 'hola', userName: 'Bob' });
+
+    expect(roomEmits).toHaveLength(0);
   });
 
   it('texto vacío o solo espacios se descarta sin emitir', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s1');
+    joinMember('s1');
     registerChatReactionsHandlers(io, sock.socket);
 
     (sock.handlers.get('send-message') as any)({ roomId: 'ABC123', text: '   ', userName: 'Ana' });
@@ -82,6 +119,7 @@ describe('chat: send-message', () => {
   it('sin roomId se descarta sin emitir', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s1');
+    joinMember('s1');
     registerChatReactionsHandlers(io, sock.socket);
 
     (sock.handlers.get('send-message') as any)({ roomId: '', text: 'hola', userName: 'Ana' });
@@ -93,6 +131,7 @@ describe('chat: send-message', () => {
   it('payload sin text se descarta sin lanzar', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s1');
+    joinMember('s1');
     registerChatReactionsHandlers(io, sock.socket);
 
     (sock.handlers.get('send-message') as any)({ roomId: 'ABC123', userName: 'Ana' });
@@ -105,6 +144,7 @@ describe('chat: send-reaction', () => {
   it('reacción válida se emite a la sala', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s1');
+    joinMember('s1');
     registerChatReactionsHandlers(io, sock.socket);
 
     (sock.handlers.get('send-reaction') as any)({ roomId: 'abc123', emoji: '❤️', userName: 'Ana' });
@@ -117,6 +157,7 @@ describe('chat: send-reaction', () => {
   it('sin emoji o sin roomId se descarta', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s1');
+    joinMember('s1');
     registerChatReactionsHandlers(io, sock.socket);
 
     (sock.handlers.get('send-reaction') as any)({ roomId: 'ABC123', emoji: '', userName: 'Ana' });
@@ -219,6 +260,7 @@ describe('chat: typing', () => {
   it('typing válido se reenvía a la sala con user + timestamp', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-typing');
+    joinMember('s-typing');
     registerChatReactionsHandlers(io, sock.socket);
 
     (sock.handlers.get('typing') as any)({ roomId: 'abc123', userName: 'Ana' });
@@ -230,25 +272,15 @@ describe('chat: typing', () => {
     expect(typeof (roomEmits[0].payload as any).timestamp).toBe('number');
   });
 
-  it('typing sin sala o sin usuario se descarta', () => {
+  it('typing sin sala se descarta', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-typing');
+    joinMember('s-typing');
     registerChatReactionsHandlers(io, sock.socket);
 
     (sock.handlers.get('typing') as any)(undefined);
     (sock.handlers.get('typing') as any)({ userName: 'Ana' });
-    (sock.handlers.get('typing') as any)({ roomId: 'ABC123' });
     (sock.handlers.get('typing') as any)({ roomId: '   ', userName: 'Ana' });
-
-    expect(roomEmits).toHaveLength(0);
-  });
-
-  it('typing con usuario vacío solo espacios no llega a emitir', () => {
-    const { io, roomEmits } = makeIo();
-    const sock = makeSocket('s-typing');
-    registerChatReactionsHandlers(io, sock.socket);
-
-    (sock.handlers.get('typing') as any)({ roomId: 'ABC123', userName: '   ' });
 
     expect(roomEmits).toHaveLength(0);
   });
@@ -256,6 +288,7 @@ describe('chat: typing', () => {
   it('resuelve el rate-limit: muchos typing seguidos se silencian en exceso', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-typing');
+    joinMember('s-typing');
     registerChatReactionsHandlers(io, sock.socket);
 
     for (let i = 0; i < 20; i++) {

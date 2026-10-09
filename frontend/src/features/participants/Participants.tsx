@@ -32,6 +32,8 @@ export const Participants: React.FC<ParticipantsProps> = ({
   onKickUser,
   onBanUser,
   onUnbanUser,
+  onToggleCoHost,
+  onTransferHost,
   onRenameUser,
   onApproveJoin,
   onRejectJoin,
@@ -67,6 +69,9 @@ export const Participants: React.FC<ParticipantsProps> = ({
 
   // Can the current user moderate (Host or Co-host)?
   const canModerate = isHost || isCoHost;
+  // Solo el host gestiona roles (promover/degradar cohost, pasar sala).
+  // La moderación normal (mute/kick/ban) sigue con canModerate.
+  const canManageRoles = isHost;
 
   // Filter participants by search query
   const filteredParticipants = useMemo(() => {
@@ -265,6 +270,8 @@ export const Participants: React.FC<ParticipantsProps> = ({
           isSameUser={isSameUser}
           canModerateTarget={canModerateTarget}
           canModerate={canModerate}
+          canManageRoles={canManageRoles}
+          isHost={isHost}
           isRenaming={isRenaming}
           newNameVal={newNameVal}
           setNewNameVal={setNewNameVal}
@@ -273,6 +280,8 @@ export const Participants: React.FC<ParticipantsProps> = ({
           saveRename={saveRename}
           onKickUser={onKickUser}
           onBanUser={onBanUser}
+          onToggleCoHost={onToggleCoHost}
+          onTransferHost={onTransferHost}
           onSelectNone={() => setSelectedParticipant(null)}
         />
       )}

@@ -123,6 +123,14 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
                 ...auth(),
               });
             }}
+            onTransferHost={(targetUserName, targetUserId) => {
+              socket.emit('transfer-host', {
+                roomId,
+                targetUserName,
+                targetUserId,
+                ...auth(),
+              });
+            }}
             onRenameUser={(oldName, newName, targetUserId) => {
               socket.emit('rename-participant', { roomId, oldName, newName, targetUserId, ...auth() });
             }}

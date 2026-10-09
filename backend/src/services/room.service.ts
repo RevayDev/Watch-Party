@@ -18,27 +18,14 @@ import {
   DEMO_ROOM_LIMIT_MESSAGE,
   isDemoMode,
 } from '../config/demo-mode.js';
-import { getPremiumPlan } from '../config/plans.js';
-import { entitlementStore } from '../payments/payment.store.js';
-
-/** Plan efectivo de una sala (ausente = 'free', compatibilidad). */
-export function getRoomPlan(room: Pick<IRoom, 'plan'>): 'free' | 'premium' {
-  return room.plan === 'premium' ? 'premium' : 'free';
+/** Plan efectivo de una sala (siempre 'free': sin premium). */
+export function getRoomPlan(_room: Pick<IRoom, 'plan'>): 'free' {
+  return 'free';
 }
 
-/** Cupo de participantes según plan (demo free o premium). */
-export function maxUsersForRoom(room: Pick<IRoom, 'plan'>): number {
-  if (isDemoMode() && getRoomPlan(room) === 'premium') {
-    return getPremiumPlan().maxUsers;
-  }
+/** Cupo de participantes (demo: tope fijo). */
+export function maxUsersForRoom(_room: Pick<IRoom, 'plan'>): number {
   return DEMO_MAX_USERS_PER_ROOM;
-}
-
-/** ¿Tiene este userId un acceso premium activo? */
-async function hasPremiumAccess(userId: string | undefined): Promise<boolean> {
-  if (!userId) return false;
-  const active = await entitlementStore.findActive({ userId }).catch(() => []);
-  return active.length > 0;
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -174,9 +161,8 @@ export class RoomService {
    * Create a new room with a host.
    *
    * DEMO (flag `DEMO_MODE`): tope de 5 salas vivas por servidor (429 con
-   * mensaje exacto). La sala hereda plan 'premium' (persistente permitida)
-   * si el creador tiene un acceso premium activo; si no, es 'free' con
-   * `isTemporary` forzado a true (ninguna sala permanente).
+   * mensaje exacto). Todas las salas son 'free' con `isTemporary` forzado
+   * a true (ninguna sala permanente).
    * La sección crítica contar+crear va tras mutex en memoria (1 instancia).
    */
   public static async createRoom(dto: CreateRoomDTO): Promise<{ room: IRoom; hostSecret: string }> {
@@ -192,14 +178,10 @@ export class RoomService {
       const hostSecret = crypto.randomBytes(16).toString('hex');
       const now = new Date();
 
-      // El acceso premium del creador se hereda a la sala (si no, 'free').
-      const premiumAccess = isDemoMode() && (await hasPremiumAccess(dto.userId));
-      const plan = premiumAccess ? ('premium' as const) : ('free' as const);
-      // En demo las free NINGUNA es permanente; las premium respetan el pedido.
+      const plan = 'free' as const;
+      // En demo NINGUNA sala es permanente.
       const isTemporary = isDemoMode()
-        ? plan === 'free'
-          ? true
-          : (dto.isTemporary !== undefined ? dto.isTemporary : false)
+        ? true
         : (dto.isTemporary !== undefined ? dto.isTemporary : true);
     const roomData: IRoom = {
       roomId,
@@ -601,8 +583,7 @@ export class RoomService {
   /**
    * Update Room Settings (e.g. mute on entry, disable camera on entry)
    *
-   * DEMO: fuerza `isTemporary=true` salvo en salas premium (ninguna sala
-   * free es permanente; se ignora el modo persistente sin borrar su código).
+   * DEMO: fuerza `isTemporary=true` (ninguna sala es permanente).
    */
   public static async updateSettings(
     roomId: string,
@@ -611,10 +592,10 @@ export class RoomService {
     const cleanId = cleanIdOf(roomId);
     const room = await roomRepository.findById(cleanId);
     if (!room) return null;
-    // En demo las salas free nunca son permanentes (sin mutar el objeto del llamador).
-    const demoForced = isDemoMode() && getRoomPlan(room) !== 'premium' ? { isTemporary: true as const } : {};
+    // En demo ninguna sala es permanente (sin mutar el objeto del llamador).
+    const demoForced = isDemoMode() ? { isTemporary: true as const } : {};
     room.settings = { ...(room.settings || {}), ...settings, ...demoForced } as IRoom['settings'];
-    if (isDemoMode() && getRoomPlan(room) !== 'premium') {
+    if (isDemoMode()) {
       room.isTemporary = true;
     }
     room.updatedAt = new Date();
@@ -637,6 +618,53 @@ export class RoomService {
 
     const candidates = await roomRepository.findTimerCandidates();
     return candidates.filter(isExpired);
+  }
+
+  /**
+   * Transfer the Host role to another participant.
+   *
+   * - Localiza al objetivo por userId o nombre (trim/case-insensitive).
+   * - Si no existe o ya es host → no-op `{ room, newHostName: null, hostSecret: null }`.
+   * - Si sí: el host actual pasa a cohost y el objetivo a host; actualiza
+   *   `room.hostName`; rota `hostSecret` salvo `opts.rotateSecret === false`.
+   */
+  public static async transferHost(
+    roomId: string,
+    target: { userId?: string; name?: string },
+    opts: { rotateSecret?: boolean } = {}
+  ): Promise<{ room: IRoom | null; newHostName: string | null; hostSecret: string | null }> {
+    const cleanId = cleanIdOf(roomId);
+    const room = await roomRepository.findById(cleanId);
+    if (!room) return { room: null, newHostName: null, hostSecret: null };
+
+    let participant: IParticipant | undefined;
+    if (target.userId) {
+      participant = room.participants.find((p) => p.userId === target.userId);
+    }
+    if (!participant && target.name) {
+      const lower = target.name.trim().toLowerCase();
+      if (lower) participant = room.participants.find((p) => p.name.toLowerCase() === lower);
+    }
+    if (!participant) return { room, newHostName: null, hostSecret: null };
+    if (participant.isHost === true || participant.role === 'host') {
+      return { room, newHostName: null, hostSecret: null };
+    }
+
+    for (const p of room.participants) {
+      if (p !== participant && (p.isHost === true || p.role === 'host')) {
+        p.isHost = false;
+        p.role = 'cohost';
+      }
+    }
+    participant.isHost = true;
+    participant.role = 'host';
+    room.hostName = participant.name;
+    if (opts.rotateSecret !== false) {
+      room.hostSecret = crypto.randomBytes(16).toString('hex');
+    }
+    room.updatedAt = new Date();
+    await roomRepository.save(room);
+    return { room, newHostName: participant.name, hostSecret: room.hostSecret ?? null };
   }
 
   /**

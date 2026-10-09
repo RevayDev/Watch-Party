@@ -12,7 +12,7 @@ import {
   Activity,
 } from "lucide-react";
 import exampleImg from "../../Example.png";
-import { ApiService } from "../../services/api";
+import { ApiService, BACKEND_BASE } from "../../services/api";
 import {
   getRecentRooms,
   removeRecentRoom,
@@ -30,6 +30,7 @@ import {
   KOFI_URL,
   PAYPAL_URL,
   TimelineEvent,
+  type FaqAnswer,
 } from "./homeData";
 import { RecentRooms } from "./RecentRooms";
 import { CreateRoomModal, JoinRoomModal, TimelineModal } from "./HomeModals";
@@ -192,6 +193,41 @@ export const Home: React.FC<HomeProps> = ({
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
+  };
+
+  // Respuestas del FAQ con resaltado: backend = marcador morado,
+  // frontend = marcador azul. Los href '@docs'/'@docs-json' apuntan al
+  // backend real (relativo rompería en producción: dominios distintos).
+  const renderFaqAnswer = (answer: FaqAnswer) => {
+    if (typeof answer === "string") return answer;
+    return answer.map((seg, i) => {
+      if (typeof seg === "string") return <span key={i}>{seg}</span>;
+      const cls = seg.tone ? `home-faq-hl home-faq-hl--${seg.tone}` : undefined;
+      if (!seg.href) {
+        return (
+          <span key={i} className={cls}>
+            {seg.text}
+          </span>
+        );
+      }
+      const href =
+        seg.href === "@docs"
+          ? `${BACKEND_BASE}/api/docs`
+          : seg.href === "@docs-json"
+            ? `${BACKEND_BASE}/api/docs/json`
+            : seg.href;
+      return (
+        <a
+          key={i}
+          className={cls}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {seg.text}
+        </a>
+      );
+    });
   };
 
   const handleRoadmapShortcut = (
@@ -477,13 +513,13 @@ export const Home: React.FC<HomeProps> = ({
 
         <div className="home-timeline-scroll">
           <ol className="home-timeline">
-            {timelineEvents.map((event) => (
+            {timelineEvents.map((event, idx) => (
               <li
                 className={`home-timeline__item ${
                   event.tone === "wip"
                     ? "home-timeline__item--now"
                     : "home-timeline__item--past"
-                }`}
+                }${idx % 2 === 1 ? " home-timeline__item--alt" : ""}`}
                 key={event.title}
               >
                 <div className="home-timeline__head">
@@ -599,7 +635,7 @@ export const Home: React.FC<HomeProps> = ({
                 </div>
                 {isOpen && (
                   <div className="home-faq-answer">
-                    <p>{faq.a}</p>
+                    <p>{renderFaqAnswer(faq.a)}</p>
                   </div>
                 )}
               </div>
@@ -815,6 +851,14 @@ export const Home: React.FC<HomeProps> = ({
               <a className="home-footer__link" href="#faq">
                 Preguntas frecuentes
               </a>
+              <a
+                className="home-footer__link"
+                href={`${BACKEND_BASE}/api/docs`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                API para desarrolladores
+              </a>
               <a className="home-footer__link" href="#donaciones">
                 Apoyar el proyecto
               </a>
@@ -849,7 +893,7 @@ export const Home: React.FC<HomeProps> = ({
           <div className="home-footer__bottom">
             <span>
               © {new Date().getFullYear()} Watch Party • Hecho con React,
-              TypeScript y WebRTC.
+              TypeScript, WebRTC y Prisma.
             </span>
             <span className="home-footer__legal">
               Watch Party no provee contenido: los archivos los suben y

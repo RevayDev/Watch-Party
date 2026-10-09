@@ -5,10 +5,10 @@ no los recoge vitest: `include: tests/**/*.test.ts`):
 
 | Script | Qué hace |
 |---|---|
-| `ramp.mjs` | Rampa HTTP 10→25→50→100 conns × 15 s (autocannon) contra `GET /api/health`, `/api/status`, `/api/demo/availability`. Para antes de tumbar (trips: errRate>5 %, p99>5000 ms, health caído). |
+| `ramp.mjs` | Rampa HTTP 10→25→50→100 conns × 15 s (autocannon) contra `GET /api/health` y `/api/demo/availability`. Para antes de tumbar (trips: errRate>5 %, p99>5000 ms, health caído). |
 | `rooms-scenarios.mjs` | Escenarios R×U (default `all` = 1×10 / 5×10 / 10×10): crea salas (REST), une usuarios (REST), conecta sockets reales (`socket.io-client`: `join-room` + heartbeat 5 s + 3× `sync-video`), observa 20 s y limpia (leave + DELETE con `hostSecret`). Clasifica cada 429 en `demo-quota` vs `rate-limit` (ver `lib.mjs:classify429`) y reintenta 1 vez tras 65 s solo los del limitador IP. |
-| `run-local.mjs` | Orquestador: levanta el servidor (`node_modules/tsx`, puerto 4100, `ADMIN_TOKEN=test-load-token`), corre escenarios y rampa en 2 fases — FREE (`DEMO_MODE=true`) y techo non-demo (`DEMO_MODE=false`) — y lo apaga. |
-| `lib.mjs` | `waitForHealth`, `adminMetrics` (`/api/admin/metrics` con `LOAD_ADMIN_TOKEN`), `approxP95` (autocannon expone p90/p97_5: p95≈media de ambos), `classify429`, `cooldownLimiter`. |
+| `run-local.mjs` | Orquestador: levanta el servidor (`node_modules/tsx`, puerto 4100), corre escenarios y rampa en 2 fases — demo (`DEMO_MODE=true`) y techo non-demo (`DEMO_MODE=false`) — y lo apaga. |
+| `lib.mjs` | `waitForHealth`, `adminMetrics` (siempre `null`: el endpoint admin se eliminó; las columnas heap/ws salen `n/a`), `approxP95` (autocannon expone p90/p97_5: p95≈media de ambos), `classify429`, `cooldownLimiter`. |
 
 ```bash
 cd backend
@@ -22,7 +22,6 @@ npm run load:rooms -- --scenario=all --observe=20 --cooldown-ms=65000
 1. **Local primero, siempre** (`run-local.mjs` solo habla a `127.0.0.1`).
 2. **NUNCA contra producción sin aviso explícito**: Render Free es 1 instancia
    con CPU compartida; la rampa satura el `globalLimiter` y contamina métricas.
-   Staging dedicado + ventana acordada + alguien mirando `GET /api/admin/metrics`.
 3. Servidor medido con `tsx` (no `node dist/`): números comparables entre runs,
    NO cotas de producción.
 
@@ -36,16 +35,16 @@ npm run load:rooms -- --scenario=all --observe=20 --cooldown-ms=65000
   `src/config/demo-mode.ts`); `429limit` = limitador IP (artefacto del banco).
 - `wsDisc` = desconexiones **espontáneas en ventana** (la limpieza propia se
   cuenta aparte: `wsDisconnectsOnCleanup`).
-- `heap±MB` = `heapUsed` del proceso servidor antes→después (vía admin).
+- `heap±MB` = `heapUsed` del proceso servidor antes→después (vía admin; hoy `n/a` porque ese endpoint se eliminó).
 - `p95≈` = media(p90, p97_5) de autocannon (no expone p95 exacto).
 
 ## Resultados MEDIDOS en local — 2026-10-06 (PROBADO, no estimado)
 
 Máquina: Windows, Node v24.18.0, servidor `tsx` puerto 4100, store en memoria
 (sin Mongo; `database: disconnected`, modo soportado). autocannon 8.0.0,
-socket.io-client 4.8.4. `LOAD_ADMIN_TOKEN=test-load-token`.
+socket.io-client 4.8.4.
 
-### Rampa HTTP (mezcla health/status/demo-availability)
+### Rampa HTTP (mezcla health/demo-availability)
 
 | Fase | conns | req/s | p50 | p95≈ | p99 | transp. err/timeout | non2xx (4xx/5xx) |
 |---|---|---|---|---|---|---|---|
@@ -93,12 +92,10 @@ gracia de desconexión de 20 s (diseño, no fuga). Los `429limit` intermedios
 (join 30/min, create 15/min) se absorbieron con 1 cooldown de 65 s: son el
 techo single-IP del banco, no del servidor.
 
-### FREE vs PREMIUM (honestidad de alcance)
+### Demo vs non-demo (honestidad de alcance)
 
-Hoy `DEMO_MODE` manda en runtime y `src/config/plans.ts` es **contrato futuro**:
-en non-demo NO hay cuota de usuarios (el 10×10 mide Node+Socket.IO, no una cuota
-premium real). `PREMIUM_ROOM_MAX_USERS=10` solo alimenta `getPremiumPlan()`.
-Cuando pagos imponga cuotas premium, repetir el 10×10 con el plan aplicado.
+Hoy `DEMO_MODE` manda en runtime: en demo hay cuota (5 salas / 5 usuarios);
+en non-demo NO hay cuota de usuarios (el 10×10 mide Node+Socket.IO puro).
 
 ### Re-medición 2026-10-06 (cuotas vigentes: demo 5/5)
 

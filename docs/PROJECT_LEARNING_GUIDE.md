@@ -1,9 +1,8 @@
 # Watch Party — Guía de aprendizaje del proyecto REAL (2026-10-03)
 
 > Fuente de verdad: código actual en `backend/src/` y `frontend/src/`.
-> Los documentos `WatchParty_Plan.md` y `WatchParty_AI_Instructions.md` describen la
-> **idea original / plan pedagógico** (fases 1–12). Esta guía describe **lo que existe hoy**.
-> Si algo contradice al plan, manda esta guía.
+> Esta guía describe **lo que existe hoy**. Si un documento antiguo la
+> contradice, manda esta guía.
 
 Última verificación: 2026-10-03 (lectura directa del código).
 
@@ -134,8 +133,8 @@ Consecuencias para aprender/depurar:
 | `GET /api/rooms/:roomId/video/stream` | header `Range` opcional | `206` con `Content-Range`, chunks ~3 MB; si `sourceType url/hls` → `302 redirect` a `directUrl`; `404` si no hay video/archivo | `:359` |
 
 Notas: `roomId` de 6 caracteres (`23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, `crypto.randomBytes`),
-`hostSecret` de 32 hex (se genera y devuelve al crear, pero **no se exige después** —
-ver deuda en `REFACTORING_PLAN.md`). `DELETE` con `forceDeleteVideo=true` interno siempre
+`hostSecret` de 32 hex (se genera y devuelve al crear, pero **no se exige después**).
+`DELETE` con `forceDeleteVideo=true` interno siempre
 borra el archivo; el barrido por timer llama con `false` (respeta no-temporales).
 
 ---
@@ -336,12 +335,11 @@ transfiere el host? ¿qué diferencia `kick` de `ban`? ¿por qué el socket nece
 
 **Importantes (segundo):** `room.routes.ts`, `room.model.ts`, `upload.middleware.ts`,
 `App.tsx`, `Participants.tsx`, `Chat.tsx`, `RoomSettingsModal.tsx`, `WaitingApproval.tsx`,
-`vite.config.ts`, `.env.example` (ambos), `Instrucciones_Pendientes.md` (estado real reciente).
+`vite.config.ts`, `.env.example` (ambos).
 
 **Ignorables al empezar:** `frontend/src/Example.png`, `dist/`, `node_modules/`,
 `*.tsbuildinfo`, `backend/uploads/*`, `backend/data/rooms.json` (generado),
-`public/`, `vercel.json`, detalles CSS de `index.css` (volver cuando toque responsive),
-`status.md` (snapshot parcial, ver §13).
+`public/`, `vercel.json`, detalles CSS de `index.css` (volver cuando toque responsive).
 
 ---
 
@@ -360,36 +358,12 @@ transfiere el host? ¿qué diferencia `kick` de `ban`? ¿por qué el socket nece
 
 ---
 
-## 13. Inconsistencias documentación vs realidad (detectadas 2026-10-03)
+## 13. Notas históricas (2026-10-03, revisado 2026-10-09)
 
-1. `WatchParty_Plan.md §3` / `WatchParty_AI_Instructions.md §3` dicen **Tailwind CSS** →
-   real: CSS propio BEM (`frontend/src/index.css`). `status.md §1` sí lo dice bien.
-2. Plan §4/§5 describe estructura ideal (`sockets/room.socket.ts + chat.socket.ts`,
-   `services/room/sync/file`, `hooks/useSocket/useRoom`) → real: solo `room.socket.ts`,
-   sin `sync.service`/`file.service`, sin esos hooks. Lógica en `Room.tsx`/`useWebRTC.ts`.
-3. Plan §6 lista 5 endpoints → real: **7 rutas** + `GET /api/health` + `GET /api/proxy`
-   + `POST …/video-url`. Faltan en el plan: `video-url`, `video/stream`, `proxy`, `health`.
-4. Plan §7 lista ~11 eventos → real: **30+** (aprobación, kick/ban, roles, rename, settings,
-   WebRTC, moderación, heartbeats, upload-progress, timer). Ver §7.
-5. Plan §9 "sincronización avanzada NO será parte de la primera versión" → real:
-   **ya existe**: `resolveRoomTime` (consenso + seniority) + compensación `sentAt` +
-   `playback-heartbeat`. El plan está desactualizado.
-6. Plan §10 "primero solo el host controla" → real: **cualquiera emite `sync-video`**
-   (sin control de permisos). El plan no refleja el código.
-7. Instrucciones §10–11 asumen WebRTC como fase futura → real: **WebRTC P2P implementado**
-   (`useWebRTC.ts`, `CameraGrid`, `MediaControls`, STUN, DataChannel).
-8. `README.md` dice "Tailwind/BEM" ambiguo y omite `VITE_SOCKET_URL`, `VITE_PATREON_URL`,
-   `VITE_PAYPAL_URL`, el fallback en memoria y `/api/proxy`. Arquitectura de carpetas
-   del README no incluye `sockets/`, `hooks/`, `middleware/upload`, `data/`.
-9. `status.md` describe `BottomSheet` + `useSheetDrag` (correcto) pero omite todo el
-   backend real (proxy, aprobación, `resolveRoomTime`, WebRTC, timer, memoria).
-   El `index-BR29v2Mp.js` citado ya no es el bundle actual.
-10. `CLIENT_URL` documentado en `backend/.env.example` y README **no se lee en ningún
-    `src/`** (CORS es `*`). Solo tiene valor como intención de deploy.
-11. `backend/.env.example` no menciona `VITE_SOCKET_URL` (sí soportado en `socket.ts`).
-
-> Correcciones aplicadas solo en `docs/` según alcance: esta guía + `REFACTORING_PLAN.md`.
-> No se tocó código. Se propone actualizar `README.md` y `status.md` fuera de este alcance.
+> Los planes originales describían Tailwind, pocos endpoints y WebRTC como
+> fase futura; el código real usa CSS propio BEM, 7+ rutas, 30+ eventos
+> socket y WebRTC P2P implementado. Esos documentos se eliminaron en la
+> limpieza de `docs/` (2026-10-09): solo quedan esta guía + `architecture/`.
 
 ---
 

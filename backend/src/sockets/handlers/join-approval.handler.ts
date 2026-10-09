@@ -18,19 +18,25 @@ import {
   hasPendingGrace,
   schedulePendingGrace,
 } from '../disconnect-grace.js';
-import { clearSocketLimits } from '../socket-limits.js';
+import { checkSocketRateLimit, clearSocketLimits } from '../socket-limits.js';
 
 const MODERATOR_ONLY = 'Solo el anfitrión o un co-anfitrión puede realizar esta acción.';
+
+// Anti-raid: un socket no puede intentar unirse más de 15 veces por minuto
+// (rejoin legítimo + aprobación reintentada caben de sobra; el flood no).
+const JOIN_LIMIT = { max: 15, windowMs: 60_000 };
 
 /** Handler de unión / aprobación / salida. Nombres de eventos y payloads idénticos al original. */
 export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
   // 1. Join Room
   socket.on(
     'join-room',
-    async (data: { roomId: string; userName: string; isHost?: boolean; userId?: string }) => {
+    async (data: { roomId: string; userName: string; isHost?: boolean; userId?: string } | undefined) => {
+      if (!data || typeof data !== 'object') return;
       const { roomId, userName, isHost: _clientIsHost = false, userId } = data;
       void _clientIsHost; // ignorado a propósito: el host se valida en el servidor
       if (!roomId || !userName) return;
+      if (!checkSocketRateLimit(socket.id, 'join-room', JOIN_LIMIT.max, JOIN_LIMIT.windowMs)) return;
 
       const cleanRoomId = roomId.toUpperCase().trim();
       const cleanName = userName.trim();
@@ -225,7 +231,8 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
   );
 
   // 2. Host deletes/closes the entire room (solo host: secreto o rol host del servidor)
-  socket.on('close-room', async (data: { roomId: string } & PrivilegedPayload) => {
+  socket.on('close-room', async (data: { roomId: string } & PrivilegedPayload | undefined) => {
+    if (!data || typeof data !== 'object') return;
     const { roomId } = data;
     if (!roomId) return;
     const cleanRoomId = roomId.toUpperCase().trim();
@@ -251,7 +258,8 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
 
   // 3. User leaves voluntarily (with Host role transfer if host leaves).
   // Salida voluntaria: inmediata (sin gracia) y cancela cualquier gracia pendiente.
-  socket.on('leave-room', async (data: { roomId: string; userName: string; userId?: string }) => {
+  socket.on('leave-room', async (data: { roomId: string; userName: string; userId?: string } | undefined) => {
+    if (!data || typeof data !== 'object') return;
     const { roomId, userName, userId } = data;
     if (!roomId) return;
     const cleanRoomId = roomId.toUpperCase().trim();

@@ -6,13 +6,10 @@ import { corsOptions } from './config/cors.js';
 import roomRoutes from './routes/room.routes.js';
 import demoRoutes from './routes/demo.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
-import paymentsRoutes from './routes/payments.routes.js';
-import adminRoutes from './routes/admin.routes.js';
+import docsRoutes from './routes/docs.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
-import { globalLimiter, adminLimiter } from './middleware/rate-limit.middleware.js';
-import { adminRateLimit } from './middleware/requireAdmin.js';
+import { globalLimiter } from './middleware/rate-limit.middleware.js';
 import { metricsMiddleware } from './services/metrics.service.js';
-import { getHealth, getStatus, streamStatus } from './controllers/status.controller.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,19 +25,18 @@ export function createApp(): Express {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Observabilidad en memoria (excluye /api/health y el stream SSE por
-  // diseño; ver metrics.service.ts). Antes de las rutas para medirlo todo.
+  // Observabilidad en memoria (excluye /api/health por diseño;
+  // ver metrics.service.ts). Antes de las rutas para medirlo todo.
   app.use(metricsMiddleware);
 
   // Static uploads directory
   const uploadsPath = path.join(__dirname, '..', 'uploads');
   app.use('/uploads', express.static(uploadsPath));
 
-  // Salud ampliada (retrocompatible) + estado público agregado + SSE.
-  // Sin rate-limit: la monitorización no debe ser estrangulada.
-  app.get('/api/health', getHealth);
-  app.get('/api/status', getStatus);
-  app.get('/api/status/stream', streamStatus);
+  // Liveness mínimo (sin PII, sin rate-limit para no bloquear probes).
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true, uptimeSec: Math.floor(process.uptime()) });
+  });
 
   // ── CORS Proxy for external video streaming (ver services/proxy.service.ts + routes/proxy.routes.ts) ──
   app.use('/api/proxy', proxyRoutes);
@@ -56,10 +52,9 @@ export function createApp(): Express {
   // Routes
   app.use('/api/rooms', roomRoutes);
 
-  // Pagos públicos + administración (tras requireAdmin interno).
-  // El admin lleva paraguas propio: bloqueo tras 401s + 60 req/min.
-  app.use('/api/payments', globalLimiter, paymentsRoutes);
-  app.use('/api/admin', adminRateLimit, adminLimiter, globalLimiter, adminRoutes);
+  // Documentación OpenAPI + Swagger UI (sin rate-limit: es documentación).
+  // UI en /api/docs, JSON crudo en /api/docs/json.
+  app.use('/api/docs', docsRoutes);
 
   // Global Error Handler
   app.use(errorHandler);

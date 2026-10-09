@@ -13,9 +13,7 @@
  *   try/catch → `null` si no disponible (nunca revienta).
  * - `metricsMiddleware`: mide duración real (evento `finish`) y cuenta
  *   errores por status. EXCLUYE `/api/health` (probes de infra: Render lo
- *   pega constantemente y contaminaría) y `/api/status/stream` (SSE de larga
- *   duración distorsionaría latencia y conteos). `/api/status` (polling del
- *   frontend) SÍ se cuenta: es tráfico real y su volumen interesa.
+ *   pega constantemente y contaminaría).
  * - El mapa de rutas está acotado (`MAX_ROUTES`): el exceso agrega en la
  *   clave `OTHER` (evita crecimiento infinito con paths variables).
  */
@@ -24,7 +22,7 @@ import os from 'node:os';
 import type { NextFunction, Request, Response } from 'express';
 
 /** Rutas excluidas del cómputo (ver cabecera para el porqué). */
-export const METRICS_EXCLUDED_PATHS = ['/api/health', '/api/status/stream'] as const;
+export const METRICS_EXCLUDED_PATHS = ['/api/health'] as const;
 
 /** Minutos de historia en el anillo. */
 export const METRICS_RING_MINUTES = 60;
@@ -270,7 +268,7 @@ export interface MetricsSnapshot {
   system: SystemMetrics;
 }
 
-/** Foto completa interna (para futuros `/api/admin/*`; NO pública). */
+/** Foto completa interna (uso interno; NO pública). */
 export function getMetricsSnapshot(): MetricsSnapshot {
   let totalRequests = 0;
   let totalErrors = 0;

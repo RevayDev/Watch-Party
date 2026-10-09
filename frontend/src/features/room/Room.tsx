@@ -95,7 +95,6 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
         roomDescription={r.roomData.settings?.description}
         timerEndsAt={r.roomData.settings?.timerEndsAt}
         roomStatus={r.roomData.status}
-        roomPlan={r.roomData.plan}
         videoDurationSeconds={r.roomData.video?.durationSeconds ?? null}
         onOpenSettings={() => r.setShowRoomSettings(true)}
         onOpenParticipants={() => r.setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
@@ -245,6 +244,11 @@ onVideoReady={r.handleVideoReady}
         onToggleRequireApproval={() => {
           const next = !(r.roomData!.settings?.requireApproval === true);
           r.socket.emit('update-room-settings', { roomId, settings: { ...r.roomData!.settings, requireApproval: next }, ...buildSocketAuth(roomId, r.myName) });
+        }}
+        hostOnlySync={r.roomData.settings?.hostOnlySync === true}
+        onToggleHostOnlySync={() => {
+          const next = !(r.roomData!.settings?.hostOnlySync === true);
+          r.socket.emit('update-room-settings', { roomId, settings: { ...r.roomData!.settings, hostOnlySync: next }, ...buildSocketAuth(roomId, r.myName) });
         }}
         canEdit={r.isHost}
         dataSaver={r.dataSaver}

@@ -95,6 +95,12 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   // Ref mirror of isHost so socket handlers never read a stale value
   const isHostRef = useRef(isHost);
   isHostRef.current = isHost;
+  // Ref mirrors of roomData/myName so sync guards and new handlers always
+  // read the current value (no stale closures in callbacks estables).
+  const roomDataRef = useRef(roomData);
+  roomDataRef.current = roomData;
+  const myNameRef = useRef(myName);
+  myNameRef.current = myName;
   // Ref mirror of pending request count (for "new request" toasts)
   const joinRequestsLenRef = useRef(0);
   const [showHostExitModal, setShowHostExitModal] = useState(false);
@@ -773,6 +779,14 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       notify('warning', data.message || 'No tienes permiso para realizar esa acción.', 'Acción denegada');
     };
 
+    // Nuevo host: el servidor envía el secreto para acreditarse en próximos emits.
+    const handleHostSecret = (data: { hostSecret?: string }) => {
+      if (data?.hostSecret) {
+        saveHostSession(roomId, myNameRef.current, data.hostSecret);
+        notify('success', 'Ahora eres el anfitrión de la sala.', 'Anfitrión');
+      }
+    };
+
     socket.on('room-state', handleRoomState);
     socket.on('host-changed', handleHostChanged);
     socket.on('room-closed', handleRoomClosed);
@@ -799,6 +813,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     socket.on('join-requests-updated', handleJoinRequestsUpdated);
     socket.on('settings-error', handleSettingsError);
     socket.on('action-denied', handleActionDenied);
+    socket.on('host-secret', handleHostSecret);
 
     // ── Estado de conexión (pill "Reconectando…", Rol A) ───────────────────
     // Caída transitoria: SOLO se marca el pill. No se emite `leave-room`,
@@ -847,6 +862,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       socket.off('join-requests-updated', handleJoinRequestsUpdated);
       socket.off('settings-error', handleSettingsError);
       socket.off('action-denied', handleActionDenied);
+      socket.off('host-secret', handleHostSecret);
       socket.off('disconnect', handleSocketDisconnect);
       socket.off('reconnect_attempt', handleReconnectAttempt);
       socket.off('reconnect', handleSocketReconnect);
@@ -1050,14 +1066,29 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
 
   const handleSyncAction = useCallback(
     (action: 'play' | 'pause' | 'seek', currentTime: number) => {
+      // Pre-chequeo local: con hostOnlySync solo host/cohost emiten sync-video.
+      // El servidor también lo niega (action-denied); esto evita el viaje.
+      const snapshot = roomDataRef.current;
+      if (snapshot?.settings?.hostOnlySync === true) {
+        const myNameVigente = myNameRef.current;
+        const cohost = (snapshot.participants ?? []).some(
+          (p) =>
+            (p.userId ? p.userId === userId : p.name.toLowerCase() === myNameVigente.toLowerCase()) &&
+            p.role === 'cohost'
+        );
+        if (!isHostRef.current && !cohost) {
+          notify('warning', 'Solo el anfitrión controla la reproducción.', 'Reproducción bloqueada');
+          return;
+        }
+      }
       socket.emit('sync-video', {
         roomId,
         action,
         currentTime,
-        ...buildSocketAuth(roomId, myName),
+        ...buildSocketAuth(roomId, myNameRef.current),
       });
     },
-    [roomId, socket, myName]
+    [roomId, socket, userId]
   );
 
   // Callback ESTABLE para el heartbeat del player: el inline anterior

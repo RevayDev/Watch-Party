@@ -16,6 +16,7 @@ import {
   __resetSocketLimitsForTests,
 } from '../src/sockets/socket-limits.js';
 import { registerChatReactionsHandlers } from '../src/sockets/handlers/chat-reactions.handler.js';
+import { activeUsers } from '../src/sockets/socket-state.js';
 
 const savedNodeEnv = process.env.NODE_ENV;
 
@@ -40,6 +41,7 @@ beforeEach(() => {
   // entorno para ejercitarlos y se restaura después.
   process.env.NODE_ENV = 'development';
   __resetSocketLimitsForTests();
+  activeUsers.clear();
 });
 
 afterEach(() => {
@@ -163,6 +165,7 @@ describe('Socket rate-limit aplicado en handlers de chat', () => {
   it('el 9.º mensaje en 10s se ignora sin emitir', () => {
     const { io, roomEmits } = makeIo();
     const { socket, handlers } = makeSocket('s-spam');
+    activeUsers.set('s-spam', { socketId: 's-spam', roomId: 'ABC123', userName: 'Ana', isHost: false });
     registerChatReactionsHandlers(io, socket);
     const send = handlers.get('send-message') as (d: unknown) => void;
     for (let i = 0; i < 9; i++) {
@@ -174,6 +177,7 @@ describe('Socket rate-limit aplicado en handlers de chat', () => {
   it('la 21.ª reacción en 10s se ignora sin emitir', () => {
     const { io, roomEmits } = makeIo();
     const { socket, handlers } = makeSocket('s-react');
+    activeUsers.set('s-react', { socketId: 's-react', roomId: 'ABC123', userName: 'Ana', isHost: false });
     registerChatReactionsHandlers(io, socket);
     const send = handlers.get('send-reaction') as (d: unknown) => void;
     for (let i = 0; i < 21; i++) {

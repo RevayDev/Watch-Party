@@ -50,6 +50,8 @@ export interface IRoomSettings {
   duckingEnabled?: boolean;
   /** Nivel de atenuación en % (10–60, default 30). */
   duckingLevel?: number;
+  /** Solo el anfitrión (host/cohost) controla la reproducción vía `sync-video`. Default OFF (cualquiera sincroniza). */
+  hostOnlySync?: boolean;
 }
 
 export interface IVideoMetadata {
@@ -68,8 +70,8 @@ export interface IRoom {
   hostSecret: string;
   status: 'waiting' | 'active' | 'closed';
   isTemporary?: boolean;
-  /** Plan de la sala: las premium heredan el acceso del creador (ausente = 'free'). */
-  plan?: 'free' | 'premium';
+  /** Plan de la sala (siempre 'free': compatibilidad con salas antiguas). */
+  plan?: 'free';
   video?: IVideoMetadata;
   participants: IParticipant[];
   joinRequests?: IJoinRequest[];

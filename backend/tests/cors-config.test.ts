@@ -100,8 +100,6 @@ describe('CORS: allowlist (CLIENT_URL + locales de desarrollo)', () => {
       'x-host-secret',
       'x-user-id',
       'x-user-name',
-      'x-admin-token',
-      'x-admin-actor',
       'content-type',
       'range',
     ]) {

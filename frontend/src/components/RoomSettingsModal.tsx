@@ -18,6 +18,9 @@ interface RoomSettingsModalProps {
   onSaveDetails: (name: string, description: string) => void;
   onSetTimer: (minutes: number | null) => void;
   onToggleRequireApproval?: () => void;
+  /** Solo el anfitrión controla el vídeo (bloquea sync a no-moderadores). */
+  hostOnlySync?: boolean;
+  onToggleHostOnlySync?: () => void;
   /** Rol B: solo el anfitrión edita (los demás ven los valores deshabilitados). */
   canEdit?: boolean;
   /** Rol B: valores de rendimiento persistidos en ajustes de sala. */
@@ -47,6 +50,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   onSetTimer,
   onToggleRequireApproval,
   canEdit = true,
+  hostOnlySync = false,
+  onToggleHostOnlySync,
   dataSaver = false,
   fullscreenToasts = true,
   reactionsEnabled = true,
@@ -258,6 +263,30 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <p className="room-settings__box-desc">
                 Los invitados que se unan quedarán en espera hasta que tú
                 apruebes su entrada desde la lista de participantes.
+              </p>
+            </div>
+
+            {/* Solo el anfitrión controla el video */}
+            <div className="room-settings__box">
+              <div className="room-settings__box-head">
+                <span className="room-settings__box-title">
+                  Solo el anfitrión controla el video
+                </span>
+
+                <label className="part-switch" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={hostOnlySync}
+                    onChange={() => onToggleHostOnlySync?.()}
+                    disabled={!canEdit}
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
+
+              <p className="room-settings__box-desc">
+                Cuando está activo, solo el anfitrión y los co-anfitriones
+                pueden reproducir, pausar o mover el video.
               </p>
             </div>
 

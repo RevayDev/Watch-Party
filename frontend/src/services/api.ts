@@ -1,7 +1,6 @@
 import { IRoomData, IRoomSettings, IVideoMetadata } from '../types/room';
 import { buildRestAuthHeaders, getStoredUserId } from '../shared/utils';
 import type { DemoAvailability } from '../shared/demo';
-import type { HealthPayload, StatusPayload } from '../features/status/types';
 
 // In production, VITE_API_URL can be set to the backend URL (e.g., https://my-watchparty-backend.onrender.com)
 // In local development or when proxying, it defaults to empty string or /api
@@ -79,32 +78,6 @@ export class ApiService {
       throw new Error(errorData.error || 'Error al unirse a la sala');
     }
 
-    return response.json();
-  }
-
-  /**
-   * Estado público: liveness ampliado (`GET /api/health`). Sin token, sin PII.
-   */
-  static async getHealth(): Promise<HealthPayload> {
-    const response = await fetch(`${API_BASE_URL}/health`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'No se pudo consultar la salud del servicio');
-    }
-    return response.json();
-  }
-
-  /**
-   * Estado público: agregados (`GET /api/status`, 10 claves exactas, cero PII).
-   * Sin token. El tiempo real va por SSE (`/api/status/stream`); esto es el
-   * snapshot inicial + fallback de polling.
-   */
-  static async getStatus(): Promise<StatusPayload> {
-    const response = await fetch(`${API_BASE_URL}/status`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'No se pudo consultar el estado del servicio');
-    }
     return response.json();
   }
 

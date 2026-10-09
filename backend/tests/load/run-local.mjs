@@ -6,13 +6,11 @@
  * salvo MONGODB_URI explícito), espera /api/health y ejecuta:
  *   1. rampa HTTP progresiva (10→25→50→100),
  *   2. escenarios de salas 1×10 / 5×10 / 10×10,
- * primero con DEMO_MODE=true (cuota FREE real: topes 5/5) y luego con
- * DEMO_MODE=false + PREMIUM_ROOM_MAX_USERS=10 (techo "premium"; ver nota en
- * rooms-scenarios.mjs: hoy los planes son contrato futuro, el runtime
- * non-demo no limita usuarios).
+ * primero con DEMO_MODE=true (cuota demo real: topes 5 salas / 5 usuarios)
+ * y luego con DEMO_MODE=false (techo sin cuota: mide Node+Socket.IO).
  *
  * Uso:
- *   node tests/load/run-local.mjs [--port 4100] [--phase free|premium|all]
+ *   node tests/load/run-local.mjs [--port 4100] [--phase free|non-demo|all]
  *
  * Requiere: dependencias instaladas (npm install), puerto libre.
  * NO apunta a ningún entorno remoto: siempre 127.0.0.1.
@@ -38,7 +36,6 @@ const args = parseArgs();
 const PORT = args.port || '4100';
 const PHASE = args.phase || 'all';
 const BASE = `http://127.0.0.1:${PORT}`;
-const ADMIN_TOKEN = 'test-load-token';
 
 function runServer(extraEnv) {
   // node + tsx directo (en Windows `npx` es un shim .ps1/.cmd que spawn no
@@ -46,7 +43,7 @@ function runServer(extraEnv) {
   const tsxCli = path.join(BACKEND_DIR, 'node_modules', 'tsx', 'dist', 'cli.mjs');
   const child = spawn(process.execPath, [tsxCli, 'src/server.ts'], {
     cwd: BACKEND_DIR,
-    env: { ...process.env, PORT, ADMIN_TOKEN, ...extraEnv },
+    env: { ...process.env, PORT, ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (d) => process.stdout.write(`[srv] ${d}`));
@@ -58,7 +55,7 @@ function runScript(name, scriptArgs = []) {
   return new Promise((resolve, reject) => {
     const child = spawn('node', [`tests/load/${name}`, `--base=${BASE}`, ...scriptArgs], {
       cwd: BACKEND_DIR,
-      env: { ...process.env, LOAD_BASE_URL: BASE, LOAD_ADMIN_TOKEN: ADMIN_TOKEN },
+      env: { ...process.env, LOAD_BASE_URL: BASE },
       stdio: 'inherit',
     });
     child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`${name} salió con código ${code}`))));
@@ -86,13 +83,12 @@ async function phase(name, extraEnv) {
 
 if (PHASE === 'free' || PHASE === 'all') {
   // eslint-disable-next-line no-await-in-loop
-  await phase('FREE (DEMO_MODE=true: topes 5 salas / 5 usuarios)', { DEMO_MODE: 'true' });
+  await phase('DEMO (DEMO_MODE=true: topes 5 salas / 5 usuarios)', { DEMO_MODE: 'true' });
 }
-if (PHASE === 'premium' || PHASE === 'all') {
+if (PHASE === 'non-demo' || PHASE === 'all') {
   // eslint-disable-next-line no-await-in-loop
-  await phase('TECHO non-demo (DEMO_MODE=false, PREMIUM_ROOM_MAX_USERS=10)', {
+  await phase('TECHO non-demo (DEMO_MODE=false, sin cuota)', {
     DEMO_MODE: 'false',
-    PREMIUM_ROOM_MAX_USERS: '10',
   });
 }
 console.log('\nOrquestador terminado. Copia las tablas de arriba al reporte.');

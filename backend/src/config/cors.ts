@@ -159,8 +159,6 @@ export const corsOptions: CorsOptions = {
     'x-host-secret',
     'x-user-id',
     'x-user-name',
-    'x-admin-token',
-    'x-admin-actor',
   ],
   exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
 };

@@ -77,11 +77,13 @@ flowchart TB
 | Origen | Destino | Vía |
 |---|---|---|
 | `server.ts` | `app.ts`, `config/database`, `config/cors`, `sockets/room.socket` | import directo |
-| `app.ts` | `routes/room.routes`, `routes/proxy.routes`, `middleware/error`, `config/cors` | import directo |
+| `app.ts` | `routes/room.routes`, `routes/proxy.routes`, `routes/docs.routes`, `middleware/error`, `config/cors` | import directo |
+| `routes/docs.routes` | `docs/openapi` (spec), `swagger-ui-express` | UI en `/api/docs`, JSON en `/api/docs/json` |
 | `routes/room.routes` | `controllers/room.controller`, `middleware/upload`, `middleware/rate-limit` | import directo |
 | `controllers/room.controller` | `services/room.service`, `domain/{room.entity,auth-policy,settings-policy}` | import directo — **REST salta `application/`** |
 | `services/room.service` | `adapters/room-repository.routing` (singleton concreto) | import directo — **sin inyección, viola DI hexagonal** |
-| `adapters/room-repository.routing` | `ports/room.repository` (type), `config/database` (`getIsMongoConnected`), `memory`, `mongo` | import directo |
+| `adapters/room-repository.routing` | `ports/room.repository` (type), `config/database` (`getIsMongoConnected`, `isPrismaStore`), `memory`, `mongo`, `prisma` | import directo |
+| `adapters/prisma-room.repository` | `ports/room.repository`, `@prisma/client` (generado de `prisma/schema.prisma`) | solo con `ROOM_STORE=prisma` |
 | `adapters/memory|mongo` | `ports/room.repository` (type), `types/room.types` | solo tipos + modelo |
 | `sockets/room.socket` | `services/room.service`, `domain/playback-policy` (maps + re-export `resolveRoomTime`), 6 handlers | import directo |
 | `sockets/handlers/*` | `application/*` (casos de uso), `services/room.service`, `domain/*`, `socket-auth`, `socket-state` | ver detalle §4 |

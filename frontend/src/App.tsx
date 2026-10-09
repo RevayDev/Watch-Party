@@ -11,21 +11,12 @@ const Home = lazy(() =>
 const Room = lazy(() =>
   import('./features/room/Room').then((m) => ({ default: m.Room }))
 );
-const StatusPage = lazy(() =>
-  import('./features/status/StatusPage').then((m) => ({ default: m.StatusPage }))
-);
-const AdminPage = lazy(() =>
-  import('./features/admin/AdminPage').then((m) => ({ default: m.AdminPage }))
-);
 
-type ViewState = 'home' | 'room' | 'status' | 'admin';
+type ViewState = 'home' | 'room';
 
-/** Ruta manual (sin router): `/status`, `/admin`, `?room=` o `/`. */
+/** Ruta manual (sin router): `?room=` o `/`. */
 function routeFromLocation(): { view: ViewState; roomId: string | null } {
   if (typeof window === 'undefined') return { view: 'home', roomId: null };
-  const path = window.location.pathname.replace(/\/$/, '') || '/';
-  if (path === '/status') return { view: 'status', roomId: null };
-  if (path === '/admin') return { view: 'admin', roomId: null };
   const roomParam = new URLSearchParams(window.location.search).get('room');
   return { view: 'home', roomId: roomParam ? roomParam.toUpperCase() : null };
 }
@@ -37,15 +28,9 @@ export const App: React.FC = () => {
   const [isHost, setIsHost] = useState<boolean>(false);
 
   // Parse URL if roomId query exists or restore active session.
-  // También respeta rutas manuales `/status` y `/admin` (con popstate).
   useEffect(() => {
     const applyRoute = () => {
       const route = routeFromLocation();
-      if (route.view === 'status' || route.view === 'admin') {
-        setView(route.view);
-        setCurrentRoomId(null);
-        return;
-      }
       if (route.roomId) setCurrentRoomId(route.roomId);
     };
     applyRoute();
@@ -53,18 +38,10 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', applyRoute);
   }, []);
 
-  const navigate = useCallback((path: '/' | '/status' | '/admin') => {
+  const navigate = useCallback((path: '/') => {
     window.history.pushState({}, '', path);
-    if (path === '/status') {
-      setView('status');
-      setCurrentRoomId(null);
-    } else if (path === '/admin') {
-      setView('admin');
-      setCurrentRoomId(null);
-    } else {
-      setView('home');
-      setCurrentRoomId(null);
-    }
+    setView('home');
+    setCurrentRoomId(null);
   }, []);
 
   const handleBackToHome = () => {
@@ -137,10 +114,6 @@ export const App: React.FC = () => {
           onLeave={handleBackToHome}
         />
       )}
-
-      {view === 'status' && <StatusPage onBack={handleBackToHome} />}
-
-      {view === 'admin' && <AdminPage onBack={handleBackToHome} />}
       </Suspense>
       </div>
     </NotificationProvider>

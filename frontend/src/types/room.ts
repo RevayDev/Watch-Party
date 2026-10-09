@@ -33,6 +33,8 @@ export interface IRoomSettings {
   allowCamReactivation: boolean;
   isTemporary?: boolean;
   requireApproval?: boolean;
+  /** Solo el anfitrión (y cohosts) controlan el vídeo: el servidor niega `sync-video` a no-moderadores. */
+  hostOnlySync?: boolean;
   name?: string;
   description?: string;
   timerMinutes?: number | null;
@@ -68,8 +70,8 @@ export interface IRoomData {
   hostSecret?: string;
   status: 'waiting' | 'active' | 'closed';
   isTemporary?: boolean;
-  /** Plan de la sala (ausente = 'free'). Las premium heredan el acceso del creador. */
-  plan?: 'free' | 'premium';
+  /** Plan de la sala (siempre 'free': compatibilidad con salas antiguas). */
+  plan?: 'free';
   video?: IVideoMetadata | null;
   participants: IParticipant[];
   joinRequests?: IJoinRequest[];
