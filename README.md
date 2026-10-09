@@ -165,10 +165,29 @@ npm run test       # vitest (328 backend + 207 frontend = 535 tests OK)
 npm run build      # build de producción
 ```
 
-- **Backend →** Render/Railway (necesita WebSockets siempre activos): Root `backend`, build `npm install && npm run build`, start `npm start`, env `MONGODB_URI` (+ `PORT`, `CLIENT_URL`).
-- **Frontend →** Vercel: Root `frontend`, preset Vite, env `VITE_API_URL` (URL pública del backend).
-- **Salud:** `GET /api/health` → `{ ok: true }` (para probes, sin datos sensibles).
-- **Documentación interactiva:** con el backend corriendo abre `http://localhost:4000/api/docs` (Swagger UI: ves y pruebas cada endpoint desde el navegador) o `/api/docs/json` (spec crudo para Postman/Insomnia). El spec vive en `backend/src/docs/openapi.ts`: si cambias un endpoint, actualízalo en el mismo commit (hay un test que verifica que cada path documentado responde de verdad).
+- **Backend → Render (Web Service):**
+  - **Root Directory:** `backend`
+  - **Environment:** `Node`
+  - **Build Command:** `npm install && npm run build`
+  - **Start Command:** `npm start`
+  - **Health Check Path:** `/api/health`
+  - **Variables de Entorno en Render:**
+    - `NODE_ENV=production`
+    - `CLIENT_URL=https://tu-app-en-vercel.vercel.app` (URL de tu front en Vercel)
+    - `ALLOWED_ORIGINS=*.vercel.app` (permite previews automáticos de Vercel)
+    - `MONGODB_URI=mongodb+srv://...` (conexión a MongoDB Atlas o déjalo vacío para usar modo memoria)
+
+- **Frontend → Vercel:**
+  - **Root Directory:** `frontend`
+  - **Framework Preset:** `Vite`
+  - **Build Command:** `npm run build`
+  - **Output Directory:** `dist`
+  - **Variables de Entorno en Vercel:**
+    - `VITE_API_URL=https://tu-backend-en-render.onrender.com` (la URL que te da Render)
+    - `VITE_DEMO_MODE=false` (o `true` si deseas modo demo con límites fijos)
+
+- **Salud del Backend:** `GET /api/health` → `{ status: "ok" }`.
+- **Documentación interactiva:** `https://tu-backend-en-render.onrender.com/api/docs` (Swagger UI).
 
 ---
 
