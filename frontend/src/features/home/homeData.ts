@@ -1,10 +1,8 @@
 import {
   Zap,
   Mic,
-  PartyPopper,
   MessageCircle,
   ShieldCheck,
-  Clock,
   Upload,
   Check,
   Atom,
@@ -21,7 +19,6 @@ import {
   Layers,
   BookOpen,
   FlaskConical,
-  Wifi,
 } from 'lucide-react';
 
 /**
@@ -179,44 +176,24 @@ export const features = [
     desc: 'Habla con tus amigos mediante micrófonos y cámaras WebRTC de alta calidad mientras disfrutan del mismo archivo multimedia.',
   },
   {
-    icon: PartyPopper,
-    title: 'Reacciones Flotantes',
-    desc: 'Expresa tus emociones con emojis animados flotando sobre la pantalla, visibles para todos en tiempo real.',
-  },
-  {
-    icon: MessageCircle,
-    title: 'Chat en Directo',
-    desc: 'Comparte comentarios, bromas y opiniones al instante mediante el panel lateral integrado de mensajería.',
-  },
-  {
     icon: Upload,
     title: 'Sube tus Archivos Multimedia',
     desc: 'Carga tus propios videos desde el dispositivo o pega un enlace, con barra de progreso y streaming optimizado.',
   },
   {
-    icon: ShieldCheck,
-    title: 'Salas Privadas con Aprobación',
-    desc: 'Acceso mediante códigos únicos y solicitud de entrada: el anfitrión aprueba o rechaza a cada invitado antes de entrar.',
+    icon: MessageCircle,
+    title: 'Chat y Reacciones en Directo',
+    desc: 'Comparte comentarios al instante y exprésate con emojis animados flotando como partículas en tiempo real.',
   },
   {
-    icon: Clock,
-    title: 'Salas Temporales o Persistentes',
-    desc: 'Elige si la sala se borra al cerrarse (ideal para archivos pesados) o si se conserva para futuras sesiones.',
+    icon: ShieldCheck,
+    title: 'Salas Privadas y Aprobación',
+    desc: 'Acceso seguro mediante códigos únicos y sala de espera donde el anfitrión aprueba quién entra.',
   },
   {
     icon: Check,
-    title: 'Control del Anfitrión',
-    desc: 'Gestiona permisos, silencia participantes, transfiere el rol y define un temporizador de cierre automático para la sala.',
-  },
-  {
-    icon: Wifi,
-    title: 'Ahorro de Datos',
-    desc: 'Modo ahorro: cámaras en audio, menos tráfico y atenuación inteligente del video mientras hablas. Ideal con datos móviles.',
-  },
-  {
-    icon: Radio,
-    title: 'En Vivo, Siempre al Día',
-    desc: 'Consenso de posición en tiempo real, reconexión automática si se cae tu internet y botón para saltar al en vivo si te atrasas.',
+    title: 'Control Total del Anfitrión',
+    desc: 'Gestiona permisos, silencia micrófonos, transfiere el rol y define temporizador de cierre automático.',
   },
 ];
 
