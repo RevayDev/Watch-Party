@@ -22,7 +22,6 @@ import {
   BookOpen,
   FlaskConical,
   Wifi,
-  Radio,
 } from 'lucide-react';
 
 /**
