@@ -8,7 +8,7 @@ import { activeUsers } from './socket-state.js';
  * directorio de sockets cuando el cliente no los envía (compatibilidad).
  */
 export interface PrivilegedPayload {
-  hostSecret?: string;
+  leaderSecret?: string;
   requesterUserId?: string;
   requesterName?: string;
 }
@@ -17,7 +17,7 @@ export interface PrivilegedPayload {
 export function resolveSocketClaim(socket: Socket, payload: PrivilegedPayload): AuthClaim {
   const entry = activeUsers.get(socket.id);
   return {
-    hostSecret: payload.hostSecret,
+    leaderSecret: payload.leaderSecret,
     requesterUserId: payload.requesterUserId ?? entry?.userId,
     requesterName: payload.requesterName ?? entry?.userName,
   };

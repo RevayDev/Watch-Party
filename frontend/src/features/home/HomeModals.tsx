@@ -7,8 +7,8 @@ import { TimelineEvent } from './homeData';
 export interface CreateRoomModalProps {
   open: boolean;
   onClose: () => void;
-  hostName: string;
-  setHostName: (v: string) => void;
+  leaderName: string;
+  setLeaderName: (v: string) => void;
   isTemporary: boolean;
   setIsTemporary: (v: boolean) => void;
   loading: boolean;
@@ -20,8 +20,8 @@ export interface CreateRoomModalProps {
 export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
   open,
   onClose,
-  hostName,
-  setHostName,
+  leaderName,
+  setLeaderName,
   isTemporary,
   setIsTemporary,
   loading,
@@ -55,14 +55,14 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
       open={open}
       onClose={onClose}
       label="Crear una nueva sala"
-      className="host-exit-modal"
+      className="leader-exit-modal"
     >
       <div className="modal-card__header">
-        <h3 className="host-exit-modal__title">Crear una nueva sala</h3>
+        <h3 className="leader-exit-modal__title">Crear una nueva sala</h3>
       </div>
 
-      <p className="host-exit-modal__desc">
-        Tú serás el anfitrión (Host) de la sala y podrás compartir el enlace con tus amigos.
+      <p className="leader-exit-modal__desc">
+        Tú serás el anfitrión de la sala y podrás compartir el enlace con tus amigos.
       </p>
 
       {error && (
@@ -94,8 +94,8 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             type="text"
             className="form-group__input"
             placeholder="Ej. Roberto"
-            value={hostName}
-            onChange={(e) => setHostName(e.target.value)}
+            value={leaderName}
+            onChange={(e) => setLeaderName(e.target.value)}
             onFocus={handleInputFocus}
             disabled={loading}
             autoFocus
@@ -167,7 +167,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="host-exit-modal__cancel-btn"
+            className="leader-exit-modal__cancel-btn"
             style={{ marginTop: 0, flex: 1 }}
           >
             Cancelar
@@ -246,17 +246,17 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
       open={open}
       onClose={onClose}
       label="Unirse a una sala"
-      className="host-exit-modal"
+      className="leader-exit-modal"
     >
       <div className="modal-card__header">
-        <h3 className="host-exit-modal__title">
+        <h3 className="leader-exit-modal__title">
           {isUrlInvite && roomCode
             ? `Unirse a la sala ${roomCode}`
             : 'Unirse a una sala'}
         </h3>
       </div>
 
-      <p className="host-exit-modal__desc">
+      <p className="leader-exit-modal__desc">
         {isUrlInvite && roomCode
           ? `Ingresa tu nombre de usuario para unirte de inmediato a la sala ${roomCode}.`
           : 'Ingresa tu nombre y el código de 6 u 8 caracteres que te compartió el anfitrión.'}
@@ -356,7 +356,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="host-exit-modal__cancel-btn"
+            className="leader-exit-modal__cancel-btn"
             style={{ marginTop: 0, flex: 1 }}
           >
             Cancelar

@@ -60,7 +60,7 @@ describe('CORS estricto: allowlist reducida (sin 3000/4000)', () => {
     expect(isOriginAllowed('http://localhost:3000')).toBe(false);
   });
 
-  it('LAN se conserva SOLO en no-producción (dev en móvil: vite host:true + socket a <hostname>:4000)', () => {
+  it('LAN se conserva SOLO en no-producción (dev en móvil: vite leader:true + socket a <hostname>:4000)', () => {
     process.env.NODE_ENV = 'development';
     process.env.CLIENT_URL = 'https://mi-app.vercel.app';
     expect(isOriginAllowed('http://192.168.1.50:5173')).toBe(true);

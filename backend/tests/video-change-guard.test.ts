@@ -1,7 +1,7 @@
 /**
- * Guards de `video-changed` / `upload-progress`: SOLO el host puede cambiar
- * el video o informar progreso de subida (el frontend solo lo emite desde
- * el panel del anfitrión). Sin permiso → `action-denied`, sin broadcast.
+ * Guards de `video-changed` / `upload-progress`: anfitrión o co-anfitrión
+ * pueden cambiar el video o informar progreso de subida. Sin permiso →
+ * `action-denied`, sin broadcast.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
 import { RoomService } from '../src/services/room.service.js';
@@ -81,11 +81,11 @@ const VALID_VIDEO = (tag: string) => ({
   sourceType: 'file' as const,
 });
 
-describe('video-changed vía socket: solo host', () => {
-  it('un MIEMBRO (no host, sin secreto) recibe action-denied y no hay broadcast', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+describe('video-changed vía socket: anfitrión o co-anfitrión', () => {
+  it('un MIEMBRO (no leader, sin secreto) recibe action-denied y no hay broadcast', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
     await RoomService.joinRoom(room.roomId, 'Miembro', 'Web', 'u-mem');
 
     const { io, roomEmits } = makeIo();
@@ -94,7 +94,7 @@ describe('video-changed vía socket: solo host', () => {
       socketId: 's-mem-video',
       roomId: room.roomId,
       userName: 'Miembro',
-      isHost: false,
+      isLeader: false,
       userId: 'u-mem',
     });
     registerSyncPlaybackHandlers(io, sock.socket);
@@ -109,7 +109,7 @@ describe('video-changed vía socket: solo host', () => {
   });
 
   it('un socket ANÓNIMO (fuera de la sala) es denegado sin broadcast', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const { io, roomEmits } = makeIo();
@@ -125,26 +125,55 @@ describe('video-changed vía socket: solo host', () => {
     expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(true);
   });
 
-  it('el HOST (con secreto) sí provoca broadcast', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+  it('el LEADER (con secreto) sí provoca broadcast', async () => {
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
 
     const { io, roomEmits } = makeIo();
-    const sock = makeSocket('s-host-video');
-    activeUsers.set('s-host-video', {
-      socketId: 's-host-video',
+    const sock = makeSocket('s-leader-video');
+    activeUsers.set('s-leader-video', {
+      socketId: 's-leader-video',
       roomId: room.roomId,
       userName: 'Host',
-      isHost: true,
-      userId: 'u-host',
+      isLeader: true,
+      userId: 'u-leader',
     });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'video-changed', {
       roomId: room.roomId,
-      video: VALID_VIDEO('host'),
-      hostSecret,
+      video: VALID_VIDEO('leader'),
+      leaderSecret,
+    });
+
+    expect(roomEmits.filter((e) => e.event === 'video-changed')).toHaveLength(1);
+    expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(false);
+  });
+
+  it('un CO-ANFITRIÓN sí provoca broadcast', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
+    created.push(room.roomId);
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
+    await RoomService.joinRoom(room.roomId, 'Ayudante', 'Web', 'u-ay');
+    await RoomService.setParticipantRole(room.roomId, 'Ayudante', 'coleader');
+
+    const { io, roomEmits } = makeIo();
+    const sock = makeSocket('s-co-video');
+    activeUsers.set('s-co-video', {
+      socketId: 's-co-video',
+      roomId: room.roomId,
+      userName: 'Ayudante',
+      isLeader: false,
+      userId: 'u-ay',
+    });
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'video-changed', {
+      roomId: room.roomId,
+      video: VALID_VIDEO('coleader'),
+      requesterUserId: 'u-ay',
+      requesterName: 'Ayudante',
     });
 
     expect(roomEmits.filter((e) => e.event === 'video-changed')).toHaveLength(1);
@@ -152,7 +181,7 @@ describe('video-changed vía socket: solo host', () => {
   });
 
   it('la validación de FORMA sigue exigiendo originalName/fileName', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const { io, roomEmits } = makeIo();
@@ -162,16 +191,16 @@ describe('video-changed vía socket: solo host', () => {
     await fire(sock.handlers, 'video-changed', {
       roomId: room.roomId,
       video: { originalName: '', fileName: '' },
-      hostSecret,
+      leaderSecret,
     });
 
     expect(roomEmits.filter((e) => e.event === 'video-changed')).toHaveLength(0);
   });
 });
 
-describe('upload-progress vía socket: solo host', () => {
-  it('un NO-host recibe action-denied y no hay reemisión', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+describe('upload-progress vía socket: anfitrión o co-anfitrión', () => {
+  it('un NO-leader recibe action-denied y no hay reemisión', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const { io } = makeIo();
@@ -188,19 +217,19 @@ describe('upload-progress vía socket: solo host', () => {
     expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(true);
   });
 
-  it('el HOST sí reemite progreso', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+  it('el LEADER sí reemite progreso', async () => {
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
 
     const { io } = makeIo();
-    const sock = makeSocket('s-host-prog');
-    activeUsers.set('s-host-prog', {
-      socketId: 's-host-prog',
+    const sock = makeSocket('s-leader-prog');
+    activeUsers.set('s-leader-prog', {
+      socketId: 's-leader-prog',
       roomId: room.roomId,
       userName: 'Host',
-      isHost: true,
-      userId: 'u-host',
+      isLeader: true,
+      userId: 'u-leader',
     });
     registerSyncPlaybackHandlers(io, sock.socket);
 
@@ -208,9 +237,39 @@ describe('upload-progress vía socket: solo host', () => {
       roomId: room.roomId,
       progress: 42,
       fileName: 'peli.mp4',
-      hostSecret,
+      leaderSecret,
     });
 
     expect(sock.emitted.some((e) => e.event === 'to:' + room.roomId + ':upload-progress')).toBe(true);
+  });
+
+  it('un CO-ANFITRIÓN sí reemite progreso', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
+    created.push(room.roomId);
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
+    await RoomService.joinRoom(room.roomId, 'Ayudante', 'Web', 'u-ay');
+    await RoomService.setParticipantRole(room.roomId, 'Ayudante', 'coleader');
+
+    const { io } = makeIo();
+    const sock = makeSocket('s-co-prog');
+    activeUsers.set('s-co-prog', {
+      socketId: 's-co-prog',
+      roomId: room.roomId,
+      userName: 'Ayudante',
+      isLeader: false,
+      userId: 'u-ay',
+    });
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'upload-progress', {
+      roomId: room.roomId,
+      progress: 55,
+      fileName: 'peli.mp4',
+      requesterUserId: 'u-ay',
+      requesterName: 'Ayudante',
+    });
+
+    expect(sock.emitted.some((e) => e.event === 'to:' + room.roomId + ':upload-progress')).toBe(true);
+    expect(sock.emitted.some((e) => e.event === 'action-denied')).toBe(false);
   });
 });

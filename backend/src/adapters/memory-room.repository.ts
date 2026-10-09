@@ -37,7 +37,7 @@ export class MemoryRoomRepository implements RoomRepository {
         if (!room?.roomId) continue;
         room.createdAt = reviveDate(room.createdAt);
         room.updatedAt = reviveDate(room.updatedAt);
-        room.hostName = room.hostName || '';
+        room.leaderName = room.leaderName || '';
         room.participants = (room.participants || []).map((p) => ({ ...p, joinedAt: reviveDate(p.joinedAt) }));
         room.kickedUsers = (room.kickedUsers || []).map((k) => ({ ...k, kickedAt: reviveDate(k.kickedAt) }));
         room.joinRequests = (room.joinRequests || []).map((j) => ({ ...j, requestedAt: reviveDate(j.requestedAt) }));

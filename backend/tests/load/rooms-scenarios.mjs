@@ -9,7 +9,7 @@
  *    3 × sync-video, ventana de observación 20 s,
  *  - medición: joins OK/429, WS conectados, errores de conexión, desconexiones
  *    observadas, latencia de join (p50/p95 medidas en cliente),
- *  - limpieza: leave-room + DELETE de cada sala (con su hostSecret).
+ *  - limpieza: leave-room + DELETE de cada sala (con su leaderSecret).
  *
  * DEMO vs NON-DEMO: con DEMO_MODE=true el servidor impone 5 salas y
  * 5 usuarios/sala — los escenarios ×10 registrarán 429/room-full
@@ -47,12 +47,12 @@ function percentile(sorted, p) {
   return Math.round(sorted[idx] * 100) / 100;
 }
 
-async function createRoom(hostName) {
+async function createRoom(leaderName) {
   const t0 = Date.now();
   const { status, json } = await fetchJson(`${BASE}/api/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ hostName }),
+    body: JSON.stringify({ leaderName }),
   });
   return { status, json, ms: Date.now() - t0 };
 }
@@ -134,15 +134,15 @@ async function runScenario(spec) {
     joinsOk: 0, joins429Demo: 0, joins429Limit: 0, joinsOther: 0, joinMs: [],
     wsConnected: 0, wsErrors: 0, wsRejected: 0, wsDisconnects: 0, wsDisconnectReasons: {},
   };
-  const rooms = []; // { roomId, hostSecret, sockets[] }
+  const rooms = []; // { roomId, leaderSecret, sockets[] }
 
   for (let r = 0; r < R; r++) {
-    const hostName = `LoadHost-${spec}-${r}`;
+    const leaderName = `LoadHost-${spec}-${r}`;
     // eslint-disable-next-line no-await-in-loop
-    const created = await withLimiterRetry(() => createRoom(hostName), `create sala ${r}`);
+    const created = await withLimiterRetry(() => createRoom(leaderName), `create sala ${r}`);
     if (created.status === 201) {
       stats.roomsCreated += 1;
-      rooms.push({ roomId: created.json.roomId, hostSecret: created.json.hostSecret, sockets: [] });
+      rooms.push({ roomId: created.json.roomId, leaderSecret: created.json.leaderSecret, sockets: [] });
     } else if (created.status === 429) {
       if (classify429(created.json, '') === 'demo-quota') stats.rooms429Demo += 1;
       else stats.rooms429Limit += 1;
@@ -204,7 +204,7 @@ async function runScenario(spec) {
   for (const room of rooms) {
     const { status } = await fetchJson(`${BASE}/api/rooms/${room.roomId}`, {
       method: 'DELETE',
-      headers: { 'x-host-secret': room.hostSecret },
+      headers: { 'x-leader-secret': room.leaderSecret },
     });
     if (status === 200) roomsDeleted += 1;
   }

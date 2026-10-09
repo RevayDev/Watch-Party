@@ -64,7 +64,8 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       emoji: cleanEmoji,
       user: serverName,
-      xOffset: Math.random() * 40 - 20,
+      xOffset: Math.random() * 120 - 60,
+      floatDuration: 3.5 + Math.random() * 2,
     };
 
     io.to(cleanRoomId).emit('reaction', reactionPayload);

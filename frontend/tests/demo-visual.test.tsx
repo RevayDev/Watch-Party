@@ -56,7 +56,7 @@ describe('RoomHeader en demo', () => {
   const baseProps = {
     roomId: 'ABC123',
     participantCount: 3,
-    isHost: true,
+    isLeader: true,
     roomStatus: 'active' as const,
     videoDurationSeconds: 125,
     onOpenSettings: vi.fn(),
@@ -84,7 +84,7 @@ describe('RoomHeader en demo', () => {
         <RoomHeader
           roomId="ABC123"
           participantCount={1}
-          isHost={false}
+          isLeader={false}
           roomStatus={undefined}
           videoDurationSeconds={null}
         />,

@@ -24,10 +24,11 @@ import {
 interface VideoPlayerProps {
   roomId: string;
   video: IVideoMetadata | null | undefined;
-  isHost: boolean;
+  isLeader: boolean;
   onUploadVideo: (file: File) => Promise<void>;
   onSetVideoUrl?: (url: string, title?: string) => Promise<void>;
   uploadProgress: number | null;
+  isVideoLoading?: boolean;
   onSyncAction: (action: 'play' | 'pause' | 'seek', currentTime: number) => void;
   remoteAction: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number; timestamp: number; autoplay?: boolean } | null;
   reactions: ReactionItem[];
@@ -55,10 +56,11 @@ interface VideoPlayerProps {
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   roomId,
   video,
-  isHost,
+  isLeader,
   onUploadVideo,
   onSetVideoUrl,
   uploadProgress,
+  isVideoLoading = false,
   onSyncAction,
   remoteAction,
   reactions,
@@ -622,7 +624,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <Loader2 size={44} className="animate-spin" color="#818cf8" />
             <div>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.25rem' }}>
-                {isHost ? 'Subiendo video a la sala...' : 'El Anfitrión está subiendo el video...'}
+                {isLeader ? 'Subiendo video a la sala...' : 'El Anfitrión está subiendo el video...'}
               </h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--color-muted-light)' }}>
                 {uploadProgress}% transferido
@@ -648,6 +650,40 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     );
   }
 
+  // 1b. Video URL / stream link loading state
+  if (isVideoLoading) {
+    return (
+      <div ref={containerRef} className="player-container">
+        <div className="player-container__placeholder">
+          <div className="dropzone-container" style={{ textAlign: 'center', alignItems: 'center' }}>
+            <Loader2 size={44} className="animate-spin" color="#818cf8" />
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.25rem' }}>
+                Cargando enlace de video...
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted-light)' }}>
+                Verificando origen y preparando la transmisión sincronizada...
+              </p>
+            </div>
+            <div className="upload-progress" style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
+              <div
+                className="upload-progress__bar upload-progress__bar--indeterminate"
+                style={{
+                  width: '65%',
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #6366f1, #a855f7)',
+                }}
+              />
+            </div>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              Conectando con la sala...
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 2. No video uploaded yet
   if (!video) {
     return (
@@ -661,7 +697,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         />
 
         <div className="player-container__placeholder">
-          {isHost ? (
+          {isLeader ? (
             <>
               {/* Phone bottom sheet, plain inline picker on desktop */}
               <BottomSheet
@@ -745,7 +781,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </span>
           )}
 
-          {isHost && (
+          {isLeader && (
             <button
               onClick={() => openChangePanel()}
               className="player-change-btn"
@@ -760,7 +796,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </div>
 
       {/* Mobile-only floating button: opens the "Cambiar video" panel (top bar auto-hides on touch) */}
-      {isHost && !showChangePanel && (
+      {isLeader && !showChangePanel && (
         <button
           onClick={() => openChangePanel()}
           className="player-change-fab"
@@ -796,7 +832,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <button onClick={handleRetryStream} className="btn btn--primary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
               <span>Reintentar</span>
             </button>
-            {isHost && (
+            {isLeader && (
               <button onClick={() => openChangePanel()} className="btn btn--primary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
                 <span>Cambiar video (archivo o enlace)</span>
               </button>
@@ -815,7 +851,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <div
               key={r.id}
               className={`floating-reaction${visualEffects ? '' : ' floating-reaction--static'}`}
-              style={{ '--x-offset': `${r.xOffset ?? 0}px` } as React.CSSProperties}
+              style={{ '--x-offset': `${r.xOffset ?? 0}px`, '--float-duration': `${r.floatDuration ?? 4.2}s` } as React.CSSProperties}
             >
               <span>{r.emoji}</span>
               {r.user && <span className="floating-reaction__user">{r.user}</span>}
@@ -891,7 +927,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </video>
 
       {/* Change-video modal: upload a file OR paste a link (also reachable from the error overlay) */}
-      {isHost && (
+      {isLeader && (
         <BottomSheet
           open={showChangePanel}
           onClose={() => setShowChangePanel(false)}
@@ -907,7 +943,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <div className="room-settings__actions">
               <button
                 type="button"
-                className="host-exit-modal__cancel-btn"
+                className="leader-exit-modal__cancel-btn"
                 onClick={() => setShowChangePanel(false)}
               >
                 Cancelar

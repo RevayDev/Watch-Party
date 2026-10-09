@@ -10,7 +10,7 @@ import { ResolveSyncTimeUseCase } from '../../application/sync-playback.usecase.
 import { dropPosition, roomPlayback, roomPositions } from '../../domain/playback-policy.js';
 import { clearVideoReady, pruneVideoReadySocket } from './video-ready.handler.js';
 import { findBannedEntry, isNameTaken } from '../../domain/room.entity.js';
-import { requireHost, requireModerator } from '../../domain/auth-policy.js';
+import { requireLeader, requireModerator } from '../../domain/auth-policy.js';
 import { SocketUser, activeUsers, activeMediaStates } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 import {
@@ -31,10 +31,10 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
   // 1. Join Room
   socket.on(
     'join-room',
-    async (data: { roomId: string; userName: string; isHost?: boolean; userId?: string } | undefined) => {
+    async (data: { roomId: string; userName: string; isLeader?: boolean; userId?: string } | undefined) => {
       if (!data || typeof data !== 'object') return;
-      const { roomId, userName, isHost: _clientIsHost = false, userId } = data;
-      void _clientIsHost; // ignorado a propósito: el host se valida en el servidor
+      const { roomId, userName, isLeader: _clientIsHost = false, userId } = data;
+      void _clientIsHost; // ignorado a propósito: el leader se valida en el servidor
       if (!roomId || !userName) return;
       if (!checkSocketRateLimit(socket.id, 'join-room', JOIN_LIMIT.max, JOIN_LIMIT.windowMs)) return;
 
@@ -45,7 +45,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       const previousEntry = activeUsers.get(socket.id);
       const isSameSocketRejoin = previousEntry?.roomId === cleanRoomId;
 
-      // Check if this room already exists and who is current host
+      // Check if this room already exists and who is current leader
       const existingRoom = await RoomService.getRoomById(cleanRoomId);
 
       // ── Ban check: banned users cannot re-enter (H4: espejo del chequeo REST) ──
@@ -90,11 +90,11 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         return !p.userId && p.name.toLowerCase() === cleanName.toLowerCase();
       });
 
-      // El host se reconoce por estado del servidor (nombre o registro),
-      // NUNCA por el flag `isHost` que envía el cliente.
-      const isActuallyHost =
-        (existingRoom && existingRoom.hostName.toLowerCase() === cleanName.toLowerCase()) ||
-        Boolean(participantMatch?.isHost);
+      // El leader se reconoce por estado del servidor (nombre o registro),
+      // NUNCA por el flag `isLeader` que envía el cliente.
+      const isActuallyLeader =
+        (existingRoom && existingRoom.leaderName.toLowerCase() === cleanName.toLowerCase()) ||
+        Boolean(participantMatch?.isLeader);
 
       // ── Cuota demo: sala llena (según plan) → `join-rejected` con el
       // mensaje exacto. Rejoin/merge (alreadyParticipant) no consumen cupo.
@@ -113,14 +113,14 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         return;
       }
 
-      // ── Manual approval (waiting list): hold newcomers until host approves ──
+      // ── Manual approval (waiting list): hold newcomers until leader approves ──
       const requireApproval = existingRoom?.settings?.requireApproval === true;
-      if (requireApproval && !isActuallyHost && !alreadyParticipant) {
+      if (requireApproval && !isActuallyLeader && !alreadyParticipant) {
         activeUsers.set(socket.id, {
           socketId: socket.id,
           roomId: cleanRoomId,
           userName: cleanName,
-          isHost: false,
+          isLeader: false,
           userId,
           pending: true,
         });
@@ -145,7 +145,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         socketId: socket.id,
         roomId: cleanRoomId,
         userName: cleanName,
-        isHost: !!isActuallyHost,
+        isLeader: !!isActuallyLeader,
         userId,
       };
       activeUsers.set(socket.id, socketUser);
@@ -168,10 +168,10 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       }
       const room = await RoomService.getRoomById(cleanRoomId);
 
-      console.log(`👤 ${cleanName} se unió a la sala [${cleanRoomId}] (Host: ${socketUser.isHost})`);
+      console.log(`👤 ${cleanName} se unió a la sala [${cleanRoomId}] (Host: ${socketUser.isLeader})`);
 
       // Build existing peers list and media states for WebRTC mesh
-      const existingPeers: Array<{ socketId: string; userName: string; isHost: boolean }> = [];
+      const existingPeers: Array<{ socketId: string; userName: string; isLeader: boolean }> = [];
       const existingMediaStates: Record<string, { isCameraOn: boolean; isMicOn: boolean; userName: string }> = {};
       const roomSockets = io.sockets.adapter.rooms.get(cleanRoomId);
       if (roomSockets) {
@@ -182,7 +182,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
               existingPeers.push({
                 socketId: peer.socketId,
                 userName: peer.userName,
-                isHost: peer.isHost,
+                isLeader: peer.isLeader,
               });
               const media = activeMediaStates.get(sockId) || { isCameraOn: false, isMicOn: false };
               existingMediaStates[sockId] = { ...media, userName: peer.userName };
@@ -197,7 +197,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         socket.to(cleanRoomId).emit('user-joined', {
           socketId: socket.id,
           userName: cleanName,
-          isHost: socketUser.isHost,
+          isLeader: socketUser.isLeader,
           participants: room?.participants || [],
           settings: room?.settings,
           status: room?.status || 'waiting',
@@ -212,8 +212,8 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       // Send initial room state + peer list for WebRTC + playback position + media states
       socket.emit('room-state', {
         roomId: cleanRoomId,
-        hostName: room?.hostName,
-        isHost: socketUser.isHost,
+        leaderName: room?.leaderName,
+        isLeader: socketUser.isLeader,
         isTemporary: room?.isTemporary !== false,
         settings: room?.settings,
         video: room?.video || null,
@@ -230,7 +230,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // 2. Host deletes/closes the entire room (solo host: secreto o rol host del servidor)
+  // 2. Host deletes/closes the entire room (solo leader: secreto o rol leader del servidor)
   socket.on('close-room', async (data: { roomId: string } & PrivilegedPayload | undefined) => {
     if (!data || typeof data !== 'object') return;
     const { roomId } = data;
@@ -238,7 +238,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     const cleanRoomId = roomId.toUpperCase().trim();
 
     const room = await RoomService.getRoomById(cleanRoomId);
-    if (!requireHost(room, resolveSocketClaim(socket, data))) {
+    if (!requireLeader(room, resolveSocketClaim(socket, data))) {
       denySocket(socket, 'close-room', 'Solo el anfitrión puede cerrar la sala.');
       return;
     }
@@ -256,7 +256,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     await RoomService.deleteRoom(cleanRoomId, true);
   });
 
-  // 3. User leaves voluntarily (with Host role transfer if host leaves).
+  // 3. User leaves voluntarily (with Host role transfer if leader leaves).
   // Salida voluntaria: inmediata (sin gracia) y cancela cualquier gracia pendiente.
   socket.on('leave-room', async (data: { roomId: string; userName: string; userId?: string } | undefined) => {
     if (!data || typeof data !== 'object') return;
@@ -286,21 +286,21 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       return;
     }
 
-    const { room, newHostName } = await RoomService.removeParticipantAndTransferHost(
+    const { room, newLeaderName } = await RoomService.removeParticipantAndTransferHost(
       cleanRoomId,
       userName,
       effectiveUserId
     );
 
-    if (newHostName) {
+    if (newLeaderName) {
       for (const [_sId, u] of activeUsers.entries()) {
-        if (u.roomId === cleanRoomId && u.userName.toLowerCase() === newHostName.toLowerCase()) {
-          u.isHost = true;
+        if (u.roomId === cleanRoomId && u.userName.toLowerCase() === newLeaderName.toLowerCase()) {
+          u.isLeader = true;
         }
       }
 
-      io.to(cleanRoomId).emit('host-changed', {
-        newHostName,
+      io.to(cleanRoomId).emit('leader-changed', {
+        newLeaderName,
         participants: room?.participants || [],
       });
     }
@@ -312,7 +312,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     });
   });
 
-  // ── WAITING LIST: approve / reject join requests (moderador: host o cohost) ──
+  // ── WAITING LIST: approve / reject join requests (moderador: leader o coleader) ──
   socket.on(
     'approve-join',
     async (data: { roomId: string; userId?: string; name?: string } & PrivilegedPayload) => {
@@ -385,7 +385,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         io.to(cleanRoomId).emit('user-joined', {
           socketId: requesterSocketId,
           userName: request.name,
-          isHost: false,
+          isLeader: false,
           participants: room?.participants || [],
         });
       }
@@ -442,7 +442,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // 9. Disconnection (Handle auto-host transfer when host drops out).
+  // 9. Disconnection (Handle auto-leader transfer when leader drops out).
   // Con userId: eliminación + transferencia diferidas 20s (gracia de refresh).
   // Sin userId o pendiente: comportamiento inmediato original.
   // `user-left` solo se emite al eliminar de verdad.
@@ -454,7 +454,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       activeUsers.delete(socket.id);
       dropPosition(user.roomId, socket.id);
       // La desconexión también saca al socket del conteo de auto-play (la
-      // gracia de 20 s solo difiere participante + host, nunca el consenso).
+      // gracia de 20 s solo difiere participante + leader, nunca el consenso).
       pruneVideoReadySocket(io, user.roomId, socket.id);
 
       // Pending (waiting-list) users: never joined the participant list.
@@ -479,7 +479,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
           for (const [, u] of activeUsers.entries()) {
             if (u.roomId === roomId && !u.pending && u.userId === userId) return;
           }
-          const { room, newHostName } = await RoomService.removeParticipantAndTransferHost(
+          const { room, newLeaderName } = await RoomService.removeParticipantAndTransferHost(
             roomId,
             userName,
             userId
@@ -487,18 +487,18 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
 
           console.log(`🔌 ${userName} se desconectó de la sala [${roomId}]`);
 
-          if (newHostName) {
+          if (newLeaderName) {
             for (const [_sId, u] of activeUsers.entries()) {
               if (
                 u.roomId === roomId &&
-                u.userName.toLowerCase() === newHostName.toLowerCase()
+                u.userName.toLowerCase() === newLeaderName.toLowerCase()
               ) {
-                u.isHost = true;
+                u.isLeader = true;
               }
             }
 
-            socket.to(roomId).emit('host-changed', {
-              newHostName,
+            socket.to(roomId).emit('leader-changed', {
+              newLeaderName,
               participants: room?.participants || [],
             });
           }
@@ -520,7 +520,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         return;
       }
 
-      const { room, newHostName } = await RoomService.removeParticipantAndTransferHost(
+      const { room, newLeaderName } = await RoomService.removeParticipantAndTransferHost(
         user.roomId,
         user.userName,
         user.userId
@@ -528,18 +528,18 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
 
       console.log(`🔌 ${user.userName} se desconectó de la sala [${user.roomId}]`);
 
-      if (newHostName) {
+      if (newLeaderName) {
         for (const [_sId, u] of activeUsers.entries()) {
           if (
             u.roomId === user.roomId &&
-            u.userName.toLowerCase() === newHostName.toLowerCase()
+            u.userName.toLowerCase() === newLeaderName.toLowerCase()
           ) {
-            u.isHost = true;
+            u.isLeader = true;
           }
         }
 
-        socket.to(user.roomId).emit('host-changed', {
-          newHostName,
+        socket.to(user.roomId).emit('leader-changed', {
+          newLeaderName,
           participants: room?.participants || [],
         });
       }

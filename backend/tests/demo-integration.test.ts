@@ -109,7 +109,7 @@ async function fire(handlers: Map<string, (...args: any[]) => unknown>, event: s
 }
 
 async function makeFullRoom(): Promise<string> {
-  const { room } = await RoomService.createRoom({ hostName: 'Host' });
+  const { room } = await RoomService.createRoom({ leaderName: 'Host' });
   created.push(room.roomId);
   for (let i = 1; i <= 4; i++) {
     await RoomService.joinRoom(room.roomId, `U${i}`, 'Web', `uid-${i}`);
@@ -149,14 +149,14 @@ describe('integrado salas: 5×201 vía REST y la 6ª 429 exacto', () => {
     expect(await RoomService.countLiveRooms()).toBe(0);
     for (let i = 0; i < DEMO_MAX_ROOMS; i++) {
       const res = mockRes();
-      await RoomController.create(mockReq({}, { hostName: `H${i}` }, {}) as any, res, next);
+      await RoomController.create(mockReq({}, { leaderName: `H${i}` }, {}) as any, res, next);
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.body.roomId).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
       created.push(res.body.roomId);
     }
     expect(await RoomService.countLiveRooms()).toBe(5);
     const res6 = mockRes();
-    await RoomController.create(mockReq({}, { hostName: 'Extra' }, {}) as any, res6, next);
+    await RoomController.create(mockReq({}, { leaderName: 'Extra' }, {}) as any, res6, next);
     expect(res6.status).toHaveBeenCalledWith(429);
     expect(res6.body).toEqual({ error: DEMO_ROOM_LIMIT_MESSAGE });
     expect(res6.body).toEqual({
@@ -199,7 +199,7 @@ describe('integrado usuarios: 5/5, 6º rechazado, liberación de cupo', () => {
       socketId: 's-u1',
       roomId,
       userName: 'U1',
-      isHost: false,
+      isLeader: false,
       userId: 'uid-1',
     });
     registerJoinApprovalHandlers(io, sock.socket);
@@ -225,7 +225,7 @@ describe('integrado usuarios: 5/5, 6º rechazado, liberación de cupo', () => {
       socketId: 's-u1',
       roomId,
       userName: 'U1',
-      isHost: false,
+      isLeader: false,
       userId: 'uid-1',
     });
     registerJoinApprovalHandlers(io, sock.socket);
@@ -263,16 +263,16 @@ describe('integrado usuarios: 5/5, 6º rechazado, liberación de cupo', () => {
     await drain();
     const secrets: Array<{ id: string; secret: string }> = [];
     for (let i = 0; i < 5; i++) {
-      const { room, hostSecret } = await RoomService.createRoom({ hostName: `H${i}` });
+      const { room, leaderSecret } = await RoomService.createRoom({ leaderName: `H${i}` });
       created.push(room.roomId);
-      secrets.push({ id: room.roomId, secret: hostSecret });
+      secrets.push({ id: room.roomId, secret: leaderSecret });
     }
     expect(await RoomService.countLiveRooms()).toBe(5);
 
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-host0');
     registerJoinApprovalHandlers(io, sock.socket);
-    await fire(sock.handlers, 'close-room', { roomId: secrets[0].id, hostSecret: secrets[0].secret });
+    await fire(sock.handlers, 'close-room', { roomId: secrets[0].id, leaderSecret: secrets[0].secret });
     expect(await RoomService.getRoomById(secrets[0].id)).toBeNull();
     expect(roomEmits.some((e) => e.event === 'room-closed')).toBe(true);
     expect(await RoomService.countLiveRooms()).toBe(4);
@@ -282,7 +282,7 @@ describe('integrado usuarios: 5/5, 6º rechazado, liberación de cupo', () => {
     );
 
     const res = mockRes();
-    await RoomController.create(mockReq({}, { hostName: 'Nueva' }, {}) as any, res, next);
+    await RoomController.create(mockReq({}, { leaderName: 'Nueva' }, {}) as any, res, next);
     expect(res.status).toHaveBeenCalledWith(201);
     created.push(res.body.roomId);
     expect(await RoomService.countLiveRooms()).toBe(5);
@@ -302,19 +302,19 @@ describe('integrado privacidad: sin código no se entra; sin listado; sin fugas'
     expect(res.body).toEqual({ error: 'Room not found' });
   });
 
-  it('PROBADO: getById inexistente → 404; existente jamás expone hostSecret', async () => {
+  it('PROBADO: getById inexistente → 404; existente jamás expone leaderSecret', async () => {
     const missing = mockRes();
     await RoomController.getById({ params: { roomId: 'ZZZZZZ' } } as any, missing, next);
     expect(missing.status).toHaveBeenCalledWith(404);
     expect(missing.body).toEqual({ error: 'Room not found' });
 
-    const { room } = await RoomService.createRoom({ hostName: 'H' });
+    const { room } = await RoomService.createRoom({ leaderName: 'H' });
     created.push(room.roomId);
     const ok = mockRes();
     await RoomController.getById({ params: { roomId: room.roomId } } as any, ok, next);
     expect(ok.body.roomId).toBe(room.roomId);
-    expect(ok.body.hostSecret).toBeUndefined();
-    expect(JSON.stringify(ok.body)).not.toContain(room.hostSecret);
+    expect(ok.body.leaderSecret).toBeUndefined();
+    expect(JSON.stringify(ok.body)).not.toContain(room.leaderSecret);
   });
 
   it('PROBADO: no existe endpoint de listado de salas en el backend', () => {
@@ -340,7 +340,7 @@ describe('integrado privacidad: sin código no se entra; sin listado; sin fugas'
   it('PROBADO: availability solo conteos y errores sin códigos ni participantes', async () => {
     await drain();
     for (let i = 0; i < 2; i++) {
-      const { room } = await RoomService.createRoom({ hostName: `H${i}` });
+      const { room } = await RoomService.createRoom({ leaderName: `H${i}` });
       created.push(room.roomId);
     }
     const res = mockRes();
@@ -376,7 +376,7 @@ describe('integrado privacidad: sin código no se entra; sin listado; sin fugas'
     expect(sock.emitted.some((e) => e.event === 'join-rejected')).toBe(false);
     const states = sock.emitted.filter((e) => e.event === 'room-state').map((e) => e.args[0]);
     expect(states).toHaveLength(1);
-    expect((states[0] as any).hostName).toBeUndefined();
+    expect((states[0] as any).leaderName).toBeUndefined();
     expect((states[0] as any).participants).toEqual([]);
   });
 });
@@ -384,9 +384,9 @@ describe('integrado privacidad: sin código no se entra; sin listado; sin fugas'
 // ── 4. Vídeo Drive (lógica, sin red) ─────────────────────────────────────────
 describe('integrado vídeo Drive: conversión de enlace sin red', () => {
   it('PROBADO: setVideoUrl convierte enlace Drive a usercontent sin tocar la red (fetch stub)', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
 
     const fetchMock = vi.fn(async (input: any) => {
       const url = String(input);
@@ -409,7 +409,7 @@ describe('integrado vídeo Drive: conversión de enlace sin red', () => {
       mockReq(
         { roomId: room.roomId },
         { url: 'https://drive.google.com/file/d/ABC123XYZ/view?usp=sharing' },
-        { 'x-host-secret': hostSecret }
+        { 'x-leader-secret': leaderSecret }
       ) as any,
       res,
       next
@@ -434,7 +434,7 @@ describe('integrado vídeo Drive: conversión de enlace sin red', () => {
 // ── 5. Temporizador server-side ──────────────────────────────────────────────
 describe('integrado temporizador: server-side, estable ante rejoins', () => {
   it('PROBADO: rejoins y varios usuarios NO reinician ni tocan timerEndsAt', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const endsAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     await RoomService.updateSettings(room.roomId, { timerEndsAt: endsAt });
@@ -456,7 +456,7 @@ describe('integrado temporizador: server-side, estable ante rejoins', () => {
   });
 
   it('PROBADO: getRoomsPastTimer detecta sala vencida con varios usuarios; futura/sin timer no', async () => {
-    const { room: expired } = await RoomService.createRoom({ hostName: 'H1' });
+    const { room: expired } = await RoomService.createRoom({ leaderName: 'H1' });
     created.push(expired.roomId);
     await RoomService.joinRoom(expired.roomId, 'M1', 'Web', 'u-m1');
     await RoomService.joinRoom(expired.roomId, 'M2', 'Web', 'u-m2');
@@ -464,7 +464,7 @@ describe('integrado temporizador: server-side, estable ante rejoins', () => {
       timerEndsAt: new Date(Date.now() - 60_000).toISOString(),
     });
 
-    const { room: future } = await RoomService.createRoom({ hostName: 'H2' });
+    const { room: future } = await RoomService.createRoom({ leaderName: 'H2' });
     created.push(future.roomId);
     await RoomService.updateSettings(future.roomId, {
       timerEndsAt: new Date(Date.now() + 3_600_000).toISOString(),
@@ -487,7 +487,7 @@ describe('simulación 5×5 en memoria (PROBADO memoria; 25 reales = ESTIMADO)', 
     const t0 = performance.now();
     const ids: string[] = [];
     for (let s = 0; s < 5; s++) {
-      const { room } = await RoomService.createRoom({ hostName: `Host${s}` });
+      const { room } = await RoomService.createRoom({ leaderName: `Host${s}` });
       created.push(room.roomId);
       ids.push(room.roomId);
       for (let u = 1; u <= 4; u++) {

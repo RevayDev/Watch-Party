@@ -8,7 +8,7 @@ import { DEMO_MAX_USERS_PER_ROOM, isDemoMode } from '../shared/demo';
 interface RoomHeaderProps {
   roomId: string;
   participantCount: number;
-  isHost: boolean;
+  isLeader: boolean;
   createdAt?: string;
   roomName?: string;
   roomDescription?: string;
@@ -28,7 +28,7 @@ interface RoomHeaderProps {
 export const RoomHeader: React.FC<RoomHeaderProps> = ({
   roomId,
   participantCount,
-  isHost,
+  isLeader,
   createdAt,
   roomName,
   roomDescription,
@@ -344,8 +344,8 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           )}
         </div>
 
-        {/* ⚙ Room settings (host only): name, info, save-mode, approval, timer */}
-        {isHost && onOpenSettings && (
+        {/* ⚙ Room settings (leader only): name, info, save-mode, approval, timer */}
+        {isLeader && onOpenSettings && (
           <button
             type="button"
             onClick={onOpenSettings}

@@ -6,7 +6,7 @@ import {
   getStoredUserId,
   getStoredUserName,
   resolveJoinRejectedFeedback,
-  saveHostSession,
+  saveLeaderSession,
 } from '../src/shared/utils';
 
 /**
@@ -41,7 +41,7 @@ afterEach(() => {
 describe('getStoredHostSecret', () => {
   it('devuelve el secreto solo si la sesión es de esa sala', () => {
     installStorage({
-      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', hostName: 'Ana', hostSecret: 's3cr3t' }),
+      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', leaderName: 'Ana', leaderSecret: 's3cr3t' }),
     });
     expect(getStoredHostSecret('ABC123')).toBe('s3cr3t');
     expect(getStoredHostSecret('abc123')).toBe('s3cr3t');
@@ -53,7 +53,7 @@ describe('getStoredHostSecret', () => {
     installStorage({ watchparty_host_session: 'no-json{{{' });
     expect(getStoredHostSecret('ABC123')).toBeUndefined();
     installStorage({
-      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', hostName: 'Ana' }),
+      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', leaderName: 'Ana' }),
     });
     expect(getStoredHostSecret('ABC123')).toBeUndefined();
   });
@@ -65,21 +65,21 @@ describe('getStoredHostSecret', () => {
 });
 
 describe('buildSocketAuth', () => {
-  it('incluye hostSecret + requester solo cuando hay valor', () => {
+  it('incluye leaderSecret + requester solo cuando hay valor', () => {
     installStorage({
-      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', hostName: 'Ana', hostSecret: 's3cr3t' }),
+      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', leaderName: 'Ana', leaderSecret: 's3cr3t' }),
       watchparty_user_id: 'u-1',
     });
     expect(buildSocketAuth('ABC123', 'Ana')).toEqual({
-      hostSecret: 's3cr3t',
+      leaderSecret: 's3cr3t',
       requesterUserId: 'u-1',
       requesterName: 'Ana',
     });
   });
 
-  it('omite hostSecret de otra sala y requesterName vacío', () => {
+  it('omite leaderSecret de otra sala y requesterName vacío', () => {
     installStorage({
-      watchparty_host_session: JSON.stringify({ roomId: 'OTRA99', hostName: 'Ana', hostSecret: 's3cr3t' }),
+      watchparty_host_session: JSON.stringify({ roomId: 'OTRA99', leaderName: 'Ana', leaderSecret: 's3cr3t' }),
       watchparty_user_id: 'u-1',
     });
     expect(buildSocketAuth('ABC123', '   ')).toEqual({ requesterUserId: 'u-1' });
@@ -91,62 +91,62 @@ describe('buildSocketAuth', () => {
 });
 
 describe('buildRestAuthHeaders', () => {
-  it('envía x-host-secret / x-user-id / x-user-name cuando existen', () => {
+  it('envía x-leader-secret / x-user-id / x-user-name cuando existen', () => {
     installStorage({
-      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', hostName: 'Ana', hostSecret: 's3cr3t' }),
+      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', leaderName: 'Ana', leaderSecret: 's3cr3t' }),
       watchparty_user_id: 'u-1',
       watchparty_last_username: 'Ana',
     });
     expect(buildRestAuthHeaders('ABC123')).toEqual({
-      'x-host-secret': 's3cr3t',
+      'x-leader-secret': 's3cr3t',
       'x-user-id': 'u-1',
       'x-user-name': 'Ana',
     });
   });
 
-  it('no envía x-host-secret de otra sala', () => {
+  it('no envía x-leader-secret de otra sala', () => {
     installStorage({
-      watchparty_host_session: JSON.stringify({ roomId: 'OTRA99', hostName: 'Ana', hostSecret: 's3cr3t' }),
+      watchparty_host_session: JSON.stringify({ roomId: 'OTRA99', leaderName: 'Ana', leaderSecret: 's3cr3t' }),
     });
     const headers = buildRestAuthHeaders('ABC123');
-    expect(headers).not.toHaveProperty('x-host-secret');
+    expect(headers).not.toHaveProperty('x-leader-secret');
     expect(headers).not.toHaveProperty('x-user-id');
     expect(headers).not.toHaveProperty('x-user-name');
   });
 });
 
-describe('saveHostSession', () => {
-  it('guarda roomId + hostName + hostSecret', () => {
+describe('saveLeaderSession', () => {
+  it('guarda roomId + leaderName + leaderSecret', () => {
     const api = installStorage();
-    saveHostSession('ABC123', 'Ana', 's3cr3t');
+    saveLeaderSession('ABC123', 'Ana', 's3cr3t');
     expect(JSON.parse(api.getItem('watchparty_host_session')!)).toEqual({
       roomId: 'ABC123',
-      hostName: 'Ana',
-      hostSecret: 's3cr3t',
+      leaderName: 'Ana',
+      leaderSecret: 's3cr3t',
     });
     expect(getStoredUserId()).toBeUndefined();
   });
 
   it('preserva el secreto existente si no se provee uno nuevo', () => {
     const api = installStorage({
-      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', hostName: 'Ana', hostSecret: 's3cr3t' }),
+      watchparty_host_session: JSON.stringify({ roomId: 'ABC123', leaderName: 'Ana', leaderSecret: 's3cr3t' }),
     });
-    saveHostSession('ABC123', 'Ana Renombrada');
+    saveLeaderSession('ABC123', 'Ana Renombrada');
     expect(JSON.parse(api.getItem('watchparty_host_session')!)).toEqual({
       roomId: 'ABC123',
-      hostName: 'Ana Renombrada',
-      hostSecret: 's3cr3t',
+      leaderName: 'Ana Renombrada',
+      leaderSecret: 's3cr3t',
     });
   });
 
   it('no arrastra el secreto de otra sala', () => {
     const api = installStorage({
-      watchparty_host_session: JSON.stringify({ roomId: 'OTRA99', hostName: 'Ana', hostSecret: 's3cr3t' }),
+      watchparty_host_session: JSON.stringify({ roomId: 'OTRA99', leaderName: 'Ana', leaderSecret: 's3cr3t' }),
     });
-    saveHostSession('ABC123', 'Ana');
+    saveLeaderSession('ABC123', 'Ana');
     expect(JSON.parse(api.getItem('watchparty_host_session')!)).toEqual({
       roomId: 'ABC123',
-      hostName: 'Ana',
+      leaderName: 'Ana',
     });
   });
 });

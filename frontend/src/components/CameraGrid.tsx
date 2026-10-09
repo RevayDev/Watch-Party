@@ -9,7 +9,7 @@ interface CameraGridProps {
   remotePeers: RemotePeer[];
   participants: IParticipant[];
   currentUserName: string;
-  isHost: boolean;
+  isLeader: boolean;
   isMicOn: boolean;
   isCameraOn: boolean;
   peerMediaStates?: Record<string, PeerMediaState>;
@@ -82,7 +82,7 @@ function useIsSpeaking(stream: MediaStream | null, isLocal: boolean, isMicOn: bo
 const CameraTile: React.FC<{
   stream?: MediaStream | null;
   userName: string;
-  isHost?: boolean;
+  isLeader?: boolean;
   isLocal?: boolean;
   isMicOn?: boolean;
   isCameraOn?: boolean;
@@ -90,7 +90,7 @@ const CameraTile: React.FC<{
   weakSignal?: boolean;
   /** Nivel crítico: audio-only en recepción (se oculta su <video>, nunca su <audio>). */
   criticalSignal?: boolean;
-}> = ({ stream = null, userName, isHost = false, isLocal = false, isMicOn = false, isCameraOn = false, weakSignal = false, criticalSignal = false }) => {
+}> = ({ stream = null, userName, isLeader = false, isLocal = false, isMicOn = false, isCameraOn = false, weakSignal = false, criticalSignal = false }) => {
   const isSpeaking = useIsSpeaking(stream, isLocal, isMicOn);
   const initial = (userName || '?').charAt(0).toUpperCase();
   // Remoto con señal débil/crítica: no mostrar el frame congelado; el <audio>
@@ -152,7 +152,7 @@ const CameraTile: React.FC<{
 
       {/* Name plate */}
       <div className="cam-tile__nameplate">
-        {isHost && <Crown size={10} color="#f59e0b" />}
+        {isLeader && <Crown size={10} color="#f59e0b" />}
         <span className="cam-tile__name">{isLocal ? 'Tú' : userName}</span>
       </div>
     </div>
@@ -165,7 +165,7 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
   remotePeers,
   participants,
   currentUserName,
-  isHost,
+  isLeader,
   isMicOn,
   isCameraOn,
   peerMediaStates = {},
@@ -200,7 +200,7 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
       <CameraTile
         stream={localStream}
         userName={currentUserName}
-        isHost={isHost}
+        isLeader={isLeader}
         isLocal={true}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
@@ -231,7 +231,7 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
             key={p.name}
             stream={stream}
             userName={p.name}
-            isHost={p.isHost}
+            isLeader={p.isLeader}
             isLocal={false}
             isMicOn={peerMicOn}
             // Rol B (ahorro): avatar en vez de vídeo remoto; el audio sigue

@@ -48,7 +48,7 @@ export const RecentRooms: React.FC<RecentRoomsProps> = ({
                 className={`home-recent-item__avatar home-recent-item__avatar--${room.role}`}
                 aria-hidden="true"
               >
-                {(room.hostName || '?').trim().charAt(0).toUpperCase()}
+                {(room.leaderName || '?').trim().charAt(0).toUpperCase()}
               </span>
               <div className="home-recent-item__info">
                 <div className="home-recent-item__top">
@@ -58,12 +58,12 @@ export const RecentRooms: React.FC<RecentRoomsProps> = ({
                   <span
                     className={`home-recent-item__role home-recent-item__role--${room.role}`}
                   >
-                    {room.role === 'host' ? (
+                    {room.role === 'leader' ? (
                       <Crown size={11} strokeWidth={2.4} />
                     ) : (
                       <User size={11} strokeWidth={2.4} />
                     )}
-                    {room.role === 'host' ? 'Anfitrión' : 'Invitado'}
+                    {room.role === 'leader' ? 'Anfitrión' : 'Invitado'}
                   </span>
                 </div>
                 {room.roomName?.trim() && (
@@ -82,7 +82,7 @@ export const RecentRooms: React.FC<RecentRoomsProps> = ({
                   </span>
                 )}
                 <span className="home-recent-item__meta">
-                  {room.hostName} · {formatRelativeTime(room.lastJoined)}
+                  {room.leaderName} · {formatRelativeTime(room.lastJoined)}
                 </span>
               </div>
               <div className="home-recent-item__actions">

@@ -28,7 +28,7 @@ export class UnbanUserUseCase {
 }
 
 export class SetRoleUseCase {
-  static async execute(input: { roomId: string; targetUserName: string; role: 'cohost' | 'member' }) {
+  static async execute(input: { roomId: string; targetUserName: string; role: 'coleader' | 'member' }) {
     return RoomService.setParticipantRole(input.roomId, input.targetUserName, input.role);
   }
 }

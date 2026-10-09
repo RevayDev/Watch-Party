@@ -1,31 +1,31 @@
 import type { IParticipant, IRoom } from '../types/room.types.js';
-import { isHostParticipant } from './room.entity.js';
+import { isLeaderParticipant } from './room.entity.js';
 
 /**
  * Política de autorización para acciones privilegiadas (H5/H6).
  *
  * Toda la autorización se basa en estado del SERVIDOR (participantes
- * persistidos + `hostSecret` de la sala). Nunca se confía en flags
- * enviados por el cliente (`isHost`, etc.).
+ * persistidos + `leaderSecret` de la sala). Nunca se confía en flags
+ * enviados por el cliente (`isLeader`, etc.).
  *
  * Contrato con frontend:
- * - Los payloads socket privilegiados pueden traer `hostSecret?`,
+ * - Los payloads socket privilegiados pueden traer `leaderSecret?`,
  *   `requesterUserId?`, `requesterName?`.
- * - REST usa los headers `x-host-secret`, `x-user-id`, `x-user-name`.
- * - Se autoriza si `hostSecret === room.hostSecret`, o si el solicitante
+ * - REST usa los headers `x-leader-secret`, `x-user-id`, `x-user-name`.
+ * - Se autoriza si `leaderSecret === room.leaderSecret`, o si el solicitante
  *   coincide (userId, fallback nombre) con un participante con rol adecuado.
  */
-export type RequiredRole = 'host' | 'moderator';
+export type RequiredRole = 'leader' | 'moderator';
 
 export interface AuthClaim {
-  hostSecret?: string;
+  leaderSecret?: string;
   requesterUserId?: string;
   requesterName?: string;
 }
 
-/** ¿Es este participante moderador (host o cohost)? */
+/** ¿Es este participante moderador (leader o coleader)? */
 export function isModeratorParticipant(p: IParticipant): boolean {
-  return p.isHost === true || p.role === 'host' || p.role === 'cohost';
+  return p.isLeader === true || p.role === 'leader' || p.role === 'coleader';
 }
 
 /**
@@ -59,8 +59,8 @@ export function findRequesterParticipant(
 
 /**
  * ¿Está autorizado el solicitante para una acción que requiere `required`?
- * - 'host': solo el host (secreto válido o participante host).
- * - 'moderator': host o cohost (secreto válido o participante con rol adecuado).
+ * - 'leader': solo el leader (secreto válido o participante leader).
+ * - 'moderator': leader o coleader (secreto válido o participante con rol adecuado).
  */
 export function isAuthorized(
   room: IRoom | null | undefined,
@@ -68,24 +68,24 @@ export function isAuthorized(
   required: RequiredRole,
 ): boolean {
   if (!room) return false;
-  if (claim.hostSecret && room.hostSecret && claim.hostSecret === room.hostSecret) return true;
+  if (claim.leaderSecret && room.leaderSecret && claim.leaderSecret === room.leaderSecret) return true;
   const requester = findRequesterParticipant(room, claim);
   if (requester) {
-    if (required === 'host') return isHostParticipant(requester);
+    if (required === 'leader') return isLeaderParticipant(requester);
     return isModeratorParticipant(requester);
   }
-  if (claim.requesterName && room.hostName.toLowerCase() === claim.requesterName.trim().toLowerCase()) {
+  if (claim.requesterName && room.leaderName.toLowerCase() === claim.requesterName.trim().toLowerCase()) {
     return true;
   }
   return false;
 }
 
 /** Alias expresivos para los handlers (H5/H6). */
-export function requireHost(
+export function requireLeader(
   room: IRoom | null | undefined,
   claim: AuthClaim,
 ): boolean {
-  return isAuthorized(room, claim, 'host');
+  return isAuthorized(room, claim, 'leader');
 }
 
 export function requireModerator(

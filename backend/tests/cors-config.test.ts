@@ -97,7 +97,7 @@ describe('CORS: allowlist (CLIENT_URL + locales de desarrollo)', () => {
       h.toLowerCase()
     );
     for (const h of [
-      'x-host-secret',
+      'x-leader-secret',
       'x-user-id',
       'x-user-name',
       'content-type',

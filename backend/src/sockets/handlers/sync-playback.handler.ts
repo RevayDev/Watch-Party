@@ -2,14 +2,14 @@ import { Server, Socket } from 'socket.io';
 import { IVideoMetadata } from '../../types/room.types.js';
 import { RecordHeartbeatUseCase, SyncPlaybackUseCase } from '../../application/sync-playback.usecase.js';
 import { roomPlayback } from '../../domain/playback-policy.js';
-import { requireHost, requireModerator } from '../../domain/auth-policy.js';
+import { requireModerator } from '../../domain/auth-policy.js';
 import { RoomService } from '../../services/room.service.js';
 import { activeUsers } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 import { checkSocketThrottle, isDuplicateSocketEvent } from '../socket-limits.js';
 import { resetVideoReady } from './video-ready.handler.js';
 
-const VIDEO_HOST_ONLY = 'Solo el anfitrión puede cambiar el video de la sala.';
+const VIDEO_MOD_ONLY = 'Solo el anfitrión o un co-anfitrión puede cambiar el video de la sala.';
 
 // Throttle de heartbeats por socket: mínimo 1 cada 2s (el excedente se
 // ignora). El cliente emite cada ~5s, así que es transparente en uso normal.
@@ -28,7 +28,7 @@ function isSyncAction(value: unknown): value is SyncAction {
 export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
   // 5. Video Playback Synchronization (play, pause, seek with latency compensation)
   // Por defecto cualquier participante puede sincronizar; con
-  // `settings.hostOnlySync === true` solo host/cohost (moderadores).
+  // `settings.hostOnlySync === true` solo leader/coleader (moderadores).
   socket.on(
     'sync-video',
     async (
@@ -53,7 +53,7 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       if (!member || member.roomId !== cleanRoomId || member.pending) return;
 
       // `hostOnlySync` (default OFF): bloqueado → solo moderadores
-      // (host o cohost) pueden sincronizar; el resto recibe `action-denied`.
+      // (leader o coleader) pueden sincronizar; el resto recibe `action-denied`.
       if (room.settings?.hostOnlySync === true) {
         if (!requireModerator(room, resolveSocketClaim(socket, data))) {
           denySocket(socket, 'sync-video', 'Solo el anfitrión controla la reproducción.');
@@ -99,7 +99,7 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // 6. Video Changed (solo host: la UI solo lo emite desde el panel del anfitrión)
+  // 6. Video Changed (anfitrión o co-anfitrión: la UI lo emite desde su panel)
   socket.on('video-changed', async (data: { roomId: string; video: IVideoMetadata } & PrivilegedPayload | undefined) => {
     if (!data || typeof data !== 'object') return;
     const { roomId, video } = data;
@@ -112,8 +112,8 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
     const cleanRoomId = roomId.toUpperCase().trim();
     const room = await RoomService.getRoomById(cleanRoomId);
     if (!room) return;
-    if (!requireHost(room, resolveSocketClaim(socket, data))) {
-      denySocket(socket, 'video-changed', VIDEO_HOST_ONLY);
+    if (!requireModerator(room, resolveSocketClaim(socket, data))) {
+      denySocket(socket, 'video-changed', VIDEO_MOD_ONLY);
       return;
     }
     if (
@@ -140,7 +140,7 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
     io.to(cleanRoomId).emit('video-changed', { video });
   });
 
-  // 6.1 Upload Progress broadcast (solo host: solo el anfitrión sube videos)
+  // 6.1 Upload Progress broadcast (anfitrión o co-anfitrión suben videos)
   socket.on(
     'upload-progress',
     async (data: { roomId: string; progress: number | null; fileName?: string } & PrivilegedPayload | undefined) => {
@@ -153,8 +153,8 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       const cleanRoomId = roomId.toUpperCase().trim();
       const room = await RoomService.getRoomById(cleanRoomId);
       if (!room) return;
-      if (!requireHost(room, resolveSocketClaim(socket, data))) {
-        denySocket(socket, 'upload-progress', VIDEO_HOST_ONLY);
+      if (!requireModerator(room, resolveSocketClaim(socket, data))) {
+        denySocket(socket, 'upload-progress', VIDEO_MOD_ONLY);
         return;
       }
       if (

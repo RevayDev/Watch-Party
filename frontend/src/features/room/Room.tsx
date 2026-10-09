@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { RoomHeader } from '../../components/RoomHeader';
 import { VideoPlayer } from '../player/VideoPlayer';
 import { CameraGrid } from '../../components/CameraGrid';
-import { HostExitModal } from '../../components/HostExitModal';
+import { LeaderExitModal } from '../../components/LeaderExitModal';
 import { MemberExitModal } from '../../components/MemberExitModal';
 import { RoomSettingsModal } from '../../components/RoomSettingsModal';
 import { WaitingApproval } from '../waiting/WaitingApproval';
@@ -15,7 +15,7 @@ import { RoomDrawer } from './components/RoomDrawer';
 export interface RoomProps {
   roomId: string;
   userName: string;
-  isHost: boolean;
+  isLeader: boolean;
   onLeave: () => void;
 }
 
@@ -23,8 +23,8 @@ export interface RoomProps {
  * Sala: composición (toda la lógica vive en useRoomSocket).
  * JSX movido verbatim desde pages/Room.tsx — CERO cambios visuales.
  */
-export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsHost, onLeave }) => {
-  const r = useRoomSocket({ roomId, userName, initialIsHost, onLeave });
+export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialIsLeader, onLeave }) => {
+  const r = useRoomSocket({ roomId, userName, initialIsLeader, onLeave });
 
 
 
@@ -89,7 +89,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
       <RoomHeader
         roomId={r.roomData.roomId}
         participantCount={r.roomData.participants.length}
-        isHost={r.isHost}
+        isLeader={r.isLeader}
         createdAt={r.roomData.createdAt}
         roomName={r.roomData.settings?.name}
         roomDescription={r.roomData.settings?.description}
@@ -110,10 +110,11 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isHost: initialIsH
           <VideoPlayer
             roomId={roomId}
             video={r.roomData.video}
-            isHost={r.isHost}
+            isLeader={r.isLeader || r.isCohost}
             onUploadVideo={r.handleUploadVideo}
             onSetVideoUrl={r.handleSetVideoUrl}
             uploadProgress={r.uploadProgress}
+            isVideoLoading={r.isVideoLoading}
             onSyncAction={r.handleSyncAction}
             onPlaybackHeartbeat={r.handlePlaybackHeartbeat}
             heartbeatIntervalMs={r.lowBandwidth || r.dataSaver ? 15000 : 2500}
@@ -148,7 +149,7 @@ onVideoReady={r.handleVideoReady}
               remotePeers={r.remotePeers}
               participants={r.roomData.participants}
               currentUserName={r.myName}
-              isHost={r.isHost}
+              isLeader={r.isLeader}
               isMicOn={r.isMicOn}
               isCameraOn={r.isCameraOn}
               peerMediaStates={r.peerMediaStates}
@@ -170,7 +171,7 @@ onVideoReady={r.handleVideoReady}
           myName={r.myName}
           roomData={r.roomData}
           userId={r.userId}
-          isHost={r.isHost}
+          isLeader={r.isLeader}
           peerMediaStates={r.peerMediaStates}
           isMicOn={r.isMicOn}
           isCameraOn={r.isCameraOn}
@@ -213,11 +214,11 @@ onVideoReady={r.handleVideoReady}
         <div className="meet-error-banner">📶 Señal débil: video pausado, seguís con audio</div>
       )}
 
-      <HostExitModal
-        isOpen={r.showHostExitModal}
+      <LeaderExitModal
+        isOpen={r.showLeaderExitModal}
         participantCount={r.roomData.participants.length}
         isTemporary={r.roomData.isTemporary !== false}
-        onClose={() => r.setShowHostExitModal(false)}
+        onClose={() => r.setShowLeaderExitModal(false)}
         onLeaveOnlyMe={r.handleLeaveOnlyMe}
         onDeleteRoomForAll={r.handleDeleteRoomForAll}
       />
@@ -250,7 +251,7 @@ onVideoReady={r.handleVideoReady}
           const next = !(r.roomData!.settings?.hostOnlySync === true);
           r.socket.emit('update-room-settings', { roomId, settings: { ...r.roomData!.settings, hostOnlySync: next }, ...buildSocketAuth(roomId, r.myName) });
         }}
-        canEdit={r.isHost}
+        canEdit={r.isLeader}
         dataSaver={r.dataSaver}
         fullscreenToasts={r.fullscreenToasts}
         reactionsEnabled={r.reactionsEnabled}

@@ -3,7 +3,7 @@ import { isNameTaken } from '../src/domain/room.entity.js';
 import type { IParticipant } from '../src/types/room.types.js';
 
 function p(name: string, userId?: string): IParticipant {
-  return { name, userId, isHost: false, role: 'member', joinedAt: new Date() };
+  return { name, userId, isLeader: false, role: 'member', joinedAt: new Date() };
 }
 
 describe('isNameTaken (H8)', () => {

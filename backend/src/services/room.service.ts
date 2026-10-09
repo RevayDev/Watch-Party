@@ -158,14 +158,14 @@ export class RoomService {
   }
 
   /**
-   * Create a new room with a host.
+   * Create a new room with a leader.
    *
    * DEMO (flag `DEMO_MODE`): tope de 5 salas vivas por servidor (429 con
    * mensaje exacto). Todas las salas son 'free' con `isTemporary` forzado
    * a true (ninguna sala permanente).
    * La sección crítica contar+crear va tras mutex en memoria (1 instancia).
    */
-  public static async createRoom(dto: CreateRoomDTO): Promise<{ room: IRoom; hostSecret: string }> {
+  public static async createRoom(dto: CreateRoomDTO): Promise<{ room: IRoom; leaderSecret: string }> {
     return createRoomMutex.run(async () => {
       if (isDemoMode()) {
         const liveRooms = await roomRepository.count();
@@ -175,7 +175,7 @@ export class RoomService {
       }
 
       const roomId = await this.getUniqueRoomCode();
-      const hostSecret = crypto.randomBytes(16).toString('hex');
+      const leaderSecret = crypto.randomBytes(16).toString('hex');
       const now = new Date();
 
       const plan = 'free' as const;
@@ -185,17 +185,17 @@ export class RoomService {
         : (dto.isTemporary !== undefined ? dto.isTemporary : true);
     const roomData: IRoom = {
       roomId,
-      hostName: dto.hostName.trim(),
-      hostSecret,
+      leaderName: dto.leaderName.trim(),
+      leaderSecret,
       status: 'waiting',
       isTemporary,
       plan,
       participants: [
         {
-          name: dto.hostName.trim(),
+          name: dto.leaderName.trim(),
           userId: dto.userId,
-          isHost: true,
-          role: 'host',
+          isLeader: true,
+          role: 'leader',
           joinedAt: now,
           device: 'Host Web',
         },
@@ -208,7 +208,7 @@ export class RoomService {
         allowMicReactivation: true,
         allowCamReactivation: true,
         isTemporary,
-        // timerEndsAt se establece cuando entra el primer participante no-host
+        // timerEndsAt se establece cuando entra el primer participante no-leader
         // (disparador: waiting → active). Ver joinRoomLocked.
       },
       createdAt: now,
@@ -216,7 +216,7 @@ export class RoomService {
     };
 
     const room = await roomRepository.create(roomData);
-      return { room, hostSecret };
+      return { room, leaderSecret };
     });
   }
 
@@ -300,20 +300,20 @@ export class RoomService {
       if (isDemoMode() && room.participants.length >= maxUsersForRoom(room)) {
         throw new DemoCapacityError('DEMO_ROOM_FULL', DEMO_ROOM_FULL_MESSAGE);
       }
-      const isHost = room.hostName.toLowerCase() === trimmedName.toLowerCase();
+      const isLeader = room.leaderName.toLowerCase() === trimmedName.toLowerCase();
       room.participants.push({
         name: trimmedName,
         userId,
-        isHost,
-        role: isHost ? 'host' : 'member',
+        isLeader,
+        role: isLeader ? 'leader' : 'member',
         joinedAt: new Date(),
         device,
       });
 
-      // ── Disparador: primer miembro (no-host) → waiting → active + timer ──
-      // Cuando entra el primer participante que no es el host y la sala aún
+      // ── Disparador: primer miembro (no-leader) → waiting → active + timer ──
+      // Cuando entra el primer participante que no es el leader y la sala aún
       // está en estado 'waiting', se activa el temporizador de 3 h 30 min.
-      if (!isHost && room.status === 'waiting') {
+      if (!isLeader && room.status === 'waiting') {
         room.status = 'active';
         if (room.settings && !room.settings.timerEndsAt) {
           room.settings.timerEndsAt = new Date(Date.now() + 210 * 60 * 1000).toISOString();
@@ -347,12 +347,12 @@ export class RoomService {
   }
 
   /**
-   * Change a participant's role (e.g. promote to cohost or demote)
+   * Change a participant's role (e.g. promote to coleader or demote)
    */
   public static async setParticipantRole(
     roomId: string,
     targetName: string,
-    newRole: 'cohost' | 'member'
+    newRole: 'coleader' | 'member'
   ): Promise<IRoom | null> {
     const cleanId = cleanIdOf(roomId);
     const room = await roomRepository.findById(cleanId);
@@ -360,7 +360,7 @@ export class RoomService {
     const target = room.participants.find(
       (p) => p.name.toLowerCase() === targetName.trim().toLowerCase()
     );
-    if (target && !target.isHost) {
+    if (target && !target.isLeader) {
       target.role = newRole;
       room.updatedAt = new Date();
       await roomRepository.save(room);
@@ -391,7 +391,7 @@ export class RoomService {
     const participant = room.participants.find(matches);
     if (participant) {
       participant.name = cleanNewName;
-      if (participant.isHost) room.hostName = cleanNewName;
+      if (participant.isLeader) room.leaderName = cleanNewName;
       room.updatedAt = new Date();
       await roomRepository.save(room);
     }
@@ -425,7 +425,7 @@ export class RoomService {
     const room = await roomRepository.findById(cleanId);
     if (!room) return null;
     const targetIndex = room.participants.findIndex(matches);
-    if (targetIndex !== -1 && !room.participants[targetIndex].isHost) {
+    if (targetIndex !== -1 && !room.participants[targetIndex].isLeader) {
       const removed = room.participants[targetIndex];
       room.participants = room.participants.filter((_, i) => i !== targetIndex);
       if (!room.kickedUsers) room.kickedUsers = [];
@@ -503,7 +503,7 @@ export class RoomService {
    *
    * DEMO: si la sala está llena y la solicitud añadiría un participante nuevo,
    * lanza `DemoCapacityError` SIN desencolar (la solicitud sigue en espera y
-   * el host puede aprobar más tarde). Todo ello bajo el mutex de la sala.
+   * el leader puede aprobar más tarde). Todo ello bajo el mutex de la sala.
    */
   public static async approveJoinRequest(
     roomId: string,
@@ -624,18 +624,18 @@ export class RoomService {
    * Transfer the Host role to another participant.
    *
    * - Localiza al objetivo por userId o nombre (trim/case-insensitive).
-   * - Si no existe o ya es host → no-op `{ room, newHostName: null, hostSecret: null }`.
-   * - Si sí: el host actual pasa a cohost y el objetivo a host; actualiza
-   *   `room.hostName`; rota `hostSecret` salvo `opts.rotateSecret === false`.
+   * - Si no existe o ya es leader → no-op `{ room, newLeaderName: null, leaderSecret: null }`.
+   * - Si sí: el leader actual pasa a coleader y el objetivo a leader; actualiza
+   *   `room.leaderName`; rota `leaderSecret` salvo `opts.rotateSecret === false`.
    */
-  public static async transferHost(
+  public static async transferLeader(
     roomId: string,
     target: { userId?: string; name?: string },
     opts: { rotateSecret?: boolean } = {}
-  ): Promise<{ room: IRoom | null; newHostName: string | null; hostSecret: string | null }> {
+  ): Promise<{ room: IRoom | null; newLeaderName: string | null; leaderSecret: string | null }> {
     const cleanId = cleanIdOf(roomId);
     const room = await roomRepository.findById(cleanId);
-    if (!room) return { room: null, newHostName: null, hostSecret: null };
+    if (!room) return { room: null, newLeaderName: null, leaderSecret: null };
 
     let participant: IParticipant | undefined;
     if (target.userId) {
@@ -645,36 +645,36 @@ export class RoomService {
       const lower = target.name.trim().toLowerCase();
       if (lower) participant = room.participants.find((p) => p.name.toLowerCase() === lower);
     }
-    if (!participant) return { room, newHostName: null, hostSecret: null };
-    if (participant.isHost === true || participant.role === 'host') {
-      return { room, newHostName: null, hostSecret: null };
+    if (!participant) return { room, newLeaderName: null, leaderSecret: null };
+    if (participant.isLeader === true || participant.role === 'leader') {
+      return { room, newLeaderName: null, leaderSecret: null };
     }
 
     for (const p of room.participants) {
-      if (p !== participant && (p.isHost === true || p.role === 'host')) {
-        p.isHost = false;
-        p.role = 'cohost';
+      if (p !== participant && (p.isLeader === true || p.role === 'leader')) {
+        p.isLeader = false;
+        p.role = 'coleader';
       }
     }
-    participant.isHost = true;
-    participant.role = 'host';
-    room.hostName = participant.name;
+    participant.isLeader = true;
+    participant.role = 'leader';
+    room.leaderName = participant.name;
     if (opts.rotateSecret !== false) {
-      room.hostSecret = crypto.randomBytes(16).toString('hex');
+      room.leaderSecret = crypto.randomBytes(16).toString('hex');
     }
     room.updatedAt = new Date();
     await roomRepository.save(room);
-    return { room, newHostName: participant.name, hostSecret: room.hostSecret ?? null };
+    return { room, newLeaderName: participant.name, leaderSecret: room.leaderSecret ?? null };
   }
 
   /**
-   * Remove a participant and transfer Host role to the next participant if the host left.
+   * Remove a participant and transfer Host role to the next participant if the leader left.
    */
   public static async removeParticipantAndTransferHost(
     roomId: string,
     userName: string,
     userId?: string
-  ): Promise<{ room: IRoom | null; newHostName: string | null }> {
+  ): Promise<{ room: IRoom | null; newLeaderName: string | null }> {
     const cleanId = cleanIdOf(roomId);
 
     const matches = (p: IParticipant): boolean => {
@@ -683,19 +683,19 @@ export class RoomService {
     };
 
     const room = await roomRepository.findById(cleanId);
-    if (!room) return { room: null, newHostName: null };
+    if (!room) return { room: null, newLeaderName: null };
 
-    let newHostName: string | null = null;
-    const wasHost = room.participants.some((p) => matches(p) && p.isHost);
+    let newLeaderName: string | null = null;
+    const wasLeader = room.participants.some((p) => matches(p) && p.isLeader);
 
     room.participants = room.participants.filter((p) => !matches(p));
 
-    if (wasHost && room.participants.length > 0) {
-      room.participants[0].isHost = true;
-      room.participants[0].role = 'host';
-      room.hostName = room.participants[0].name;
-      newHostName = room.participants[0].name;
-      console.log(`👑 Rol de Anfitrión transferido a: ${newHostName} en la sala ${cleanId}`);
+    if (wasLeader && room.participants.length > 0) {
+      room.participants[0].isLeader = true;
+      room.participants[0].role = 'leader';
+      room.leaderName = room.participants[0].name;
+      newLeaderName = room.participants[0].name;
+      console.log(`👑 Rol de Anfitrión transferido a: ${newLeaderName} en la sala ${cleanId}`);
     }
 
     room.updatedAt = new Date();
@@ -711,13 +711,13 @@ export class RoomService {
       console.log(`🧹 Demo: sala vacía [${cleanId}] eliminada para liberar cupo.`);
     }
 
-    return { room, newHostName };
+    return { room, newLeaderName };
   }
 
   /**
    * Delete room and cleanup its uploaded video file.
    * @param forceDeleteVideo  When true the video file is always removed from disk
-   *   (used when the host deliberately closes/deletes the room vs auto-cleanup).
+   *   (used when the leader deliberately closes/deletes the room vs auto-cleanup).
    */
   public static async deleteRoom(roomId: string, forceDeleteVideo = false): Promise<boolean> {
     const cleanId = cleanIdOf(roomId);
@@ -730,7 +730,7 @@ export class RoomService {
     await roomRepository.delete(cleanId);
 
     // Delete the physical video file if:
-    //  1. forceDeleteVideo was requested (host explicitly destroyed the room), or
+    //  1. forceDeleteVideo was requested (leader explicitly destroyed the room), or
     //  2. the room was temporary (auto-cleanup)
     // For URL/HLS sources there is no physical file to remove.
     const hasLocalFile = sourceType === 'file' || !sourceType;

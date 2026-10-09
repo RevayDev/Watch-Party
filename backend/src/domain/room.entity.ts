@@ -5,9 +5,9 @@ export function normalizeRoomId(roomId: string): string {
   return roomId.toUpperCase().trim();
 }
 
-/** ¿Es este participante el host de la sala? */
-export function isHostParticipant(p: IParticipant): boolean {
-  return p.isHost === true || p.role === 'host';
+/** ¿Es este participante el leader de la sala? */
+export function isLeaderParticipant(p: IParticipant): boolean {
+  return p.isLeader === true || p.role === 'leader';
 }
 
 /** Identidad estable: userId si existe, si no nombre (legacy). */
@@ -65,7 +65,7 @@ export function findParticipant(
   });
 }
 
-/** Resuelve si alguien es host efectivo (flag del cliente, nombre del host o rol). */
+/** Resuelve si alguien es leader efectivo (flag del cliente, nombre del leader o rol). */
 export function resolveIsHost(
   clientClaimedHost: boolean,
   room: IRoom | null | undefined,
@@ -74,8 +74,8 @@ export function resolveIsHost(
 ): boolean {
   return (
     clientClaimedHost ||
-    (room != null && room.hostName.toLowerCase() === cleanName.toLowerCase()) ||
-    Boolean(participantMatch?.isHost)
+    (room != null && room.leaderName.toLowerCase() === cleanName.toLowerCase()) ||
+    Boolean(participantMatch?.isLeader)
   );
 }
 

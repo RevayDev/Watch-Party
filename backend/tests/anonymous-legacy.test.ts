@@ -28,8 +28,8 @@ import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
 
 const created: string[] = [];
 
-async function makeRoom(hostName = 'Host'): Promise<string> {
-  const { room } = await RoomService.createRoom({ hostName });
+async function makeRoom(leaderName = 'Host'): Promise<string> {
+  const { room } = await RoomService.createRoom({ leaderName });
   created.push(room.roomId);
   return room.roomId;
 }
@@ -77,7 +77,7 @@ describe('merge legacy: dos anónimos con el mismo nombre son la misma persona',
 
   it('isAlreadyParticipant/findParticipant tratan a los dos anónimos como uno (criterio del socket)', () => {
     const participants = [
-      { name: 'Ana', isHost: false, role: 'member' as const, joinedAt: new Date() },
+      { name: 'Ana', isLeader: false, role: 'member' as const, joinedAt: new Date() },
     ];
     // Los llamantes reales (socket join-room) ya pasan el nombre limpio;
     // estas funciones comparan case-insensitive sobre el nombre limpio.
@@ -110,8 +110,8 @@ describe('el merge nunca suplanta identidades registradas', () => {
 describe('sin fugas de estado efímero en el ciclo anónimo', () => {
   it('activeUsers se indexa por socket.id: dos sockets anónimos con el mismo nombre coexisten y se limpian', () => {
     const before = activeUsers.size;
-    activeUsers.set('s-a1', { socketId: 's-a1', roomId: 'R', userName: 'Ana', isHost: false });
-    activeUsers.set('s-a2', { socketId: 's-a2', roomId: 'R', userName: 'Ana', isHost: false });
+    activeUsers.set('s-a1', { socketId: 's-a1', roomId: 'R', userName: 'Ana', isLeader: false });
+    activeUsers.set('s-a2', { socketId: 's-a2', roomId: 'R', userName: 'Ana', isLeader: false });
     expect(activeUsers.size).toBe(before + 2);
     // Salida de ambos (disconnect/leave borra por socket.id): sin residuos.
     activeUsers.delete('s-a1');

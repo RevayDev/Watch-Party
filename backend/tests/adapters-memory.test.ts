@@ -22,12 +22,12 @@ function makeRoom(roomId: string): IRoom {
   const now = new Date();
   return {
     roomId,
-    hostName: 'Host',
-    hostSecret: 'secret',
+    leaderName: 'Host',
+    leaderSecret: 'secret',
     status: 'waiting',
     isTemporary: true,
     participants: [
-      { name: 'Host', isHost: true, role: 'host', joinedAt: now },
+      { name: 'Host', isLeader: true, role: 'leader', joinedAt: now },
     ],
     joinRequests: [],
     kickedUsers: [],
@@ -69,9 +69,9 @@ describe('MemoryRoomRepository: contrato del adaptador en memoria', () => {
     const id = uniqueId('ADP');
     await repo.create(makeRoom(id));
     const found = (await repo.findById(id)) as IRoom;
-    found.hostName = 'Otro';
+    found.leaderName = 'Otro';
     await repo.save(found);
-    expect((await repo.findById(id))?.hostName).toBe('Otro');
+    expect((await repo.findById(id))?.leaderName).toBe('Otro');
     expect(await repo.delete(` ${id.toLowerCase()} `)).toBe(true);
     expect(await repo.delete(id)).toBe(false);
     expect(await repo.findById(id)).toBeNull();

@@ -43,8 +43,8 @@ import {
 interface HomeProps {
   initialRoomCode?: string | null;
   onJoinRoom: (code: string, name: string) => void;
-  onRoomCreated: (roomId: string, hostName: string, hostSecret: string) => void;
-  onReconnectHost: (roomId: string, hostName: string) => void;
+  onRoomCreated: (roomId: string, leaderName: string, leaderSecret: string) => void;
+  onReconnectHost: (roomId: string, leaderName: string) => void;
 }
 
 /**
@@ -68,7 +68,7 @@ export const Home: React.FC<HomeProps> = ({
   const [showJoinModal, setShowJoinModal] = useState(Boolean(initialRoomCode));
 
   // Create room modal form state
-  const [createHostName, setCreateHostName] = useState("");
+  const [createLeaderName, setCreateLeaderName] = useState("");
   const [isTemporary, setIsTemporary] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -128,8 +128,8 @@ export const Home: React.FC<HomeProps> = ({
   }, []);
 
   const handleEnterRecentRoom = (room: RecentRoom) => {
-    if (room.role === "host") {
-      onReconnectHost(room.roomId, room.hostName);
+    if (room.role === "leader") {
+      onReconnectHost(room.roomId, room.leaderName);
       return;
     }
     const lastUsername = getLastUsername();
@@ -164,7 +164,7 @@ export const Home: React.FC<HomeProps> = ({
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createHostName.trim()) {
+    if (!createLeaderName.trim()) {
       setCreateError("Por favor ingresa tu nombre");
       return;
     }
@@ -173,7 +173,7 @@ export const Home: React.FC<HomeProps> = ({
       setCreateLoading(true);
       setCreateError("");
       const data = await ApiService.createRoom(
-        createHostName.trim(),
+        createLeaderName.trim(),
         isTemporary,
       );
       setShowCreateModal(false);
@@ -183,7 +183,7 @@ export const Home: React.FC<HomeProps> = ({
       if (demo) {
         void refreshDemoAvailability();
       }
-      onRoomCreated(data.roomId, data.hostName, data.hostSecret);
+      onRoomCreated(data.roomId, data.leaderName, data.leaderSecret);
     } catch (err: any) {
       setCreateError(err.message || "Error al conectar con el servidor.");
     } finally {
@@ -750,8 +750,8 @@ export const Home: React.FC<HomeProps> = ({
       <CreateRoomModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        hostName={createHostName}
-        setHostName={setCreateHostName}
+        leaderName={createLeaderName}
+        setLeaderName={setCreateLeaderName}
         isTemporary={isTemporary}
         setIsTemporary={setIsTemporary}
         loading={createLoading}

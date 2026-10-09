@@ -66,20 +66,20 @@ export function formatRemaining(ms: number): string {
 }
 
 /* ── Auth para endpoints/emits privilegiados (contrato con backend) ─────────
- * El backend acepta `hostSecret?`, `requesterUserId?`, `requesterName?` en
- * los payloads socket privilegiados y los headers `x-host-secret`,
+ * El backend acepta `leaderSecret?`, `requesterUserId?`, `requesterName?` en
+ * los payloads socket privilegiados y los headers `x-leader-secret`,
  * `x-user-id`, `x-user-name` en REST. Los campos solo se envían cuando hay
  * valor (sin credenciales == comportamiento de invitado, como hoy).
  */
 
-/** hostSecret guardado en la sesión de host, solo si es de esta sala. */
+/** leaderSecret guardado en la sesión de leader, solo si es de esta sala. */
 export function getStoredHostSecret(roomId: string): string | undefined {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.HOST_SESSION);
+    const raw = localStorage.getItem(STORAGE_KEYS.LEADER_SESSION);
     if (!raw) return undefined;
     const parsed = JSON.parse(raw);
-    if (parsed?.roomId?.toUpperCase() === roomId.toUpperCase() && parsed.hostSecret) {
-      return String(parsed.hostSecret);
+    if (parsed?.roomId?.toUpperCase() === roomId.toUpperCase() && parsed.leaderSecret) {
+      return String(parsed.leaderSecret);
     }
     return undefined;
   } catch {
@@ -123,7 +123,7 @@ export function getStoredUserName(): string | undefined {
 }
 
 export interface SocketAuth {
-  hostSecret?: string;
+  leaderSecret?: string;
   requesterUserId?: string;
   requesterName?: string;
 }
@@ -131,8 +131,8 @@ export interface SocketAuth {
 /** Credenciales para emits socket privilegiados (solo campos con valor). */
 export function buildSocketAuth(roomId: string, requesterName?: string): SocketAuth {
   const auth: SocketAuth = {};
-  const hostSecret = getStoredHostSecret(roomId);
-  if (hostSecret) auth.hostSecret = hostSecret;
+  const leaderSecret = getStoredHostSecret(roomId);
+  if (leaderSecret) auth.leaderSecret = leaderSecret;
   const userId = getStoredUserId();
   if (userId) auth.requesterUserId = userId;
   const name = requesterName?.trim() || getStoredUserName();
@@ -143,8 +143,8 @@ export function buildSocketAuth(roomId: string, requesterName?: string): SocketA
 /** Headers REST para endpoints privilegiados (solo los que tienen valor). */
 export function buildRestAuthHeaders(roomId: string, requesterName?: string): Record<string, string> {
   const headers: Record<string, string> = {};
-  const hostSecret = getStoredHostSecret(roomId);
-  if (hostSecret) headers['x-host-secret'] = hostSecret;
+  const leaderSecret = getStoredHostSecret(roomId);
+  if (leaderSecret) headers['x-leader-secret'] = leaderSecret;
   const userId = getStoredUserId();
   if (userId) headers['x-user-id'] = userId;
   const name = requesterName?.trim() || getStoredUserName();
@@ -153,23 +153,23 @@ export function buildRestAuthHeaders(roomId: string, requesterName?: string): Re
 }
 
 /**
- * Guarda la sesión de host. Si no se provee hostSecret, se preserva el ya
+ * Guarda la sesión de leader. Si no se provee leaderSecret, se preserva el ya
  * guardado para esa sala (para no borrarlo en re-entradas sin secreto).
  */
-export function saveHostSession(roomId: string, hostName: string, hostSecret?: string): void {
+export function saveLeaderSession(roomId: string, leaderName: string, leaderSecret?: string): void {
   try {
-    let secret = hostSecret;
+    let secret = leaderSecret;
     if (!secret) {
       secret = getStoredHostSecret(roomId);
     }
-    const sessionObj: { roomId: string; hostName: string; hostSecret?: string } = {
+    const sessionObj: { roomId: string; leaderName: string; leaderSecret?: string } = {
       roomId,
-      hostName,
+      leaderName,
     };
     if (secret) {
-      sessionObj.hostSecret = secret;
+      sessionObj.leaderSecret = secret;
     }
-    localStorage.setItem(STORAGE_KEYS.HOST_SESSION, JSON.stringify(sessionObj));
+    localStorage.setItem(STORAGE_KEYS.LEADER_SESSION, JSON.stringify(sessionObj));
   } catch {
     // storage unavailable → se ignora (igual que el resto de persistencia)
   }
@@ -190,7 +190,7 @@ export function resolveJoinRejectedFeedback(
       message: message || 'Ese nombre ya está en uso en esta sala. Vuelve al inicio y entra con otro nombre.',
     };
   }
-  // Demo: la sala alcanzó su cupo (5 participantes incl. host). El backend
+  // Demo: la sala alcanzó su cupo (5 participantes incl. leader). El backend
   // envía reason 'room-full' con el mensaje EXACTO 'Esta sala está llena.';
   // si hay mensaje del servidor, ese texto manda (contrato).
   if (reason === 'room-full') {

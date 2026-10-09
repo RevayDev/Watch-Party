@@ -83,13 +83,13 @@ afterAll(async () => {
 });
 
 async function makeRoomWithMembers() {
-  const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+  const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
   created.push(room.roomId);
-  await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+  await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
   await RoomService.joinRoom(room.roomId, 'Cohost', 'Web', 'u-co');
-  await RoomService.setParticipantRole(room.roomId, 'Cohost', 'cohost');
+  await RoomService.setParticipantRole(room.roomId, 'Cohost', 'coleader');
   await RoomService.joinRoom(room.roomId, 'Miembro', 'Web', 'u-mem');
-  return { roomId: room.roomId, hostSecret };
+  return { roomId: room.roomId, leaderSecret };
 }
 
 describe('socket guards: moderación (requireModerator)', () => {
@@ -97,7 +97,7 @@ describe('socket guards: moderación (requireModerator)', () => {
     const { roomId } = await makeRoomWithMembers();
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-mem');
-    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isHost: false, userId: 'u-mem' });
+    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isLeader: false, userId: 'u-mem' });
     registerModerationHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'moderate-mute-user', { roomId, targetUserName: 'Cohost' });
@@ -108,11 +108,11 @@ describe('socket guards: moderación (requireModerator)', () => {
     expect(roomEmits.some((e) => e.event === 'force-mute-user')).toBe(false);
   });
 
-  it('cohost sí puede mutar (rol del servidor)', async () => {
+  it('coleader sí puede mutar (rol del servidor)', async () => {
     const { roomId } = await makeRoomWithMembers();
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-co');
-    activeUsers.set('s-co', { socketId: 's-co', roomId, userName: 'Cohost', isHost: false, userId: 'u-co' });
+    activeUsers.set('s-co', { socketId: 's-co', roomId, userName: 'Cohost', isLeader: false, userId: 'u-co' });
     registerModerationHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'moderate-mute-user', { roomId, targetUserName: 'Miembro' });
@@ -121,13 +121,13 @@ describe('socket guards: moderación (requireModerator)', () => {
     expect(roomEmits.some((e) => e.event === 'force-mute-user')).toBe(true);
   });
 
-  it('hostSecret válido autoriza aunque el socket sea anónimo', async () => {
-    const { roomId, hostSecret } = await makeRoomWithMembers();
+  it('leaderSecret válido autoriza aunque el socket sea anónimo', async () => {
+    const { roomId, leaderSecret } = await makeRoomWithMembers();
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-x');
     registerModerationHandlers(io, sock.socket);
 
-    await fire(sock.handlers, 'moderate-mute-all', { roomId, hostSecret });
+    await fire(sock.handlers, 'moderate-mute-all', { roomId, leaderSecret });
 
     expect(lastEmitted(sock.emitted, 'action-denied')).toHaveLength(0);
     expect(roomEmits.some((e) => e.event === 'force-mute-all')).toBe(true);
@@ -137,7 +137,7 @@ describe('socket guards: moderación (requireModerator)', () => {
     const { roomId } = await makeRoomWithMembers();
     const { io } = makeIo();
     const sock = makeSocket('s-mem');
-    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isHost: false, userId: 'u-mem' });
+    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isLeader: false, userId: 'u-mem' });
     registerModerationHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'kick-user', {
@@ -156,7 +156,7 @@ describe('socket guards: moderación (requireModerator)', () => {
     const { roomId } = await makeRoomWithMembers();
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-mem');
-    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isHost: false, userId: 'u-mem' });
+    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isLeader: false, userId: 'u-mem' });
     registerModerationHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'rename-participant', {
@@ -179,12 +179,12 @@ describe('socket guards: moderación (requireModerator)', () => {
   });
 });
 
-describe('socket guards: close-room y settings (solo host)', () => {
+describe('socket guards: close-room y settings (solo leader)', () => {
   it('miembro no puede cerrar: action-denied y la sala sigue', async () => {
     const { roomId } = await makeRoomWithMembers();
     const { io } = makeIo();
     const sock = makeSocket('s-mem');
-    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isHost: false, userId: 'u-mem' });
+    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isLeader: false, userId: 'u-mem' });
     registerJoinApprovalHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'close-room', { roomId });
@@ -193,11 +193,11 @@ describe('socket guards: close-room y settings (solo host)', () => {
     expect(await RoomService.getRoomById(roomId)).not.toBeNull();
   });
 
-  it('cohost no puede cerrar (solo host), pero el host con secreto sí', async () => {
-    const { roomId, hostSecret } = await makeRoomWithMembers();
+  it('coleader no puede cerrar (solo leader), pero el leader con secreto sí', async () => {
+    const { roomId, leaderSecret } = await makeRoomWithMembers();
     const { io } = makeIo();
     const co = makeSocket('s-co');
-    activeUsers.set('s-co', { socketId: 's-co', roomId, userName: 'Cohost', isHost: false, userId: 'u-co' });
+    activeUsers.set('s-co', { socketId: 's-co', roomId, userName: 'Cohost', isLeader: false, userId: 'u-co' });
     registerJoinApprovalHandlers(io, co.socket);
     await fire(co.handlers, 'close-room', { roomId });
     expect(lastEmitted(co.emitted, 'action-denied')[0]).toMatchObject({ event: 'close-room' });
@@ -205,16 +205,16 @@ describe('socket guards: close-room y settings (solo host)', () => {
 
     const anon = makeSocket('s-anon');
     registerJoinApprovalHandlers(io, anon.socket);
-    await fire(anon.handlers, 'close-room', { roomId, hostSecret });
+    await fire(anon.handlers, 'close-room', { roomId, leaderSecret });
     expect(await RoomService.getRoomById(roomId)).toBeNull();
     created.pop();
   });
 
-  it('settings inválidos del host → settings-error y nada aplicado', async () => {
+  it('settings inválidos del leader → settings-error y nada aplicado', async () => {
     const { roomId } = await makeRoomWithMembers();
     const { io } = makeIo();
-    const sock = makeSocket('s-host');
-    activeUsers.set('s-host', { socketId: 's-host', roomId, userName: 'Host', isHost: true, userId: 'u-host' });
+    const sock = makeSocket('s-leader');
+    activeUsers.set('s-leader', { socketId: 's-leader', roomId, userName: 'Host', isLeader: true, userId: 'u-leader' });
     registerSettingsHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'update-room-settings', {
@@ -229,12 +229,12 @@ describe('socket guards: close-room y settings (solo host)', () => {
     expect(stored?.settings?.muteOnEntry).toBe(false);
   });
 
-  it('settings de no-host → action-denied (aunque el socket diga isHost)', async () => {
+  it('settings de no-leader → action-denied (aunque el socket diga isLeader)', async () => {
     const { roomId } = await makeRoomWithMembers();
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-mem');
-    // Cliente que miente con isHost=true en el directorio: el servidor manda.
-    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isHost: true, userId: 'u-mem' });
+    // Cliente que miente con isLeader=true en el directorio: el servidor manda.
+    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isLeader: true, userId: 'u-mem' });
     registerSettingsHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'update-room-settings', { roomId, settings: { muteOnEntry: true } });
@@ -248,7 +248,7 @@ describe('socket guards: close-room y settings (solo host)', () => {
 
 describe('socket join-room: colisión de nombres (H8)', () => {
   it('nombre de otra identidad → join-rejected name-taken, sin agregar', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
 
@@ -266,7 +266,7 @@ describe('socket join-room: colisión de nombres (H8)', () => {
   });
 
   it('rejoin con mismo userId no colisiona', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
 
@@ -283,7 +283,7 @@ describe('socket join-room: colisión de nombres (H8)', () => {
 
 describe('socket disconnect: gracia de refresh (H3)', () => {
   it('con userId difiere la eliminación; user-left no se emite aún', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
 
@@ -293,7 +293,7 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
       socketId: 's-ana',
       roomId: room.roomId,
       userName: 'Ana',
-      isHost: false,
+      isLeader: false,
       userId: 'u-ana',
     });
     registerJoinApprovalHandlers(io, sock.socket);
@@ -307,7 +307,7 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
   });
 
   it('sin userId la eliminación sigue inmediata', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Anon', 'Web');
 
@@ -317,7 +317,7 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
       socketId: 's-anon',
       roomId: room.roomId,
       userName: 'Anon',
-      isHost: false,
+      isLeader: false,
     });
     registerJoinApprovalHandlers(io, sock.socket);
 
@@ -329,10 +329,10 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
   });
 
   it('rejoin dentro de la ventana cancela la gracia y conserva el rol', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Ayudante', 'Web', 'u-ay');
-    await RoomService.setParticipantRole(room.roomId, 'Ayudante', 'cohost');
+    await RoomService.setParticipantRole(room.roomId, 'Ayudante', 'coleader');
 
     const { io } = makeIo();
     const sock = makeSocket('s-ay');
@@ -340,7 +340,7 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
       socketId: 's-ay',
       roomId: room.roomId,
       userName: 'Ayudante',
-      isHost: false,
+      isLeader: false,
       userId: 'u-ay',
     });
     registerJoinApprovalHandlers(io, sock.socket);
@@ -353,11 +353,11 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
 
     expect(hasPendingGrace(room.roomId, 'u-ay')).toBe(false);
     const stored = await RoomService.getRoomById(room.roomId);
-    expect(stored?.participants.find((p) => p.userId === 'u-ay')?.role).toBe('cohost');
+    expect(stored?.participants.find((p) => p.userId === 'u-ay')?.role).toBe('coleader');
   });
 
   it('approve-join de no-moderador se deniega sin efectos', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.updateSettings(room.roomId, { requireApproval: true });
     await RoomService.joinRoom(room.roomId, 'Miembro', 'Web', 'u-mem');
@@ -369,7 +369,7 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
       socketId: 's-mem',
       roomId: room.roomId,
       userName: 'Miembro',
-      isHost: false,
+      isLeader: false,
       userId: 'u-mem',
     });
     registerJoinApprovalHandlers(io, sock.socket);
@@ -386,7 +386,7 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
     const { roomId } = await makeRoomWithMembers();
     const { io } = makeIo();
     const sock = makeSocket('s-mem');
-    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isHost: false, userId: 'u-mem' });
+    activeUsers.set('s-mem', { socketId: 's-mem', roomId, userName: 'Miembro', isLeader: false, userId: 'u-mem' });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId, action: 'play', currentTime: 10 });
@@ -396,11 +396,11 @@ describe('socket disconnect: gracia de refresh (H3)', () => {
     expect(sock.toEmitted.some((e) => e.event === 'sync-video')).toBe(true);
   });
 
-  it('sync-video: host o cohost sí pueden emitir play/pause/seek', async () => {
+  it('sync-video: leader o coleader sí pueden emitir play/pause/seek', async () => {
     const { roomId } = await makeRoomWithMembers();
     const { io } = makeIo();
     const sock = makeSocket('s-co');
-    activeUsers.set('s-co', { socketId: 's-co', roomId, userName: 'Cohost', isHost: false, userId: 'u-co' });
+    activeUsers.set('s-co', { socketId: 's-co', roomId, userName: 'Cohost', isLeader: false, userId: 'u-co' });
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId, action: 'play', currentTime: 15 });

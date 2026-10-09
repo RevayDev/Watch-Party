@@ -46,18 +46,18 @@ afterAll(async () => {
 
 describe('RoomController.create: validaciones', () => {
   it.each([[undefined], [''], ['   '], [123]])(
-    'responde 400 cuando hostName es inválido (%s)',
-    async (hostName) => {
-      const req: any = { body: { hostName } };
+    'responde 400 cuando leaderName es inválido (%s)',
+    async (leaderName) => {
+      const req: any = { body: { leaderName } };
       const res = mockRes();
       await RoomController.create(req, res, next);
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.body).toMatchObject({ error: 'hostName is required' });
+      expect(res.body).toMatchObject({ error: 'leaderName is required' });
     }
   );
 
   it('crea la sala y responde 201', async () => {
-    const req: any = { body: { hostName: 'Anfitriona', isTemporary: false } };
+    const req: any = { body: { leaderName: 'Anfitriona', isTemporary: false } };
     const res = mockRes();
     await RoomController.create(req, res, next);
     expect(res.status).toHaveBeenCalledWith(201);
@@ -69,7 +69,7 @@ describe('RoomController.create: validaciones', () => {
 
 describe('RoomController.join: validaciones y puerta de aprobación', () => {
   it('responde 400 sin userName', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'H' });
+    const { room } = await RoomService.createRoom({ leaderName: 'H' });
     created.push(room.roomId);
     const req: any = { params: { roomId: room.roomId }, body: {} };
     const res = mockRes();
@@ -85,7 +85,7 @@ describe('RoomController.join: validaciones y puerta de aprobación', () => {
   });
 
   it('con requireApproval, el invitado NO entra a participantes (pendingApproval)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'H' });
+    const { room } = await RoomService.createRoom({ leaderName: 'H' });
     created.push(room.roomId);
     await RoomService.updateSettings(room.roomId, { requireApproval: true });
 
@@ -98,8 +98,8 @@ describe('RoomController.join: validaciones y puerta de aprobación', () => {
     expect(stored?.participants.some((p) => p.name === 'Invitado')).toBe(false);
   });
 
-  it('con requireApproval, el host sí entra sin puerta', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'ElHost' });
+  it('con requireApproval, el leader sí entra sin puerta', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'ElHost' });
     created.push(room.roomId);
     await RoomService.updateSettings(room.roomId, { requireApproval: true });
 
@@ -117,13 +117,13 @@ describe('RoomController.getById', () => {
     await RoomController.getById(missing, resMissing, next);
     expect(resMissing.status).toHaveBeenCalledWith(404);
 
-    const { room } = await RoomService.createRoom({ hostName: 'H' });
+    const { room } = await RoomService.createRoom({ leaderName: 'H' });
     created.push(room.roomId);
     const req: any = { params: { roomId: room.roomId } };
     const res = mockRes();
     await RoomController.getById(req, res, next);
     expect(res.body.roomId).toBe(room.roomId);
-    // Nunca exponer el secreto del host por GET público
-    expect(res.body.hostSecret).toBeUndefined();
+    // Nunca exponer el secreto del leader por GET público
+    expect(res.body.leaderSecret).toBeUndefined();
   });
 });

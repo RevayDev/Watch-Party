@@ -73,7 +73,7 @@ function createMockSocket(connected: boolean): MockSocket {
 
 const mockRoom: IRoomData = {
   roomId: 'ABC123',
-  hostName: 'Ana',
+  leaderName: 'Ana',
   status: 'active',
   participants: [],
   createdAt: new Date().toISOString(),
@@ -85,7 +85,7 @@ function setup(connected: boolean) {
   vi.spyOn(ApiService, 'getRoom').mockResolvedValue(mockRoom);
   const onLeave = vi.fn();
   const hook = renderHook(() =>
-    useRoomSocket({ roomId: 'ABC123', userName: 'Beto', initialIsHost: false, onLeave })
+    useRoomSocket({ roomId: 'ABC123', userName: 'Beto', initialIsLeader: false, onLeave })
   );
   return { ...hook, mockSocket, onLeave };
 }
@@ -247,11 +247,11 @@ describe('useRoomSocket (eventos socket críticos)', () => {
     expect(result.current.awaitingApproval).toBe(true);
     localStorage.setItem(
       'watchparty_host_session',
-      JSON.stringify({ roomId: 'ABC123', hostName: 'Beto', hostSecret: 's3cr3t' })
+      JSON.stringify({ roomId: 'ABC123', leaderName: 'Beto', leaderSecret: 's3cr3t' })
     );
     localStorage.setItem(
       'watchparty_recent_rooms',
-      JSON.stringify([{ roomId: 'ABC123', hostName: 'Beto', role: 'guest', lastJoined: Date.now() }])
+      JSON.stringify([{ roomId: 'ABC123', leaderName: 'Beto', role: 'guest', lastJoined: Date.now() }])
     );
     act(() => {
       mockSocket._fire('join-rejected', { reason: 'rejected', message: 'Sala llena' });
@@ -271,7 +271,7 @@ describe('useRoomSocket (eventos socket críticos)', () => {
     await waitForSubscribed(mockSocket);
     localStorage.setItem(
       'watchparty_host_session',
-      JSON.stringify({ roomId: 'ABC123', hostName: 'Beto' })
+      JSON.stringify({ roomId: 'ABC123', leaderName: 'Beto' })
     );
     act(() => {
       mockSocket._fire('join-rejected', { reason: 'name-taken' });
@@ -290,11 +290,11 @@ describe('useRoomSocket (eventos socket críticos)', () => {
     await waitForSubscribed(mockSocket);
     localStorage.setItem(
       'watchparty_host_session',
-      JSON.stringify({ roomId: 'ABC123', hostName: 'Beto' })
+      JSON.stringify({ roomId: 'ABC123', leaderName: 'Beto' })
     );
     localStorage.setItem(
       'watchparty_recent_rooms',
-      JSON.stringify([{ roomId: 'ABC123', hostName: 'Beto', role: 'guest', lastJoined: Date.now() }])
+      JSON.stringify([{ roomId: 'ABC123', leaderName: 'Beto', role: 'guest', lastJoined: Date.now() }])
     );
     act(() => {
       mockSocket._fire('user-kicked', {
@@ -318,11 +318,11 @@ describe('useRoomSocket (eventos socket críticos)', () => {
     await waitForSubscribed(mockSocket);
     localStorage.setItem(
       'watchparty_host_session',
-      JSON.stringify({ roomId: 'ABC123', hostName: 'Beto' })
+      JSON.stringify({ roomId: 'ABC123', leaderName: 'Beto' })
     );
     localStorage.setItem(
       'watchparty_recent_rooms',
-      JSON.stringify([{ roomId: 'ABC123', hostName: 'Beto', role: 'guest', lastJoined: Date.now() }])
+      JSON.stringify([{ roomId: 'ABC123', leaderName: 'Beto', role: 'guest', lastJoined: Date.now() }])
     );
     act(() => {
       mockSocket._fire('room-closed', { message: 'La sala fue cerrada por el anfitrión' });
@@ -493,7 +493,7 @@ describe('useRoomSocket (eventos socket críticos)', () => {
   });
 });
 
-describe('useRoomSocket (hostOnlySync + host-secret)', () => {
+describe('useRoomSocket (hostOnlySync + leader-secret)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -520,7 +520,7 @@ describe('useRoomSocket (hostOnlySync + host-secret)', () => {
     await waitFor(() => expect(result.current.roomData).not.toBeNull());
     lockRoom(mockSocket, {
       participants: [
-        { name: 'Beto', isHost: false, role: 'member', joinedAt: new Date().toISOString() },
+        { name: 'Beto', isLeader: false, role: 'member', joinedAt: new Date().toISOString() },
       ],
       settings: { hostOnlySync: true },
     });
@@ -535,11 +535,11 @@ describe('useRoomSocket (hostOnlySync + host-secret)', () => {
     );
   });
 
-  it('handleSyncAction emite cuando el usuario es host aunque esté locked', async () => {
+  it('handleSyncAction emite cuando el usuario es leader aunque esté locked', async () => {
     const { mockSocket, result } = setup(false);
     await waitFor(() => expect(result.current.roomData).not.toBeNull());
-    lockRoom(mockSocket, { isHost: true, settings: { hostOnlySync: true } });
-    expect(result.current.isHost).toBe(true);
+    lockRoom(mockSocket, { isLeader: true, settings: { hostOnlySync: true } });
+    expect(result.current.isLeader).toBe(true);
     mockSocket.emit.mockClear();
     act(() => {
       result.current.handleSyncAction('pause', 12);
@@ -550,12 +550,12 @@ describe('useRoomSocket (hostOnlySync + host-secret)', () => {
     );
   });
 
-  it('handleSyncAction emite cuando el usuario es cohost aunque esté locked', async () => {
+  it('handleSyncAction emite cuando el usuario es coleader aunque esté locked', async () => {
     const { mockSocket, result } = setup(false);
     await waitFor(() => expect(result.current.roomData).not.toBeNull());
     lockRoom(mockSocket, {
       participants: [
-        { name: 'Beto', isHost: false, role: 'cohost', joinedAt: new Date().toISOString() },
+        { name: 'Beto', isLeader: false, role: 'coleader', joinedAt: new Date().toISOString() },
       ],
       settings: { hostOnlySync: true },
     });
@@ -583,36 +583,36 @@ describe('useRoomSocket (hostOnlySync + host-secret)', () => {
     );
   });
 
-  it("host-secret guarda la sesión y notifica 'Ahora eres el anfitrión'", async () => {
+  it("leader-secret guarda la sesión y notifica 'Ahora eres el anfitrión'", async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { mockSocket } = setup(false);
     await waitForSubscribed(mockSocket);
     act(() => {
-      mockSocket._fire('host-secret', { hostSecret: 'nuevo-secreto' });
+      mockSocket._fire('leader-secret', { leaderSecret: 'nuevo-secreto' });
     });
     expect(JSON.parse(localStorage.getItem('watchparty_host_session') ?? '{}')).toMatchObject({
       roomId: 'ABC123',
-      hostSecret: 'nuevo-secreto',
+      leaderSecret: 'nuevo-secreto',
     });
     expect(logSpy).toHaveBeenCalledWith('[notify:success]', 'Ahora eres el anfitrión de la sala.');
   });
 
-  it('host-secret sin secreto no toca la sesión ni notifica', async () => {
+  it('leader-secret sin secreto no toca la sesión ni notifica', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { mockSocket } = setup(false);
     await waitForSubscribed(mockSocket);
     act(() => {
-      mockSocket._fire('host-secret', {});
+      mockSocket._fire('leader-secret', {});
     });
     expect(localStorage.getItem('watchparty_host_session')).toBeNull();
     expect(logSpy).not.toHaveBeenCalledWith('[notify:success]', expect.anything());
   });
 
-  it("limpia el listener 'host-secret' (socket.off) al desmontar", async () => {
+  it("limpia el listener 'leader-secret' (socket.off) al desmontar", async () => {
     const { mockSocket, unmount } = setup(false);
     await waitForSubscribed(mockSocket);
-    expect(mockSocket.on).toHaveBeenCalledWith('host-secret', expect.any(Function));
+    expect(mockSocket.on).toHaveBeenCalledWith('leader-secret', expect.any(Function));
     unmount();
-    expect(mockSocket.off).toHaveBeenCalledWith('host-secret', expect.any(Function));
+    expect(mockSocket.off).toHaveBeenCalledWith('leader-secret', expect.any(Function));
   });
 });

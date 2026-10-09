@@ -3,7 +3,7 @@ import { ApiService } from './services/api';
 import { saveRecentRoom, removeRecentRoom } from './services/recentRooms';
 import { NotificationProvider, notify } from './services/notifications';
 import { STORAGE_KEYS } from './shared/constants';
-import { saveHostSession } from './shared/utils';
+import { saveLeaderSession } from './shared/utils';
 
 const Home = lazy(() =>
   import('./features/home/Home').then((m) => ({ default: m.Home }))
@@ -25,7 +25,7 @@ export const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('home');
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>('');
-  const [isHost, setIsHost] = useState<boolean>(false);
+  const [isLeader, setIsLeader] = useState<boolean>(false);
 
   // Parse URL if roomId query exists or restore active session.
   useEffect(() => {
@@ -48,33 +48,33 @@ export const App: React.FC = () => {
     navigate('/');
   };
 
-  const handleRoomCreated = (roomId: string, hostName: string, hostSecret: string) => {
-    // Persist host session (incluye hostSecret para los endpoints/emits privilegiados)
-    saveHostSession(roomId, hostName, hostSecret);
-    saveRecentRoom(roomId, hostName, 'host');
+  const handleRoomCreated = (roomId: string, leaderName: string, leaderSecret: string) => {
+    // Persist leader session (incluye leaderSecret para los endpoints/emits privilegiados)
+    saveLeaderSession(roomId, leaderName, leaderSecret);
+    saveRecentRoom(roomId, leaderName, 'leader');
     setCurrentRoomId(roomId);
-    setCurrentUserName(hostName);
-    setIsHost(true);
+    setCurrentUserName(leaderName);
+    setIsLeader(true);
     setView('room');
     window.history.pushState({}, '', `?room=${roomId}`);
   };
 
-  const handleReconnectHost = async (roomId: string, hostName: string) => {
+  const handleReconnectLeader = async (roomId: string, leaderName: string) => {
     // Verify the room still exists before entering (it may have been deleted)
     try {
       await ApiService.getRoom(roomId);
     } catch {
-      localStorage.removeItem(STORAGE_KEYS.HOST_SESSION);
+      localStorage.removeItem(STORAGE_KEYS.LEADER_SESSION);
       removeRecentRoom(roomId);
       notify('error', `La sala ${roomId} ya no existe o fue eliminada. Crea una nueva sala.`, 'Sala no disponible');
       return;
     }
-    // (preserva el hostSecret ya guardado para esa sala, si existe)
-    saveHostSession(roomId, hostName);
-    saveRecentRoom(roomId, hostName, 'host');
+    // (preserva el leaderSecret ya guardado para esa sala, si existe)
+    saveLeaderSession(roomId, leaderName);
+    saveRecentRoom(roomId, leaderName, 'leader');
     setCurrentRoomId(roomId);
-    setCurrentUserName(hostName);
-    setIsHost(true);
+    setCurrentUserName(leaderName);
+    setIsLeader(true);
     setView('room');
     window.history.pushState({}, '', `?room=${roomId}`);
   };
@@ -85,7 +85,7 @@ export const App: React.FC = () => {
       saveRecentRoom(roomId, userName, 'guest');
       setCurrentRoomId(roomId);
       setCurrentUserName(userName);
-      setIsHost(false);
+      setIsLeader(false);
       setView('room');
       window.history.pushState({}, '', `?room=${roomId}`);
     } catch (err: any) {
@@ -102,7 +102,7 @@ export const App: React.FC = () => {
           initialRoomCode={currentRoomId}
           onJoinRoom={handleJoinRoom}
           onRoomCreated={handleRoomCreated}
-          onReconnectHost={handleReconnectHost}
+          onReconnectHost={handleReconnectLeader}
         />
       )}
 
@@ -110,7 +110,7 @@ export const App: React.FC = () => {
         <Room
           roomId={currentRoomId}
           userName={currentUserName || 'Invitado'}
-          isHost={isHost}
+          isLeader={isLeader}
           onLeave={handleBackToHome}
         />
       )}

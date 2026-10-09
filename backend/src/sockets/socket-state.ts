@@ -3,7 +3,7 @@ export interface SocketUser {
   socketId: string;
   roomId: string;
   userName: string;
-  isHost: boolean;
+  isLeader: boolean;
   userId?: string;
   pending?: boolean;
 }

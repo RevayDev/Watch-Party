@@ -24,7 +24,7 @@ import {
 export interface RemotePeer {
   socketId: string;
   userName: string;
-  isHost: boolean;
+  isLeader: boolean;
   stream: MediaStream;
 }
 
@@ -46,7 +46,7 @@ const ICE_SERVERS: RTCConfiguration = {
   iceCandidatePoolSize: 10,
 };
 
-export function useWebRTC(socket: Socket | null, roomId: string, userName: string, isHost: boolean) {
+export function useWebRTC(socket: Socket | null, roomId: string, userName: string, isLeader: boolean) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
   const [peerMediaStates, setPeerMediaStates] = useState<Record<string, PeerMediaState>>({});
@@ -64,7 +64,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
 
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());
-  const peerMeta = useRef<Map<string, { userName: string; isHost: boolean }>>(new Map());
+  const peerMeta = useRef<Map<string, { userName: string; isLeader: boolean }>>(new Map());
   const remoteStreams = useRef<Map<string, MediaStream>>(new Map());
   const pendingCandidates = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const makingOfferRef = useRef<Map<string, boolean>>(new Map());
@@ -86,11 +86,11 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   const syncRemotePeersState = useCallback(() => {
     const list: RemotePeer[] = [];
     remoteStreams.current.forEach((stream, socketId) => {
-      const meta = peerMeta.current.get(socketId) || { userName: 'Participante', isHost: false };
+      const meta = peerMeta.current.get(socketId) || { userName: 'Participante', isLeader: false };
       list.push({
         socketId,
         userName: meta.userName,
-        isHost: meta.isHost,
+        isLeader: meta.isLeader,
         stream: new MediaStream(stream.getTracks()),
       });
     });
@@ -239,9 +239,9 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
 
   // ── Create or retrieve RTCPeerConnection ──────────────────────────────────
   const getOrCreatePeerConnection = useCallback(
-    (targetSocketId: string, targetName: string, targetIsHost: boolean): RTCPeerConnection => {
+    (targetSocketId: string, targetName: string, targetLeader: boolean): RTCPeerConnection => {
       if (targetName) {
-        peerMeta.current.set(targetSocketId, { userName: targetName, isHost: targetIsHost });
+        peerMeta.current.set(targetSocketId, { userName: targetName, isLeader: targetLeader });
       }
 
       const existing = peerConnections.current.get(targetSocketId);
@@ -359,8 +359,8 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
 
   // ── Send Offer (Initial or Renegotiation) ──────────────────────────────────
   const sendOffer = useCallback(
-    async (targetId: string, name: string, host: boolean) => {
-      const pc = getOrCreatePeerConnection(targetId, name, host);
+    async (targetId: string, name: string, leader: boolean) => {
+      const pc = getOrCreatePeerConnection(targetId, name, leader);
       try {
         makingOfferRef.current.set(targetId, true);
         const offer = await pc.createOffer({
@@ -373,7 +373,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
             targetSocketId: targetId,
             offer: pc.localDescription,
             callerName: userName,
-            callerIsHost: isHost,
+            callerIsLeader: isLeader,
           });
         }
       } catch (err) {
@@ -382,7 +382,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
         makingOfferRef.current.set(targetId, false);
       }
     },
-    [getOrCreatePeerConnection, socket, userName, isHost]
+    [getOrCreatePeerConnection, socket, userName, isLeader]
   );
 
   // ── ICE restart ante señal caída: re-oferta sobre la misma PC si vive,
@@ -392,14 +392,14 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       const pc = peerConnections.current.get(targetSocketId);
       const meta = peerMeta.current.get(targetSocketId);
       const name = meta?.userName ?? 'Participante';
-      const host = meta?.isHost ?? false;
+      const leader = meta?.isLeader ?? false;
       if (!pc || pc.connectionState === 'closed') {
         if (pc) {
           try { pc.close(); } catch {}
           peerConnections.current.delete(targetSocketId);
         }
         restartAttempts.current.delete(targetSocketId);
-        sendOffer(targetSocketId, name, host);
+        sendOffer(targetSocketId, name, leader);
         return;
       }
       const attempts = restartAttempts.current.get(targetSocketId) ?? 0;
@@ -427,7 +427,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
           targetSocketId,
           offer: current.localDescription,
           callerName: userName,
-          callerIsHost: isHost,
+          callerIsLeader: isLeader,
         });
       } catch {
         cleanupPeer(targetSocketId);
@@ -435,7 +435,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
         makingOfferRef.current.set(targetSocketId, false);
       }
     },
-    [socket, userName, isHost, sendOffer, cleanupPeer]
+    [socket, userName, isLeader, sendOffer, cleanupPeer]
   );
 
   // Referencia estable para el monitor de ICE (definido antes que sendOffer).
@@ -446,9 +446,9 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   // ── Renegotiate with all peers ────────────────────────────────────────────
   const renegotiateAllPeers = useCallback(() => {
     peerConnections.current.forEach((pc, socketId) => {
-      const meta = peerMeta.current.get(socketId) || { userName: 'Participante', isHost: false };
+      const meta = peerMeta.current.get(socketId) || { userName: 'Participante', isLeader: false };
       attachLocalTracksToPC(pc);
-      sendOffer(socketId, meta.userName, meta.isHost);
+      sendOffer(socketId, meta.userName, meta.isLeader);
     });
   }, [attachLocalTracksToPC, sendOffer]);
 
@@ -724,14 +724,14 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
 
     // 1. Initial room state: Newcomer initiates offers to ALL existing peers
     const onRoomState = (s: {
-      peers?: Array<{ socketId: string; userName: string; isHost: boolean }>;
+      peers?: Array<{ socketId: string; userName: string; isLeader: boolean }>;
       mediaStates?: Record<string, { isCameraOn: boolean; isMicOn: boolean; userName?: string }>;
     }) => {
       if (s.peers && s.peers.length > 0) {
         console.log(`[WebRTC] Room state received: connecting to ${s.peers.length} peers`);
         for (const p of s.peers) {
           if (p.socketId && p.socketId !== socket.id) {
-            sendOffer(p.socketId, p.userName, p.isHost);
+            sendOffer(p.socketId, p.userName, p.isLeader);
           }
         }
       }
@@ -741,10 +741,10 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     };
 
     // 2. User Joined: prepare connection and announce our media state
-    const onUserJoined = (d: { socketId: string; userName: string; isHost: boolean }) => {
+    const onUserJoined = (d: { socketId: string; userName: string; isLeader: boolean }) => {
       if (!d.socketId || d.socketId === socket.id) return;
       console.log(`[WebRTC] User joined room: ${d.userName} (${d.socketId})`);
-      getOrCreatePeerConnection(d.socketId, d.userName, d.isHost);
+      getOrCreatePeerConnection(d.socketId, d.userName, d.isLeader);
       socket.emit('peer-media-state', {
         roomId,
         userName,
@@ -758,10 +758,10 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       senderSocketId: string;
       offer: RTCSessionDescriptionInit;
       callerName: string;
-      callerIsHost: boolean;
+      callerIsLeader: boolean;
     }) => {
       console.log(`[WebRTC] Received offer from ${d.callerName} (${d.senderSocketId})`);
-      const pc = getOrCreatePeerConnection(d.senderSocketId, d.callerName, d.callerIsHost);
+      const pc = getOrCreatePeerConnection(d.senderSocketId, d.callerName, d.callerIsLeader);
       try {
         const isPolite = (socket.id || '') < d.senderSocketId;
         const isMakingOffer = makingOfferRef.current.get(d.senderSocketId) || false;

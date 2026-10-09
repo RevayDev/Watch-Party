@@ -10,7 +10,7 @@ export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
       targetSocketId: string;
       offer: unknown;
       callerName: string;
-      callerIsHost: boolean;
+      callerIsLeader: boolean;
     } | undefined) => {
       if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
       // Solo sockets conocidos de la misma sala pueden señalizar (anti-reflector).
@@ -22,7 +22,7 @@ export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
         senderSocketId: socket.id,
         offer: data.offer,
         callerName: typeof data.callerName === 'string' ? data.callerName.slice(0, 50) : '',
-        callerIsHost: data.callerIsHost === true,
+        callerIsLeader: data.callerIsLeader === true,
       });
     }
   );

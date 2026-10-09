@@ -43,7 +43,7 @@ afterAll(async () => {
 
 describe('REST join: baneo (403) y colisión de nombres (409)', () => {
   it('403 si el usuario está baneado (espejo del socket)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Troll', 'Web', 'u-troll');
     await RoomService.kickParticipant(room.roomId, { name: 'Troll', userId: 'u-troll' }, 'Host', true);
@@ -58,7 +58,7 @@ describe('REST join: baneo (403) y colisión de nombres (409)', () => {
   });
 
   it('403 por baneo también coincide por nombre legacy', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Pesado', 'Web');
     await RoomService.kickParticipant(room.roomId, { name: 'Pesado' }, 'Host', true);
@@ -69,7 +69,7 @@ describe('REST join: baneo (403) y colisión de nombres (409)', () => {
   });
 
   it('409 si el nombre lo usa otra identidad', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
 
@@ -84,7 +84,7 @@ describe('REST join: baneo (403) y colisión de nombres (409)', () => {
   });
 
   it('rejoin con el mismo userId siempre permitido (200)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
 
@@ -100,9 +100,9 @@ describe('REST join: baneo (403) y colisión de nombres (409)', () => {
   });
 });
 
-describe('REST privilegiado: solo host (403 sin secreto ni rol)', () => {
+describe('REST privilegiado: solo leader (403 sin secreto ni rol)', () => {
   it('DELETE sin auth → 403 y la sala sigue existiendo', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const res = mockRes();
@@ -111,13 +111,13 @@ describe('REST privilegiado: solo host (403 sin secreto ni rol)', () => {
     expect(await RoomService.getRoomById(room.roomId)).not.toBeNull();
   });
 
-  it('DELETE con x-host-secret válido → 200', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+  it('DELETE con x-leader-secret válido → 200', async () => {
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const res = mockRes();
     await RoomController.delete(
-      mockReq({ roomId: room.roomId }, {}, { 'x-host-secret': hostSecret }),
+      mockReq({ roomId: room.roomId }, {}, { 'x-leader-secret': leaderSecret }),
       res,
       next
     );
@@ -126,14 +126,14 @@ describe('REST privilegiado: solo host (403 sin secreto ni rol)', () => {
     created.pop();
   });
 
-  it('DELETE con x-user-id del host (rol del servidor) → 200', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+  it('DELETE con x-user-id del leader (rol del servidor) → 200', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
 
     const res = mockRes();
     await RoomController.delete(
-      mockReq({ roomId: room.roomId }, {}, { 'x-user-id': 'u-host' }),
+      mockReq({ roomId: room.roomId }, {}, { 'x-user-id': 'u-leader' }),
       res,
       next
     );
@@ -142,7 +142,7 @@ describe('REST privilegiado: solo host (403 sin secreto ni rol)', () => {
   });
 
   it('DELETE con x-user-id de miembro → 403', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Miembro', 'Web', 'u-mem');
 
@@ -156,7 +156,7 @@ describe('REST privilegiado: solo host (403 sin secreto ni rol)', () => {
   });
 
   it('POST video-url sin auth → 403 sin tocar la red (antes del probe)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const res = mockRes();
@@ -169,7 +169,7 @@ describe('REST privilegiado: solo host (403 sin secreto ni rol)', () => {
   });
 
   it('POST video (upload) sin auth → 403', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const res = mockRes();
@@ -184,7 +184,7 @@ describe('REST privilegiado: solo host (403 sin secreto ni rol)', () => {
 
 describe('REST PATCH settings: 403 / 400 / 200', () => {
   it('sin auth → 403', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const res = mockRes();
@@ -197,7 +197,7 @@ describe('REST PATCH settings: 403 / 400 / 200', () => {
   });
 
   it('ajustes inválidos → 400 con mensaje claro y sin aplicar nada', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const res = mockRes();
@@ -205,7 +205,7 @@ describe('REST PATCH settings: 403 / 400 / 200', () => {
       mockReq(
         { roomId: room.roomId },
         { settings: { muteOnEntry: 'yes', extra: 1 } },
-        { 'x-host-secret': hostSecret }
+        { 'x-leader-secret': leaderSecret }
       ),
       res,
       next
@@ -218,7 +218,7 @@ describe('REST PATCH settings: 403 / 400 / 200', () => {
   });
 
   it('ajustes válidos con secreto → 200 y se fusionan', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
 
     const res = mockRes();
@@ -226,7 +226,7 @@ describe('REST PATCH settings: 403 / 400 / 200', () => {
       mockReq(
         { roomId: room.roomId },
         { settings: { muteOnEntry: true, requireApproval: true } },
-        { 'x-host-secret': hostSecret }
+        { 'x-leader-secret': leaderSecret }
       ),
       res,
       next

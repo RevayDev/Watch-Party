@@ -1139,7 +1139,7 @@ div[id] {
   white-space: nowrap;
 }
 
-.home-recent-item__role--host {
+.home-recent-item__role--leader {
   color: #fde68a;
   background: rgba(245, 158, 11, 0.14);
   border-color: rgba(245, 158, 11, 0.35);
@@ -2764,27 +2764,27 @@ a.home-faq-hl--frontend {
 }
 
 /* Host exit modal specifics */
-.host-exit-modal__title {
+.leader-exit-modal__title {
   font-size: 1.05rem;
   font-weight: 700;
   color: #fff;
   margin: 0;
 }
 
-.host-exit-modal__desc {
+.leader-exit-modal__desc {
   color: var(--color-muted-light);
   font-size: 0.86rem;
   margin: 0.4rem 0 1.25rem;
   line-height: 1.5;
 }
 
-.host-exit-modal__actions {
+.leader-exit-modal__actions {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.host-exit-modal__opt-btn {
+.leader-exit-modal__opt-btn {
   display: flex;
   align-items: flex-start;
   gap: 0.85rem;
@@ -2801,54 +2801,54 @@ a.home-faq-hl--frontend {
   width: 100%;
 }
 
-.host-exit-modal__opt-btn:hover {
+.leader-exit-modal__opt-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.host-exit-modal__opt-btn--transfer .host-exit-modal__btn-icon {
+.leader-exit-modal__opt-btn--transfer .leader-exit-modal__btn-icon {
   color: var(--color-primary-light);
   flex-shrink: 0;
   margin-top: 2px;
 }
 
-.host-exit-modal__opt-btn--danger {
+.leader-exit-modal__opt-btn--danger {
   border-color: rgba(239, 68, 68, 0.25);
   background: rgba(239, 68, 68, 0.08);
 }
-.host-exit-modal__opt-btn--danger:hover {
+.leader-exit-modal__opt-btn--danger:hover {
   background: rgba(239, 68, 68, 0.16);
   border-color: rgba(239, 68, 68, 0.45);
 }
-.host-exit-modal__opt-btn--danger .host-exit-modal__btn-icon {
+.leader-exit-modal__opt-btn--danger .leader-exit-modal__btn-icon {
   color: #f87171;
   flex-shrink: 0;
   margin-top: 2px;
 }
 
-.host-exit-modal__btn-text {
+.leader-exit-modal__btn-text {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   flex: 1;
 }
 
-.host-exit-modal__opt-btn--transfer .host-exit-modal__btn-text strong {
+.leader-exit-modal__opt-btn--transfer .leader-exit-modal__btn-text strong {
   font-size: 0.92rem;
   color: #f1f5f9;
 }
 
-.host-exit-modal__opt-btn--danger .host-exit-modal__btn-text strong {
+.leader-exit-modal__opt-btn--danger .leader-exit-modal__btn-text strong {
   font-size: 0.92rem;
   color: #f87171;
 }
 
-.host-exit-modal__btn-text span {
+.leader-exit-modal__btn-text span {
   font-size: 0.78rem;
   color: var(--color-muted-light);
   line-height: 1.4;
 }
 
-.host-exit-modal__cancel-btn {
+.leader-exit-modal__cancel-btn {
   width: 100%;
   margin-top: 1.15rem;
   padding: 0.75rem 1rem;
@@ -2864,7 +2864,7 @@ a.home-faq-hl--frontend {
     background 0.15s ease,
     color 0.15s ease;
 }
-.host-exit-modal__cancel-btn:hover {
+.leader-exit-modal__cancel-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
 }
@@ -2997,7 +2997,7 @@ a.home-faq-hl--frontend {
   gap: 0.75rem;
   margin-top: 0.25rem;
 }
-.room-settings__actions .host-exit-modal__cancel-btn {
+.room-settings__actions .leader-exit-modal__cancel-btn {
   width: auto;
   flex: 1;
   margin-top: 0;
@@ -3678,8 +3678,8 @@ a.home-faq-hl--frontend {
   bottom: 3.5rem;
   left: 50%;
   transform: translateX(-50%);
-  width: 160px;
-  height: 260px;
+  width: 280px;
+  height: 380px;
   pointer-events: none;
   z-index: 2147483646;
   display: flex;
@@ -3697,7 +3697,7 @@ a.home-faq-hl--frontend {
   display: flex;
   flex-direction: column;
   align-items: center;
-  animation: floatUpAndFade 3.6s cubic-bezier(0.37, 0.55, 0.45, 1) forwards;
+  animation: floatUpAndFade var(--float-duration, 4.2s) cubic-bezier(0.22, 0.65, 0.35, 1) forwards;
   will-change: transform, opacity;
 }
 
@@ -3712,12 +3712,35 @@ a.home-faq-hl--frontend {
   border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-/* YouTube-style: gentle pop-in, smooth float up with soft horizontal sway, long fade out */
+/* Helium balloon: elastic pop, random pendulum sway, gentle rotation wobble, long float up */
 /* keyframes → src/styles/animations.css */
+
+/* Indeterminate progress bar shimmer (video URL loading) */
+.upload-progress__bar--indeterminate {
+  animation: indeterminateShimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes indeterminateShimmer {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateX(20%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0.7;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .floating-reaction {
     animation: floatUpAndFade 1.2s linear forwards;
+  }
+  .upload-progress__bar--indeterminate {
+    animation: none;
   }
 }
 
@@ -5185,7 +5208,7 @@ a.home-faq-hl--frontend {
   white-space: nowrap;
 }
 
-.part-badge-host {
+.part-badge-leader {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -5199,7 +5222,7 @@ a.home-faq-hl--frontend {
   flex: 0 0 auto;
 }
 
-.part-badge-cohost {
+.part-badge-coleader {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -5404,6 +5427,7 @@ a.home-faq-hl--frontend {
   justify-content: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
+  min-height: 2.5rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -5412,6 +5436,10 @@ a.home-faq-hl--frontend {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+.part-outline-action-btn span {
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .part-outline-action-btn:hover {
@@ -5448,8 +5476,8 @@ a.home-faq-hl--frontend {
 
 /* ── RIGHT DETAIL INSPECT CARD ── */
 .part-detail-card {
-  width: 280px;
-  min-width: 260px;
+  width: 320px;
+  min-width: 300px;
   background: rgba(13, 19, 33, 0.98);
   padding: 1rem;
   display: flex;
@@ -5500,7 +5528,7 @@ a.home-faq-hl--frontend {
   margin-top: 1rem;
 }
 
-.part-rename-modal__actions .host-exit-modal__cancel-btn,
+.part-rename-modal__actions .leader-exit-modal__cancel-btn,
 .part-rename-modal__actions .part-rename-save-btn {
   flex: 1;
   width: auto;
@@ -5969,8 +5997,8 @@ a.home-faq-hl--frontend {
     padding: 0.4rem 0.5rem;
     font-size: 0.7rem;
   }
-  .part-badge-host,
-  .part-badge-cohost {
+  .part-badge-leader,
+  .part-badge-coleader {
     padding: 0.05rem 0.3rem;
     font-size: 0.66rem;
   }
@@ -6751,6 +6779,13 @@ a.home-faq-hl--frontend {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+
+/* Rendimiento a todo el ancho (solo PC: en móvil hay una columna) */
+@media (min-width: 701px) {
+  .room-settings__box--full {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Evita que el modal quede demasiado ancho */

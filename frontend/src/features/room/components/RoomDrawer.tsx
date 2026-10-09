@@ -20,7 +20,7 @@ interface RoomDrawerProps {
   myName: string;
   roomData: IRoomData;
   userId: string;
-  isHost: boolean;
+  isLeader: boolean;
   peerMediaStates: Record<string, { isCameraOn: boolean; isMicOn: boolean; userName?: string }>;
   isMicOn: boolean;
   isCameraOn: boolean;
@@ -41,7 +41,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   myName,
   roomData,
   userId,
-  isHost,
+  isLeader,
   peerMediaStates,
   isMicOn,
   isCameraOn,
@@ -80,11 +80,11 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             participants={roomData.participants}
             currentUserName={myName}
             currentUserId={userId}
-            isHost={isHost}
-            isCoHost={roomData.participants.some(
+            isLeader={isLeader}
+            isCoLeader={roomData.participants.some(
               (p) =>
                 (p.userId ? p.userId === userId : p.name.toLowerCase() === myName.toLowerCase()) &&
-                p.role === 'cohost'
+                p.role === 'coleader'
             )}
             kickedUsers={roomData.kickedUsers}
             joinRequests={roomData.joinRequests}
@@ -115,16 +115,16 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onUnbanUser={(targetUserName, targetUserId) => {
               socket.emit('unban-user', { roomId, targetUserName, targetUserId, ...auth() });
             }}
-            onToggleCoHost={(targetUserName, makeCoHost) => {
+            onToggleCoLeader={(targetUserName, makeCoLeader) => {
               socket.emit('set-role', {
                 roomId,
                 targetUserName,
-                role: makeCoHost ? 'cohost' : 'member',
+                role: makeCoLeader ? 'coleader' : 'member',
                 ...auth(),
               });
             }}
             onTransferHost={(targetUserName, targetUserId) => {
-              socket.emit('transfer-host', {
+              socket.emit('transfer-leader', {
                 roomId,
                 targetUserName,
                 targetUserId,

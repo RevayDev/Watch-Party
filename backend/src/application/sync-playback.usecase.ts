@@ -63,7 +63,7 @@ export class RecordHeartbeatUseCase {
 export class ResolveSyncTimeUseCase {
   static execute(
     roomId: string,
-    participants: Array<{ userId?: string; name: string; joinedAt?: Date | string; isHost?: boolean }>,
+    participants: Array<{ userId?: string; name: string; joinedAt?: Date | string; isLeader?: boolean }>,
   ): { currentTime: number; isPlaying: boolean } | null {
     return resolveSyncedPlayback(roomId.toUpperCase().trim(), participants);
   }

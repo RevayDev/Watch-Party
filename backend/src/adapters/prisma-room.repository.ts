@@ -41,8 +41,8 @@ export async function disconnectPrisma(): Promise<void> {
 /** Fila Prisma → IRoom plano (misma forma que `.lean()` de Mongoose). */
 export function fromPrismaRoom(row: {
   roomId: string;
-  hostName: string;
-  hostSecret: string;
+  leaderName: string;
+  leaderSecret: string;
   status: string;
   isTemporary: boolean | null;
   plan: string | null;
@@ -56,8 +56,8 @@ export function fromPrismaRoom(row: {
 }): IRoom {
   return {
     roomId: row.roomId,
-    hostName: row.hostName,
-    hostSecret: row.hostSecret,
+    leaderName: row.leaderName,
+    leaderSecret: row.leaderSecret,
     status: row.status as IRoom['status'],
     isTemporary: row.isTemporary ?? undefined,
     plan: (row.plan as IRoom['plan']) ?? undefined,
@@ -74,8 +74,8 @@ export function fromPrismaRoom(row: {
 /** IRoom → fila Prisma (Json directo, sin esquemas intermedios). */
 export function toPrismaRoom(room: IRoom): {
   roomId: string;
-  hostName: string;
-  hostSecret: string;
+  leaderName: string;
+  leaderSecret: string;
   status: string;
   isTemporary: boolean | null;
   plan: string | null;
@@ -89,8 +89,8 @@ export function toPrismaRoom(room: IRoom): {
 } {
   return {
     roomId: normalize(room.roomId),
-    hostName: room.hostName,
-    hostSecret: room.hostSecret,
+    leaderName: room.leaderName,
+    leaderSecret: room.leaderSecret,
     status: room.status,
     isTemporary: room.isTemporary ?? null,
     plan: room.plan ?? null,

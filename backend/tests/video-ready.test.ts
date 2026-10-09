@@ -82,21 +82,21 @@ afterAll(async () => {
 
 describe('video-ready: handshake de auto-play grupal', () => {
   it('al completarse todos los presentes emite play grupal con autoplay', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
     await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
     await RoomService.updateRoomVideo(room.roomId, VIDEO as any);
 
     const { io, roomEmits } = makeIo();
-    const host = makeSocket('s-host');
+    const leader = makeSocket('s-leader');
     const ana = makeSocket('s-ana');
-    activeUsers.set('s-host', { socketId: 's-host', roomId: room.roomId, userName: 'Host', isHost: true, userId: 'u-host' });
-    activeUsers.set('s-ana', { socketId: 's-ana', roomId: room.roomId, userName: 'Ana', isHost: false, userId: 'u-ana' });
-    registerVideoReadyHandlers(io, host.socket);
+    activeUsers.set('s-leader', { socketId: 's-leader', roomId: room.roomId, userName: 'Host', isLeader: true, userId: 'u-leader' });
+    activeUsers.set('s-ana', { socketId: 's-ana', roomId: room.roomId, userName: 'Ana', isLeader: false, userId: 'u-ana' });
+    registerVideoReadyHandlers(io, leader.socket);
     registerVideoReadyHandlers(io, ana.socket);
 
-    await fire(host.handlers, 'video-ready', { roomId: room.roomId, fileName: VIDEO.fileName });
+    await fire(leader.handlers, 'video-ready', { roomId: room.roomId, fileName: VIDEO.fileName });
     // Solo uno reportó: aún no hay play grupal
     expect(roomEmits.filter((e) => e.event === 'sync-video')).toHaveLength(0);
     expect(__videoReadyPendingForTests(room.roomId)).toBe(true);
@@ -111,30 +111,30 @@ describe('video-ready: handshake de auto-play grupal', () => {
   });
 
   it('video-ready con fileName ajeno se ignora (no abre conteo)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
     await RoomService.updateRoomVideo(room.roomId, VIDEO as any);
 
     const { io, roomEmits } = makeIo();
-    const host = makeSocket('s-host');
-    activeUsers.set('s-host', { socketId: 's-host', roomId: room.roomId, userName: 'Host', isHost: true, userId: 'u-host' });
-    registerVideoReadyHandlers(io, host.socket);
+    const leader = makeSocket('s-leader');
+    activeUsers.set('s-leader', { socketId: 's-leader', roomId: room.roomId, userName: 'Host', isLeader: true, userId: 'u-leader' });
+    registerVideoReadyHandlers(io, leader.socket);
 
-    await fire(host.handlers, 'video-ready', { roomId: room.roomId, fileName: 'otro.mp4' });
+    await fire(leader.handlers, 'video-ready', { roomId: room.roomId, fileName: 'otro.mp4' });
     expect(roomEmits.filter((e) => e.event === 'sync-video')).toHaveLength(0);
     expect(__videoReadyPendingForTests(room.roomId)).toBe(false);
   });
 
   it('miembro ajeno a la sala no alimenta el conteo', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
     await RoomService.updateRoomVideo(room.roomId, VIDEO as any);
 
     const { io, roomEmits } = makeIo();
     const outsider = makeSocket('s-out');
-    activeUsers.set('s-out', { socketId: 's-out', roomId: 'OTRASALA', userName: 'Troll', isHost: false });
+    activeUsers.set('s-out', { socketId: 's-out', roomId: 'OTRASALA', userName: 'Troll', isLeader: false });
     registerVideoReadyHandlers(io, outsider.socket);
 
     await fire(outsider.handlers, 'video-ready', { roomId: room.roomId, fileName: VIDEO.fileName });
@@ -143,7 +143,7 @@ describe('video-ready: handshake de auto-play grupal', () => {
   });
 
   it('payloads inválidos se ignoran sin emitir ni lanzar', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-x');

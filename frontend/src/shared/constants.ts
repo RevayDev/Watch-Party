@@ -5,7 +5,7 @@
  */
 
 export const STORAGE_KEYS = {
-  HOST_SESSION: 'watchparty_host_session',
+  LEADER_SESSION: 'watchparty_host_session',
   USER_ID: 'watchparty_user_id',
 } as const;
 

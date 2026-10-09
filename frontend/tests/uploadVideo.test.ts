@@ -172,8 +172,8 @@ describe('ApiService.uploadVideo (XHR tests)', () => {
 
   it('adjunta headers de autenticación si existen en localStorage', async () => {
     const store = new Map<string, string>([
-      ['watchparty_host_session', JSON.stringify({ roomId: 'ABC123', hostName: 'HostName', hostSecret: 'secret123' })],
-      ['watchparty_user_id', 'u-host'],
+      ['watchparty_host_session', JSON.stringify({ roomId: 'ABC123', leaderName: 'LeaderName', leaderSecret: 'secret123' })],
+      ['watchparty_user_id', 'u-leader'],
     ]);
     vi.stubGlobal('localStorage', {
       getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
@@ -192,7 +192,7 @@ describe('ApiService.uploadVideo (XHR tests)', () => {
     xhr.trigger('load');
     await promise;
 
-    expect(xhr.setRequestHeader).toHaveBeenCalledWith('x-host-secret', 'secret123');
-    expect(xhr.setRequestHeader).toHaveBeenCalledWith('x-user-id', 'u-host');
+    expect(xhr.setRequestHeader).toHaveBeenCalledWith('x-leader-secret', 'secret123');
+    expect(xhr.setRequestHeader).toHaveBeenCalledWith('x-user-id', 'u-leader');
   });
 });

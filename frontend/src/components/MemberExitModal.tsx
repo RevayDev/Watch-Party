@@ -17,24 +17,24 @@ export const MemberExitModal: React.FC<MemberExitModalProps> = ({
     <BottomSheet
       open={isOpen}
       onClose={onClose}
-      label="¿Salir de la sala?"
-      className="host-exit-modal"
+      label="¿Estás seguro de que quieres salir?"
+      className="leader-exit-modal"
     >
       <div className="modal-card__header">
-        <h3 className="host-exit-modal__title">¿Salir de la sala?</h3>
+        <h3 className="leader-exit-modal__title">¿Estás seguro de que quieres salir?</h3>
       </div>
 
-      <p className="host-exit-modal__desc">
+      <p className="leader-exit-modal__desc">
         ¿Estás seguro de que deseas abandonar la reunión? Podrás volver a unirte más tarde si la sala sigue activa.
       </p>
 
-      <div className="host-exit-modal__actions">
+      <div className="leader-exit-modal__actions">
         <button
           type="button"
           onClick={onConfirmLeave}
-          className="host-exit-modal__opt-btn host-exit-modal__opt-btn--danger"
+          className="leader-exit-modal__opt-btn leader-exit-modal__opt-btn--danger"
         >
-          <div className="host-exit-modal__btn-text" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div className="leader-exit-modal__btn-text" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <LogOut size={18} />
             <strong>Sí, salir de la sala</strong>
           </div>
@@ -44,7 +44,7 @@ export const MemberExitModal: React.FC<MemberExitModalProps> = ({
       <button
         type="button"
         onClick={onClose}
-        className="host-exit-modal__cancel-btn"
+        className="leader-exit-modal__cancel-btn"
       >
         Cancelar
       </button>

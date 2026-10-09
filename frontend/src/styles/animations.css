@@ -122,40 +122,52 @@
   }
 }
 
-/* Globo: pop elástico al nacer, deriva suave con vaivén pendular, fade largo */
+/* Globo de helio: pop elástico → subida alta con vaivén pendular amplio,
+   rotación suave (wobble) y fade gradual. La posición horizontal inicial
+   depende de --x-offset (±60 px desde el servidor). */
 @keyframes floatUpAndFade {
   0% {
     opacity: 0;
     transform: translateX(calc(-50% + var(--x-offset, 0px)))
-      translateY(14px) scale(0.35);
+      translateY(20px) scale(0.3) rotate(0deg);
   }
-  8% {
+  6% {
     opacity: 1;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) + 3px))
-      translateY(-4px) scale(1.22);
+    transform: translateX(calc(-50% + var(--x-offset, 0px) + 6px))
+      translateY(-8px) scale(1.28) rotate(3deg);
   }
-  14% {
-    transform: translateX(calc(-50% + var(--x-offset, 0px) - 4px))
-      translateY(-18px) scale(0.98);
-  }
-  32% {
-    opacity: 1;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) + 10px))
-      translateY(-70px) scale(1);
-  }
-  55% {
+  12% {
     transform: translateX(calc(-50% + var(--x-offset, 0px) - 8px))
-      translateY(-130px) scale(1);
+      translateY(-30px) scale(0.96) rotate(-4deg);
   }
-  78% {
-    opacity: 0.9;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) + 9px))
-      translateY(-195px) scale(0.98);
+  24% {
+    opacity: 1;
+    transform: translateX(calc(-50% + var(--x-offset, 0px) + 18px))
+      translateY(-80px) scale(1.02) rotate(5deg);
+  }
+  38% {
+    transform: translateX(calc(-50% + var(--x-offset, 0px) - 14px))
+      translateY(-145px) scale(1) rotate(-6deg);
+  }
+  54% {
+    opacity: 0.95;
+    transform: translateX(calc(-50% + var(--x-offset, 0px) + 20px))
+      translateY(-210px) scale(0.98) rotate(4deg);
+  }
+  72% {
+    opacity: 0.7;
+    transform: translateX(calc(-50% + var(--x-offset, 0px) - 16px))
+      translateY(-280px) scale(0.95) rotate(-3deg);
+  }
+  88% {
+    opacity: 0.35;
+    transform: translateX(calc(-50% + var(--x-offset, 0px) + 10px))
+      translateY(-330px) scale(0.9) rotate(2deg);
   }
   100% {
     opacity: 0;
-    transform: translateX(calc(-50% + var(--x-offset, 0px) - 5px))
-      translateY(-250px) scale(0.92);
+    transform: translateX(calc(-50% + var(--x-offset, 0px) - 6px))
+      translateY(-380px) scale(0.85) rotate(-1deg);
   }
 }
 

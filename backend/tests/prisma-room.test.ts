@@ -14,12 +14,12 @@ function sampleRoom(): IRoom {
   const now = new Date();
   return {
     roomId: 'ab12cd',
-    hostName: 'Ana',
-    hostSecret: 's3cr3t',
+    leaderName: 'Ana',
+    leaderSecret: 's3cr3t',
     status: 'waiting',
     isTemporary: true,
     participants: [
-      { name: 'Ana', userId: 'u-1', isHost: true, role: 'host', joinedAt: now },
+      { name: 'Ana', userId: 'u-1', isLeader: true, role: 'leader', joinedAt: now },
     ],
     joinRequests: [],
     kickedUsers: [],
@@ -40,7 +40,7 @@ describe('adaptador Prisma (mapeo puro, sin DB)', () => {
   it('fromPrismaRoom devuelve un IRoom plano (round-trip)', () => {
     const room = fromPrismaRoom({ ...toPrismaRoom(sampleRoom()) } as never);
     expect(room.roomId).toBe('AB12CD');
-    expect(room.hostName).toBe('Ana');
+    expect(room.leaderName).toBe('Ana');
     expect(room.participants).toHaveLength(1);
     expect(room.createdAt).toBeInstanceOf(Date);
   });

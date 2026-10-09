@@ -1,10 +1,10 @@
-export type ParticipantRole = 'host' | 'cohost' | 'member';
+export type ParticipantRole = 'leader' | 'coleader' | 'member';
 
 export interface IParticipant {
   socketId?: string;
   userId?: string;
   name: string;
-  isHost: boolean;
+  isLeader: boolean;
   role?: ParticipantRole;
   joinedAt: string;
   device?: string;
@@ -33,7 +33,7 @@ export interface IRoomSettings {
   allowCamReactivation: boolean;
   isTemporary?: boolean;
   requireApproval?: boolean;
-  /** Solo el anfitrión (y cohosts) controlan el vídeo: el servidor niega `sync-video` a no-moderadores. */
+  /** Solo el anfitrión (y co-anfitriones) controlan el vídeo: el servidor niega `sync-video` a no-moderadores. */
   hostOnlySync?: boolean;
   name?: string;
   description?: string;
@@ -66,8 +66,8 @@ export interface IVideoMetadata {
 
 export interface IRoomData {
   roomId: string;
-  hostName: string;
-  hostSecret?: string;
+  leaderName: string;
+  leaderSecret?: string;
   status: 'waiting' | 'active' | 'closed';
   isTemporary?: boolean;
   /** Plan de la sala (siempre 'free': compatibilidad con salas antiguas). */
@@ -92,6 +92,7 @@ export interface ReactionItem {
   emoji: string;
   user: string;
   xOffset: number;
+  floatDuration?: number;
 }
 
 /** Indicador "está escribiendo": efímero, sin persistencia (expira a los 4 s). */

@@ -43,7 +43,7 @@ describe('getRecentRooms', () => {
 
   it('filtra entradas sin roomId válido', () => {
     installStorage({
-      watchparty_recent_rooms: JSON.stringify([{ foo: 1 }, { roomId: 'ABC123', hostName: 'H', role: 'guest', lastJoined: 1 }]),
+      watchparty_recent_rooms: JSON.stringify([{ foo: 1 }, { roomId: 'ABC123', leaderName: 'H', role: 'guest', lastJoined: 1 }]),
     });
     expect(getRecentRooms()).toHaveLength(1);
   });
@@ -57,10 +57,10 @@ describe('getRecentRooms', () => {
 describe('saveRecentRoom', () => {
   it('normaliza el roomId a mayúsculas y lo pone primero', () => {
     saveRecentRoom('ab12cd', 'Ana', 'guest');
-    saveRecentRoom('ef34gh', 'Beto', 'host');
+    saveRecentRoom('ef34gh', 'Beto', 'leader');
     const list = getRecentRooms();
     expect(list.map((r) => r.roomId)).toEqual(['EF34GH', 'AB12CD']);
-    expect(list[0]).toMatchObject({ hostName: 'Beto', role: 'host' });
+    expect(list[0]).toMatchObject({ leaderName: 'Beto', role: 'leader' });
     expect(list[0].lastJoined).toEqual(expect.any(Number));
   });
 

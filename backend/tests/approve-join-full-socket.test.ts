@@ -60,9 +60,9 @@ async function fire(handlers: Map<string, (...args: any[]) => unknown>, event: s
 
 /** Sala demo llena 5/5 con aprobación manual activada + 1 solicitud en espera. */
 async function makeFullRoomWithWaiter() {
-  const { room } = await RoomService.createRoom({ hostName: 'Host', userId: 'uid-host' });
+  const { room } = await RoomService.createRoom({ leaderName: 'Host', userId: 'uid-leader' });
   created.push(room.roomId);
-  await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'uid-host');
+  await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'uid-leader');
   await RoomService.joinRoom(room.roomId, 'U2', 'Web', 'uid-2');
   await RoomService.joinRoom(room.roomId, 'U3', 'Web', 'uid-3');
   await RoomService.joinRoom(room.roomId, 'U4', 'Web', 'uid-4');
@@ -98,7 +98,7 @@ afterAll(async () => {
 });
 
 describe('approve-join vía socket en sala llena (demo 5/5)', () => {
-  it('el host aprueba → room-full al solicitante, solicitud ENCOLADA, nadie agregado', async () => {
+  it('el leader aprueba → room-full al solicitante, solicitud ENCOLADA, nadie agregado', async () => {
     const roomId = await makeFullRoomWithWaiter();
     const { io, roomEmits } = makeIo();
 
@@ -107,22 +107,22 @@ describe('approve-join vía socket en sala llena (demo 5/5)', () => {
       socketId: 's-wait',
       roomId,
       userName: 'Espera',
-      isHost: false,
+      isLeader: false,
       userId: 'uid-wait',
       pending: true,
     });
-    // Host aprobador (rol host persistido del servidor).
-    const host = makeSocket('s-host');
-    activeUsers.set('s-host', {
-      socketId: 's-host',
+    // Host aprobador (rol leader persistido del servidor).
+    const leader = makeSocket('s-leader');
+    activeUsers.set('s-leader', {
+      socketId: 's-leader',
       roomId,
       userName: 'Host',
-      isHost: true,
-      userId: 'uid-host',
+      isLeader: true,
+      userId: 'uid-leader',
     });
-    registerJoinApprovalHandlers(io, host.socket);
+    registerJoinApprovalHandlers(io, leader.socket);
 
-    await fire(host.handlers, 'approve-join', { roomId, userId: 'uid-wait' });
+    await fire(leader.handlers, 'approve-join', { roomId, userId: 'uid-wait' });
 
     // 1) La solicitud sigue en espera (no se desencola ante sala llena).
     const stored = await RoomService.getRoomById(roomId);
@@ -140,7 +140,7 @@ describe('approve-join vía socket en sala llena (demo 5/5)', () => {
     expect(toWaiter[0].payload).toEqual({ reason: 'room-full', message: DEMO_ROOM_FULL_MESSAGE });
     // 5) Sin aprobación fantasma: nadie recibe join-approved/user-joined.
     expect(roomEmits.some((e) => e.event === 'join-approved' || e.event === 'user-joined')).toBe(false);
-    expect(host.emitted.some((e) => e.event === 'action-denied')).toBe(false);
+    expect(leader.emitted.some((e) => e.event === 'action-denied')).toBe(false);
   });
 
   it('tras liberar un cupo, el mismo approve sí entra al solicitante', async () => {
@@ -153,21 +153,21 @@ describe('approve-join vía socket en sala llena (demo 5/5)', () => {
       socketId: 's-wait',
       roomId,
       userName: 'Espera',
-      isHost: false,
+      isLeader: false,
       userId: 'uid-wait',
       pending: true,
     });
-    const host = makeSocket('s-host2');
+    const leader = makeSocket('s-host2');
     activeUsers.set('s-host2', {
       socketId: 's-host2',
       roomId,
       userName: 'Host',
-      isHost: true,
-      userId: 'uid-host',
+      isLeader: true,
+      userId: 'uid-leader',
     });
-    registerJoinApprovalHandlers(io, host.socket);
+    registerJoinApprovalHandlers(io, leader.socket);
 
-    await fire(host.handlers, 'approve-join', { roomId, userId: 'uid-wait' });
+    await fire(leader.handlers, 'approve-join', { roomId, userId: 'uid-wait' });
 
     const stored = await RoomService.getRoomById(roomId);
     expect(stored?.joinRequests?.some((j) => j.userId === 'uid-wait')).toBe(false);

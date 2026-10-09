@@ -9,8 +9,8 @@ import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
  */
 const created: string[] = [];
 
-async function makeRoom(hostName = 'Host Uno'): Promise<string> {
-  const { room } = await RoomService.createRoom({ hostName });
+async function makeRoom(leaderName = 'Host Uno'): Promise<string> {
+  const { room } = await RoomService.createRoom({ leaderName });
   created.push(room.roomId);
   return room.roomId;
 }
@@ -31,14 +31,14 @@ afterAll(async () => {
 });
 
 describe('RoomService.createRoom / getRoomById', () => {
-  it('crea una sala con código de 6 caracteres y registra al host', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: '  Ana  ' });
+  it('crea una sala con código de 6 caracteres y registra al leader', async () => {
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: '  Ana  ' });
     created.push(room.roomId);
     expect(room.roomId).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
-    expect(hostSecret).toMatch(/^[0-9a-f]{32}$/);
-    expect(room.hostName).toBe('Ana');
+    expect(leaderSecret).toMatch(/^[0-9a-f]{32}$/);
+    expect(room.leaderName).toBe('Ana');
     expect(room.participants).toHaveLength(1);
-    expect(room.participants[0]).toMatchObject({ name: 'Ana', isHost: true, role: 'host' });
+    expect(room.participants[0]).toMatchObject({ name: 'Ana', isLeader: true, role: 'leader' });
     expect(room.settings).toMatchObject({ muteOnEntry: false, allowMicReactivation: true });
   });
 
@@ -131,10 +131,10 @@ describe('RoomService: kick / unban', () => {
     expect(updated?.kickedUsers?.[0]).toMatchObject({ name: 'Pesado', kickedBy: 'Host', banned: false });
   });
 
-  it('no se puede expulsar al host', async () => {
+  it('no se puede expulsar al leader', async () => {
     const roomId = await makeRoom('Host');
     const updated = await RoomService.kickParticipant(roomId, { name: 'Host' }, 'Host', false);
-    expect(updated?.participants.some((p) => p.isHost)).toBe(true);
+    expect(updated?.participants.some((p) => p.isLeader)).toBe(true);
     expect(updated?.kickedUsers).toHaveLength(0);
   });
 
@@ -148,21 +148,21 @@ describe('RoomService: kick / unban', () => {
 });
 
 describe('RoomService: roles, rename y settings', () => {
-  it('promueve a cohost pero nunca degrada al host', async () => {
+  it('promueve a coleader pero nunca degrada al leader', async () => {
     const roomId = await makeRoom('Host');
     await RoomService.joinRoom(roomId, 'Ayudante', 'Web', 'u-ay');
-    await RoomService.setParticipantRole(roomId, 'Ayudante', 'cohost');
+    await RoomService.setParticipantRole(roomId, 'Ayudante', 'coleader');
     await RoomService.setParticipantRole(roomId, 'Host', 'member');
     const room = await RoomService.getRoomById(roomId);
-    expect(room?.participants.find((p) => p.name === 'Ayudante')?.role).toBe('cohost');
-    expect(room?.participants.find((p) => p.name === 'Host')?.role).toBe('host');
+    expect(room?.participants.find((p) => p.name === 'Ayudante')?.role).toBe('coleader');
+    expect(room?.participants.find((p) => p.name === 'Host')?.role).toBe('leader');
   });
 
-  it('rename actualiza hostName cuando el renombrado es el host', async () => {
+  it('rename actualiza leaderName cuando el renombrado es el leader', async () => {
     const roomId = await makeRoom('ViejoHost');
     await RoomService.renameParticipant(roomId, 'NuevoHost', { oldName: 'ViejoHost' });
     const room = await RoomService.getRoomById(roomId);
-    expect(room?.hostName).toBe('NuevoHost');
+    expect(room?.leaderName).toBe('NuevoHost');
   });
 
   it('rename con nombre vacío devuelve null', async () => {
@@ -182,23 +182,23 @@ describe('RoomService: roles, rename y settings', () => {
   });
 });
 
-describe('RoomService: transferencia de host y timer sweep', () => {
-  it('al salir el host, el siguiente participante hereda el rol', async () => {
+describe('RoomService: transferencia de leader y timer sweep', () => {
+  it('al salir el leader, el siguiente participante hereda el rol', async () => {
     const roomId = await makeRoom('HostOriginal');
     await RoomService.joinRoom(roomId, 'Segundo', 'Web', 'u-2');
     await RoomService.joinRoom(roomId, 'Tercero', 'Web', 'u-3');
-    const { room, newHostName } = await RoomService.removeParticipantAndTransferHost(roomId, 'HostOriginal');
-    expect(newHostName).toBe('Segundo');
-    expect(room?.hostName).toBe('Segundo');
-    expect(room?.participants.find((p) => p.name === 'Segundo')).toMatchObject({ isHost: true, role: 'host' });
+    const { room, newLeaderName } = await RoomService.removeParticipantAndTransferHost(roomId, 'HostOriginal');
+    expect(newLeaderName).toBe('Segundo');
+    expect(room?.leaderName).toBe('Segundo');
+    expect(room?.participants.find((p) => p.name === 'Segundo')).toMatchObject({ isLeader: true, role: 'leader' });
   });
 
-  it('al salir un miembro, el host no cambia', async () => {
+  it('al salir un miembro, el leader no cambia', async () => {
     const roomId = await makeRoom('Host');
     await RoomService.joinRoom(roomId, 'Miembro', 'Web', 'u-m');
-    const { room, newHostName } = await RoomService.removeParticipantAndTransferHost(roomId, 'Miembro', 'u-m');
-    expect(newHostName).toBeNull();
-    expect(room?.hostName).toBe('Host');
+    const { room, newLeaderName } = await RoomService.removeParticipantAndTransferHost(roomId, 'Miembro', 'u-m');
+    expect(newLeaderName).toBeNull();
+    expect(room?.leaderName).toBe('Host');
   });
 
   it('getRoomsPastTimer solo devuelve salas con timer vencido', async () => {

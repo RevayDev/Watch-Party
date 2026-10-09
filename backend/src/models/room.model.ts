@@ -8,8 +8,8 @@ const ParticipantSchema = new Schema<IParticipant>(
     socketId: { type: String },
     userId: { type: String },
     name: { type: String, required: true },
-    isHost: { type: Boolean, default: false },
-    role: { type: String, enum: ['host', 'cohost', 'member'], default: 'member' },
+    isLeader: { type: Boolean, default: false },
+    role: { type: String, enum: ['leader', 'coleader', 'member'], default: 'member' },
     joinedAt: { type: Date, default: Date.now },
     device: { type: String, default: 'Web Browser' },
   },
@@ -61,12 +61,12 @@ const RoomSchema = new Schema<RoomDocument>(
       trim: true,
       index: true,
     },
-    hostName: {
+    leaderName: {
       type: String,
       required: true,
       trim: true,
     },
-    hostSecret: {
+    leaderSecret: {
       type: String,
       required: true,
     },

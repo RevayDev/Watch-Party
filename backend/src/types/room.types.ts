@@ -1,10 +1,10 @@
-export type ParticipantRole = 'host' | 'cohost' | 'member';
+export type ParticipantRole = 'leader' | 'coleader' | 'member';
 
 export interface IParticipant {
   socketId?: string;
   userId?: string;
   name: string;
-  isHost: boolean;
+  isLeader: boolean;
   role: ParticipantRole;
   joinedAt: Date;
   device?: string;
@@ -50,7 +50,7 @@ export interface IRoomSettings {
   duckingEnabled?: boolean;
   /** Nivel de atenuación en % (10–60, default 30). */
   duckingLevel?: number;
-  /** Solo el anfitrión (host/cohost) controla la reproducción vía `sync-video`. Default OFF (cualquiera sincroniza). */
+  /** Solo el anfitrión (leader/coleader) controla la reproducción vía `sync-video`. Default OFF (cualquiera sincroniza). */
   hostOnlySync?: boolean;
 }
 
@@ -66,8 +66,8 @@ export interface IVideoMetadata {
 
 export interface IRoom {
   roomId: string;
-  hostName: string;
-  hostSecret: string;
+  leaderName: string;
+  leaderSecret: string;
   status: 'waiting' | 'active' | 'closed';
   isTemporary?: boolean;
   /** Plan de la sala (siempre 'free': compatibilidad con salas antiguas). */
@@ -82,7 +82,7 @@ export interface IRoom {
 }
 
 export interface CreateRoomDTO {
-  hostName: string;
+  leaderName: string;
   isTemporary?: boolean;
   userId?: string;
 }

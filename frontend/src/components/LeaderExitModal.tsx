@@ -1,7 +1,7 @@
 import React from 'react';
 import { BottomSheet } from '../shared/components/BottomSheet';
 
-interface HostExitModalProps {
+interface LeaderExitModalProps {
   isOpen: boolean;
   participantCount: number;
   isTemporary?: boolean;
@@ -10,7 +10,7 @@ interface HostExitModalProps {
   onDeleteRoomForAll: () => void;
 }
 
-export const HostExitModal: React.FC<HostExitModalProps> = ({
+export const LeaderExitModal: React.FC<LeaderExitModalProps> = ({
   isOpen,
   participantCount,
   isTemporary = true,
@@ -24,27 +24,27 @@ export const HostExitModal: React.FC<HostExitModalProps> = ({
     <BottomSheet
       open={isOpen}
       onClose={onClose}
-      label="Opciones de salida"
-      className="host-exit-modal"
+      label="¿Estás seguro de que quieres salir?"
+      className="leader-exit-modal"
     >
         <div className="modal-card__header">
-          <h3 className="host-exit-modal__title">Opciones de salida</h3>
+          <h3 className="leader-exit-modal__title">¿Estás seguro de que quieres salir?</h3>
         </div>
 
-        <p className="host-exit-modal__desc">
+        <p className="leader-exit-modal__desc">
           {isTemporary
             ? 'Esta sala está en modo Temporal. Al finalizar la sala se cerrará y se borrarán los archivos.'
             : 'Esta sala está en modo Permanente / Guardado. Puedes salir sin borrar la sala ni el video.'}
         </p>
 
-        <div className="host-exit-modal__actions">
+        <div className="leader-exit-modal__actions">
           {/* Salir sólo yo (siempre disponible para anfitrión en salas permanentes, o cuando hay más participantes) */}
           <button
             type="button"
             onClick={onLeaveOnlyMe}
-            className="host-exit-modal__opt-btn host-exit-modal__opt-btn--transfer"
+            className="leader-exit-modal__opt-btn leader-exit-modal__opt-btn--transfer"
           >
-            <div className="host-exit-modal__btn-text">
+            <div className="leader-exit-modal__btn-text">
               <strong>Salir de la sala (Conservar sala)</strong>
               <span>
                 {hasOtherParticipants
@@ -58,9 +58,9 @@ export const HostExitModal: React.FC<HostExitModalProps> = ({
           <button
             type="button"
             onClick={onDeleteRoomForAll}
-            className="host-exit-modal__opt-btn host-exit-modal__opt-btn--danger"
+            className="leader-exit-modal__opt-btn leader-exit-modal__opt-btn--danger"
           >
-            <div className="host-exit-modal__btn-text">
+            <div className="leader-exit-modal__btn-text">
               <strong>{isTemporary ? 'Cerrar y eliminar sala' : 'Eliminar sala permanentemente'}</strong>
               <span>Desconecta a todos los miembros y elimina el registro de la sala.</span>
             </div>
@@ -70,7 +70,7 @@ export const HostExitModal: React.FC<HostExitModalProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="host-exit-modal__cancel-btn"
+          className="leader-exit-modal__cancel-btn"
         >
           Cancelar
         </button>

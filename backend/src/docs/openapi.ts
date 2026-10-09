@@ -8,7 +8,7 @@
 
 const HOST_HEADERS = [
   {
-    name: 'x-host-secret',
+    name: 'x-leader-secret',
     in: 'header',
     required: false,
     description: 'Secreto del anfitrión (acciones privilegiadas).',
@@ -76,9 +76,9 @@ export const openapiSpec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['hostName'],
+                required: ['leaderName'],
                 properties: {
-                  hostName: { type: 'string', example: 'Ana' },
+                  leaderName: { type: 'string', example: 'Ana' },
                   isTemporary: { type: 'boolean', default: true },
                   userId: { type: 'string' },
                 },
@@ -88,15 +88,15 @@ export const openapiSpec = {
         },
         responses: {
           '201': {
-            description: 'Sala creada. ¡Guarda el hostSecret!',
+            description: 'Sala creada. ¡Guarda el leaderSecret!',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
                     roomId: { type: 'string', example: 'KX7Q2P' },
-                    hostName: { type: 'string' },
-                    hostSecret: { type: 'string' },
+                    leaderName: { type: 'string' },
+                    leaderSecret: { type: 'string' },
                     status: { type: 'string', example: 'waiting' },
                     isTemporary: { type: 'boolean' },
                     createdAt: { type: 'string', format: 'date-time' },
@@ -193,7 +193,7 @@ export const openapiSpec = {
     '/api/rooms/{roomId}/video': {
       post: {
         tags: ['Video'],
-        summary: 'Subir video (solo anfitrión; deshabilitado en demo)',
+        summary: 'Subir video (anfitrión o co-anfitrión; deshabilitado en demo)',
         parameters: [{ $ref: '#/components/parameters/RoomId' }, ...HOST_HEADERS],
         requestBody: {
           required: true,
@@ -217,7 +217,7 @@ export const openapiSpec = {
     '/api/rooms/{roomId}/video-url': {
       post: {
         tags: ['Video'],
-        summary: 'Poner video por enlace Drive/HLS (solo anfitrión)',
+        summary: 'Poner video por enlace Drive/HLS (anfitrión o co-anfitrión)',
         parameters: [{ $ref: '#/components/parameters/RoomId' }, ...HOST_HEADERS],
         requestBody: {
           required: true,
@@ -332,8 +332,8 @@ export const openapiSpec = {
         properties: {
           name: { type: 'string' },
           userId: { type: 'string' },
-          isHost: { type: 'boolean' },
-          role: { type: 'string', enum: ['host', 'cohost', 'member'] },
+          isLeader: { type: 'boolean' },
+          role: { type: 'string', enum: ['leader', 'coleader', 'member'] },
           joinedAt: { type: 'string', format: 'date-time' },
           device: { type: 'string' },
         },
@@ -366,7 +366,7 @@ export const openapiSpec = {
         type: 'object',
         properties: {
           roomId: { type: 'string' },
-          hostName: { type: 'string' },
+          leaderName: { type: 'string' },
           status: { type: 'string', enum: ['waiting', 'active', 'closed'] },
           isTemporary: { type: 'boolean' },
           settings: { $ref: '#/components/schemas/RoomSettings' },

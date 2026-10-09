@@ -157,11 +157,11 @@ describe('demo: límite de 5 salas por servidor', () => {
     await drain();
     expect(await RoomService.countLiveRooms()).toBe(0);
     for (let i = 0; i < 5; i++) {
-      const { room } = await RoomService.createRoom({ hostName: `H${i}` });
+      const { room } = await RoomService.createRoom({ leaderName: `H${i}` });
       created.push(room.roomId);
     }
     expect(await RoomService.countLiveRooms()).toBe(5);
-    const err = await RoomService.createRoom({ hostName: 'Extra' }).catch((e) => e);
+    const err = await RoomService.createRoom({ leaderName: 'Extra' }).catch((e) => e);
     expect(err).toBeInstanceOf(DemoCapacityError);
     expect((err as DemoCapacityError).statusCode).toBe(429);
     expect((err as DemoCapacityError).code).toBe('DEMO_ROOM_LIMIT');
@@ -174,7 +174,7 @@ describe('demo: límite de 5 salas por servidor', () => {
   it('concurrencia: 7 creates paralelos → exactamente 5 OK y 2 rechazados 429', async () => {
     await drain();
     const results = await Promise.allSettled(
-      Array.from({ length: 7 }, (_, i) => RoomService.createRoom({ hostName: `C${i}` }))
+      Array.from({ length: 7 }, (_, i) => RoomService.createRoom({ leaderName: `C${i}` }))
     );
     const ok = results.filter((r) => r.status === 'fulfilled');
     const ko = results.filter((r) => r.status === 'rejected');
@@ -194,11 +194,11 @@ describe('demo: límite de 5 salas por servidor', () => {
   it('REST create con cupo agotado → 429 con el mensaje exacto (no 500)', async () => {
     await drain();
     for (let i = 0; i < 5; i++) {
-      const { room } = await RoomService.createRoom({ hostName: `H${i}` });
+      const { room } = await RoomService.createRoom({ leaderName: `H${i}` });
       created.push(room.roomId);
     }
     const res = mockRes();
-    await RoomController.create(mockReq({}, { hostName: 'Extra' }, {}) as any, res, next);
+    await RoomController.create(mockReq({}, { leaderName: 'Extra' }, {}) as any, res, next);
     expect(res.status).toHaveBeenCalledWith(429);
     expect(res.body).toEqual({ error: DEMO_ROOM_LIMIT_MESSAGE });
   });
@@ -206,13 +206,13 @@ describe('demo: límite de 5 salas por servidor', () => {
   it('eliminar una sala libera cupo: se puede crear de nuevo', async () => {
     await drain();
     for (let i = 0; i < 5; i++) {
-      const { room } = await RoomService.createRoom({ hostName: `H${i}` });
+      const { room } = await RoomService.createRoom({ leaderName: `H${i}` });
       created.push(room.roomId);
     }
     const doomed = created.shift()!;
     expect(await RoomService.deleteRoom(doomed, true)).toBe(true);
     expect(await RoomService.countLiveRooms()).toBe(4);
-    const { room } = await RoomService.createRoom({ hostName: 'Nueva' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Nueva' });
     created.push(room.roomId);
     expect(await RoomService.countLiveRooms()).toBe(5);
   });
@@ -224,7 +224,7 @@ describe('demo: límite de 5 salas por servidor', () => {
     expect(res0.body).toEqual({ roomsUsed: 0, roomsTotal: 5, roomsAvailable: 5 });
 
     for (let i = 0; i < 2; i++) {
-      const { room } = await RoomService.createRoom({ hostName: `H${i}` });
+      const { room } = await RoomService.createRoom({ leaderName: `H${i}` });
       created.push(room.roomId);
     }
     const res = mockRes();
@@ -244,7 +244,7 @@ describe('demo: límite de 5 usuarios por sala (reserva atómica)', () => {
   });
 
   async function makeFullRoom(): Promise<string> {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     for (let i = 1; i <= 4; i++) {
       await RoomService.joinRoom(room.roomId, `U${i}`, 'Web', `uid-${i}`);
@@ -265,7 +265,7 @@ describe('demo: límite de 5 usuarios por sala (reserva atómica)', () => {
   });
 
   it('reserva atómica: 3 joins paralelos sobre 4 → solo 1 entra (total 5)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     for (let i = 1; i <= 3; i++) {
       await RoomService.joinRoom(room.roomId, `U${i}`, 'Web', `uid-${i}`);
@@ -305,7 +305,7 @@ describe('demo: límite de 5 usuarios por sala (reserva atómica)', () => {
   });
 
   it('merge legacy con cupo lleno no consume cupo (sigue en 5)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Anon', 'Web');
     for (let i = 1; i <= 3; i++) {
@@ -348,7 +348,7 @@ describe('demo: límite de 5 usuarios por sala (reserva atómica)', () => {
 
   it('sala que queda vacía se elimina y libera cupo de salas', async () => {
     const before = await RoomService.countLiveRooms();
-    const { room } = await RoomService.createRoom({ hostName: 'Solo' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Solo' });
     created.push(room.roomId);
     expect(await RoomService.countLiveRooms()).toBe(before + 1);
     await RoomService.removeParticipantAndTransferHost(room.roomId, 'Solo');
@@ -369,7 +369,7 @@ describe('demo: límite de 5 usuarios por sala (reserva atómica)', () => {
   });
 
   it('demo fuerza isTemporary=true en create y en update de settings', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'H', isTemporary: false });
+    const { room } = await RoomService.createRoom({ leaderName: 'H', isTemporary: false });
     created.push(room.roomId);
     expect(room.isTemporary).toBe(true);
     expect(room.settings?.isTemporary).toBe(true);
@@ -385,7 +385,7 @@ describe('demo: upload deshabilitado (Drive/proxy intactos por código)', () => 
   });
 
   it('controlador responde 403 con mensaje claro (respaldo tras multer)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const res = mockRes();
     await RoomController.uploadVideo(
@@ -458,14 +458,14 @@ describe('demo off: comportamiento original restaurado', () => {
   it('sin tope de salas: 6 salas simultáneas OK', async () => {
     await drain();
     for (let i = 0; i < 6; i++) {
-      const { room } = await RoomService.createRoom({ hostName: `H${i}` });
+      const { room } = await RoomService.createRoom({ leaderName: `H${i}` });
       created.push(room.roomId);
     }
     expect(await RoomService.countLiveRooms()).toBe(6);
   });
 
   it('sin tope de usuarios: 11 participantes OK', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     for (let i = 1; i <= 10; i++) {
       await RoomService.joinRoom(room.roomId, `U${i}`, 'Web', `uid-${i}`);
@@ -474,7 +474,7 @@ describe('demo off: comportamiento original restaurado', () => {
   });
 
   it('isTemporary:false se conserva (create servicio + REST + update settings)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'H', isTemporary: false });
+    const { room } = await RoomService.createRoom({ leaderName: 'H', isTemporary: false });
     created.push(room.roomId);
     expect(room.isTemporary).toBe(false);
     const updated = await RoomService.updateSettings(room.roomId, { isTemporary: false });
@@ -482,7 +482,7 @@ describe('demo off: comportamiento original restaurado', () => {
     expect(updated?.settings?.isTemporary).toBe(false);
 
     const res = mockRes();
-    await RoomController.create(mockReq({}, { hostName: 'X', isTemporary: false }, {}) as any, res, next);
+    await RoomController.create(mockReq({}, { leaderName: 'X', isTemporary: false }, {}) as any, res, next);
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.body.isTemporary).toBe(false);
     created.push(res.body.roomId);

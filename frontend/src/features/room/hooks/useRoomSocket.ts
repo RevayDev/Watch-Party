@@ -8,7 +8,7 @@ import { useWebRTC } from '../../../hooks/useWebRTC';
 import { useSwipeDown } from '../../../shared/hooks/useSheetDrag';
 import { usePresence } from '../../../hooks/usePresence';
 import { STORAGE_KEYS } from '../../../shared/constants';
-import { buildSocketAuth, resolveJoinRejectedFeedback, saveHostSession } from '../../../shared/utils';
+import { buildSocketAuth, resolveJoinRejectedFeedback, saveLeaderSession } from '../../../shared/utils';
 import { playJoinSound, playLeaveSound, playChatSound } from '../utils/sounds';
 import { clampDuckPct, DUCK_DEFAULT_PCT, heartbeatIntervalMs } from '../../../shared/perf';
 import {
@@ -22,7 +22,7 @@ import {
 export interface UseRoomSocketArgs {
   roomId: string;
   userName: string;
-  initialIsHost: boolean;
+  initialIsLeader: boolean;
   onLeave: () => void;
 }
 
@@ -47,7 +47,7 @@ export const TYPING_THROTTLE_MS = 2000;
  * Toda la lógica socket/estado extraída verbatim de pages/Room.tsx.
  * El componente queda como composición (sin lógica de negocio aquí alterada).
  */
-export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseRoomSocketArgs) {
+export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: UseRoomSocketArgs) {
   // Stable user identity for this browser (never changes on rename → no duplicates)
   const userId = useMemo(() => {
     try {
@@ -91,10 +91,10 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   const [error, setError] = useState('');
   // True once the server confirmed entry with 'room-state' (blocks UI flash)
   const [joined, setJoined] = useState(false);
-  const [isHost, setIsHost] = useState(initialIsHost);
-  // Ref mirror of isHost so socket handlers never read a stale value
-  const isHostRef = useRef(isHost);
-  isHostRef.current = isHost;
+  const [isLeader, setIsLeader] = useState(initialIsLeader);
+  // Ref mirror of isLeader so socket handlers never read a stale value
+  const isLeaderRef = useRef(isLeader);
+  isLeaderRef.current = isLeader;
   // Ref mirrors of roomData/myName so sync guards and new handlers always
   // read the current value (no stale closures in callbacks estables).
   const roomDataRef = useRef(roomData);
@@ -103,7 +103,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   myNameRef.current = myName;
   // Ref mirror of pending request count (for "new request" toasts)
   const joinRequestsLenRef = useRef(0);
-  const [showHostExitModal, setShowHostExitModal] = useState(false);
+  const [showLeaderExitModal, setShowLeaderExitModal] = useState(false);
   const [showMemberExitModal, setShowMemberExitModal] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
@@ -251,7 +251,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     toggleMic,
     toggleCamera,
     enableMedia,
-  } = useWebRTC(socket, roomId, myName, isHost);
+  } = useWebRTC(socket, roomId, myName, isLeader);
 
   // Pill "Reconectando…": true entre `disconnect`/`reconnect_attempt` y el
   // próximo `connect`/`room-state`. NUNCA destruye sala/chat/video ni emite
@@ -259,7 +259,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   // servidor + el re-join automático en `connect` (ver efecto gigante).
   const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // Espejos por ref del estado media/host para el efecto socket gigante.
+  // Espejos por ref del estado media/leader para el efecto socket gigante.
   // Sin esto, togglear mic/cámara cambiaba isMicOn/isCameraOn (deps del
   // efecto) y re-ejecutaba loadRoom + join-room → recarga/reconexión.
   const enableMediaRef = useRef(enableMedia);
@@ -295,11 +295,11 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   // Clears local data only for THIS room (keeps sessions of other rooms intact)
   const clearRoomLocalData = useCallback(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.HOST_SESSION);
+      const raw = localStorage.getItem(STORAGE_KEYS.LEADER_SESSION);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed?.roomId && parsed.roomId.toUpperCase() === roomId.toUpperCase()) {
-          localStorage.removeItem(STORAGE_KEYS.HOST_SESSION);
+          localStorage.removeItem(STORAGE_KEYS.LEADER_SESSION);
         }
       }
     } catch {
@@ -314,7 +314,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
 
     // Join room via Socket.IO (hoisted so it can be unsubscribed on cleanup)
     const emitJoin = () => {
-      socket.emit('join-room', { roomId, userName: myName, isHost: initialIsHost, userId });
+      socket.emit('join-room', { roomId, userName: myName, isLeader: initialIsLeader, userId });
     };
 
     async function loadRoom() {
@@ -323,10 +323,10 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
         const data = await ApiService.getRoom(roomId);
         if (isMounted) {
           setRoomData(data);
-          if (data.hostName.toLowerCase() === myName.toLowerCase()) {
-            setIsHost(true);
-            // Preserva el hostSecret ya guardado para esta sala, si existe
-            saveHostSession(roomId, myName);
+          if (data.leaderName.toLowerCase() === myName.toLowerCase()) {
+            setIsLeader(true);
+            // Preserva el leaderSecret ya guardado para esta sala, si existe
+            saveLeaderSession(roomId, myName);
           }
         }
 
@@ -347,8 +347,8 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     const handleRoomState = (state: {
       video: any;
       participants: any[];
-      hostName?: string;
-      isHost?: boolean;
+      leaderName?: string;
+      isLeader?: boolean;
       isTemporary?: boolean;
       settings?: any;
       joinRequests?: any[];
@@ -373,7 +373,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       // Re-conexión completada: el servidor confirmó la sala (no se perdió nada).
       setIsReconnecting(false);
       joinRequestsLenRef.current = state.joinRequests?.length || 0;
-      if (state.isHost !== undefined) setIsHost(state.isHost);
+      if (state.isLeader !== undefined) setIsLeader(state.isLeader);
 
       // Admitted from the waiting lobby → apply the mic/cam prefs chosen there
       if (applyMediaOnJoinRef.current) {
@@ -402,22 +402,27 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       }
     };
 
-    const handleHostChanged = (data: { newHostName: string; participants: any[] }) => {
+    const handleLeaderChanged = (data: { newLeaderName: string; participants: any[] }) => {
       setRoomData((prev) =>
-        prev ? { ...prev, participants: data.participants, hostName: data.newHostName } : null
+        prev ? { ...prev, participants: data.participants, leaderName: data.newLeaderName } : null
       );
-      const amINewHost = data.newHostName.toLowerCase() === myName.toLowerCase();
+      const amINewHost = data.newLeaderName.toLowerCase() === myName.toLowerCase();
       if (amINewHost) {
-        setIsHost(true);
-        // Preserva el hostSecret ya guardado para esta sala, si existe
-        saveHostSession(roomId, myName);
+        setIsLeader(true);
+        // Preserva el leaderSecret ya guardado para esta sala, si existe
+        saveLeaderSession(roomId, myName);
+        notify('success', 'Ahora eres el anfitrión de la sala.', 'Nuevo rol');
+      } else if (isLeaderRef.current) {
+        // Yo era el anfitrión y la sala pasó a otro: bajo a co-anfitrión.
+        setIsLeader(false);
+        notify('info', `Le entregaste la sala a ${data.newLeaderName}. Ahora eres co-anfitrión.`, 'Rol actualizado');
       }
       setMessages((prev) => [
         ...prev,
         {
           id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           user: 'Sistema',
-          text: `👑 ${data.newHostName} es ahora el nuevo Anfitrión (Host) de la sala`,
+          text: `👑 ${data.newLeaderName} es ahora el nuevo anfitrión de la sala`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -534,9 +539,11 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
 
     const handleReactionEvent = (reaction: ReactionItem) => {
       setReactions((prev) => [...prev, reaction]);
+      // Limpieza tras la animación de globo de helio (máx 5.5 s + margen)
+      const cleanupMs = ((reaction.floatDuration ?? 4.2) * 1000) + 400;
       setTimeout(() => {
         setReactions((prev) => prev.filter((r) => r.id !== reaction.id));
-      }, 2600);
+      }, cleanupMs);
 
       // ── Combo Interestellar: 🪐 + ✨ de usuarios DISTINTOS en ≤5 s ──
       if (!visualEffectsRef.current) return;
@@ -599,13 +606,13 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     };
 
     const handleForceMuteAll = () => {
-      if (!isHostRef.current) {
+      if (!isLeaderRef.current) {
         enableMediaRef.current(false, isCameraOnRef.current);
       }
     };
 
     const handleForceDisableAllCameras = () => {
-      if (!isHostRef.current) {
+      if (!isLeaderRef.current) {
         enableMediaRef.current(isMicOnRef.current, false);
       }
     };
@@ -659,8 +666,8 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     const handleParticipantRoleUpdated = (data: { targetUserName: string; role: string; participants: any[] }) => {
       setRoomData((prev) => (prev ? { ...prev, participants: data.participants } : null));
       if (data.targetUserName.toLowerCase() === myName.toLowerCase()) {
-        if (data.role === 'cohost') {
-          notify('success', '¡Ahora eres Co-Afitrión de la sala!', 'Nuevo rol');
+        if (data.role === 'coleader') {
+          notify('success', '¡Ahora eres co-anfitrión de la sala!', 'Nuevo rol');
         }
       }
       setMessages((prev) => [
@@ -668,7 +675,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
         {
           id: `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           user: 'Sistema',
-          text: `🎖️ ${data.targetUserName} ahora tiene el rol: ${data.role === 'cohost' ? 'Co-Afitrión' : 'Miembro'}`,
+          text: `🎖️ ${data.targetUserName} ahora tiene el rol: ${data.role === 'coleader' ? 'Co-anfitrión' : 'Miembro'}`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -690,12 +697,12 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       if (isMe && data.newName !== myName) {
         setMyName(data.newName);
         try {
-          const raw = localStorage.getItem(STORAGE_KEYS.HOST_SESSION);
+          const raw = localStorage.getItem(STORAGE_KEYS.LEADER_SESSION);
           if (raw) {
             const parsed = JSON.parse(raw);
-            if (parsed?.roomId?.toUpperCase() === roomId.toUpperCase() && parsed.hostName === data.oldName) {
-              parsed.hostName = data.newName;
-              localStorage.setItem(STORAGE_KEYS.HOST_SESSION, JSON.stringify(parsed));
+            if (parsed?.roomId?.toUpperCase() === roomId.toUpperCase() && parsed.leaderName === data.oldName) {
+              parsed.leaderName = data.newName;
+              localStorage.setItem(STORAGE_KEYS.LEADER_SESSION, JSON.stringify(parsed));
             }
           }
         } catch {
@@ -726,7 +733,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       applyMediaOnJoinRef.current = true;
       setAwaitingApproval(false);
       // Re-run the join flow now that we were accepted
-      socket.emit('join-room', { roomId, userName: myName, isHost: initialIsHost, userId });
+      socket.emit('join-room', { roomId, userName: myName, isLeader: initialIsLeader, userId });
     };
 
     const handleJoinRejected = (data: { reason?: string; message?: string }) => {
@@ -744,8 +751,8 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       const prevLen = joinRequestsLenRef.current;
       joinRequestsLenRef.current = nextList.length;
       setRoomData((prev) => (prev ? { ...prev, joinRequests: nextList } : prev));
-      // Host/co-host: pop a toast when a NEW join request arrives
-      if (nextList.length > prevLen && isHostRef.current) {
+      // Host/co-leader: pop a toast when a NEW join request arrives
+      if (nextList.length > prevLen && isLeaderRef.current) {
         const newest = nextList[nextList.length - 1];
         notify(
           'info',
@@ -779,16 +786,16 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       notify('warning', data.message || 'No tienes permiso para realizar esa acción.', 'Acción denegada');
     };
 
-    // Nuevo host: el servidor envía el secreto para acreditarse en próximos emits.
-    const handleHostSecret = (data: { hostSecret?: string }) => {
-      if (data?.hostSecret) {
-        saveHostSession(roomId, myNameRef.current, data.hostSecret);
+    // Nuevo leader: el servidor envía el secreto para acreditarse en próximos emits.
+    const handleHostSecret = (data: { leaderSecret?: string }) => {
+      if (data?.leaderSecret) {
+        saveLeaderSession(roomId, myNameRef.current, data.leaderSecret);
         notify('success', 'Ahora eres el anfitrión de la sala.', 'Anfitrión');
       }
     };
 
     socket.on('room-state', handleRoomState);
-    socket.on('host-changed', handleHostChanged);
+    socket.on('leader-changed', handleLeaderChanged);
     socket.on('room-closed', handleRoomClosed);
     socket.on('user-joined', handleUserJoined);
     socket.on('user-left', handleUserLeft);
@@ -813,7 +820,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     socket.on('join-requests-updated', handleJoinRequestsUpdated);
     socket.on('settings-error', handleSettingsError);
     socket.on('action-denied', handleActionDenied);
-    socket.on('host-secret', handleHostSecret);
+    socket.on('leader-secret', handleHostSecret);
 
     // ── Estado de conexión (pill "Reconectando…", Rol A) ───────────────────
     // Caída transitoria: SOLO se marca el pill. No se emite `leave-room`,
@@ -837,7 +844,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       isMounted = false;
       socket.off('connect', emitJoin);
       socket.off('room-state', handleRoomState);
-      socket.off('host-changed', handleHostChanged);
+      socket.off('leader-changed', handleLeaderChanged);
       socket.off('room-closed', handleRoomClosed);
       socket.off('user-joined', handleUserJoined);
       socket.off('user-left', handleUserLeft);
@@ -862,12 +869,12 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
       socket.off('join-requests-updated', handleJoinRequestsUpdated);
       socket.off('settings-error', handleSettingsError);
       socket.off('action-denied', handleActionDenied);
-      socket.off('host-secret', handleHostSecret);
+      socket.off('leader-secret', handleHostSecret);
       socket.off('disconnect', handleSocketDisconnect);
       socket.off('reconnect_attempt', handleReconnectAttempt);
       socket.off('reconnect', handleSocketReconnect);
     };
-  }, [roomId, myName, initialIsHost, socket, onLeave, userId, clearRoomLocalData]);
+  }, [roomId, myName, initialIsLeader, socket, onLeave, userId, clearRoomLocalData]);
 
   // Aviso de 10 minutos restantes (solo 1 vez por sesión)
   useEffect(() => {
@@ -888,7 +895,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const handleToggleTemporaryMode = () => {
-    if (!isHost || !roomData) return;
+    if (!isLeader || !roomData) return;
     const currentIsTemp = roomData.isTemporary !== false;
     const nextIsTemp = !currentIsTemp;
     socket.emit('update-room-settings', {
@@ -912,7 +919,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
 
   // ⚙ Configuración de sala: nombre + información
   const handleSaveRoomDetails = (name: string, description: string) => {
-    if (!isHost || !roomData) return;
+    if (!isLeader || !roomData) return;
     socket.emit('update-room-settings', {
       roomId,
       settings: { ...roomData.settings, name, description },
@@ -930,7 +937,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
 
   // ⚙ Configuración de sala: temporizador de cierre automático (minutes = null → eliminar)
   const handleSetRoomTimer = (minutes: number | null) => {
-    if (!isHost || !roomData) return;
+    if (!isLeader || !roomData) return;
     const timerEndsAt = minutes ? new Date(Date.now() + minutes * 60000).toISOString() : null;
     socket.emit('update-room-settings', {
       roomId,
@@ -952,7 +959,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   // difunde `room-settings-updated`. Optimista en local para respuesta inmediata.
   const handleUpdatePerfSettings = useCallback(
     (patch: Partial<IRoomSettings>) => {
-      if (!isHostRef.current) return;
+      if (!isLeaderRef.current) return;
       setRoomData((prev) =>
         prev
           ? { ...prev, settings: { ...prev.settings, ...patch } as IRoomData['settings'] }
@@ -1011,12 +1018,12 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   }, []);
 
   const handleLeaveClick = () => {
-    if (isHost) setShowHostExitModal(true);
+    if (isLeader) setShowLeaderExitModal(true);
     else setShowMemberExitModal(true);
   };
 
   const handleLeaveOnlyMe = () => {
-    setShowHostExitModal(false);
+    setShowLeaderExitModal(false);
     setShowMemberExitModal(false);
     // Host session + recent room are KEPT so the room can be recovered from Home
     socket.emit('leave-room', { roomId, userName: myName, userId });
@@ -1025,7 +1032,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
   };
 
   const handleDeleteRoomForAll = () => {
-    setShowHostExitModal(false);
+    setShowLeaderExitModal(false);
     clearRoomLocalData();
     socket.emit('close-room', { roomId, ...buildSocketAuth(roomId, myName) });
     disconnectSocket();
@@ -1051,32 +1058,34 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     }
   };
 
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
+
   const handleSetVideoUrl = async (url: string, title?: string) => {
     try {
-      setLoading(true);
+      setIsVideoLoading(true);
       const res = await ApiService.setVideoUrl(roomId, url, title);
       setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
       socket.emit('video-changed', { roomId, video: res.video, ...buildSocketAuth(roomId, myName) });
     } catch (err: any) {
       notify('error', err.message || 'Error al cargar el enlace de video', 'Error al cargar video');
     } finally {
-      setLoading(false);
+      setIsVideoLoading(false);
     }
   };
 
   const handleSyncAction = useCallback(
     (action: 'play' | 'pause' | 'seek', currentTime: number) => {
-      // Pre-chequeo local: con hostOnlySync solo host/cohost emiten sync-video.
+      // Pre-chequeo local: con hostOnlySync solo leader/coleader emiten sync-video.
       // El servidor también lo niega (action-denied); esto evita el viaje.
       const snapshot = roomDataRef.current;
       if (snapshot?.settings?.hostOnlySync === true) {
         const myNameVigente = myNameRef.current;
-        const cohost = (snapshot.participants ?? []).some(
+        const coleader = (snapshot.participants ?? []).some(
           (p) =>
             (p.userId ? p.userId === userId : p.name.toLowerCase() === myNameVigente.toLowerCase()) &&
-            p.role === 'cohost'
+            p.role === 'coleader'
         );
-        if (!isHostRef.current && !cohost) {
+        if (!isLeaderRef.current && !coleader) {
           notify('warning', 'Solo el anfitrión controla la reproducción.', 'Reproducción bloqueada');
           return;
         }
@@ -1143,6 +1152,17 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     socket.emit('send-reaction', { roomId, emoji, userName: myName });
   };
 
+  // ¿Soy co-anfitrión? (el anfitrión también cambia video: ver VideoPlayer).
+  const isCohost = useMemo(() => {
+    const list = roomData?.participants ?? [];
+    const me = myName.trim().toLowerCase();
+    return list.some(
+      (p) =>
+        (p.userId ? p.userId === userId : p.name.toLowerCase() === me) &&
+        p.role === 'coleader'
+    );
+  }, [roomData?.participants, myName, userId]);
+
   const handleCancelWaiting = () => {
     setAwaitingApproval(false);
     // Cancels the join request server-side (leave-room handles pending users)
@@ -1163,9 +1183,10 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     loading,
     error,
     joined,
-    isHost,
-    showHostExitModal,
-    setShowHostExitModal,
+    isLeader,
+    isCohost,
+    showLeaderExitModal,
+    setShowLeaderExitModal,
     showMemberExitModal,
     setShowMemberExitModal,
     messages,
@@ -1224,6 +1245,7 @@ export function useRoomSocket({ roomId, userName, initialIsHost, onLeave }: UseR
     handleDeleteRoomForAll,
     handleUploadVideo,
     handleSetVideoUrl,
+    isVideoLoading,
     handleSyncAction,
     handlePlaybackHeartbeat,
     handleVideoReady,

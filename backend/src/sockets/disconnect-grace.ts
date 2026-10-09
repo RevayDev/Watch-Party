@@ -2,7 +2,7 @@
  * Gracia de refresh ante `disconnect` (H3).
  *
  * Si el usuario tiene userId, su eliminación de participantes y la
- * transferencia de host se difieren 20s (clave `${roomId}:${userId}`).
+ * transferencia de leader se difieren 20s (clave `${roomId}:${userId}`).
  * Si reaparece vía `join-room` dentro de la ventana, el temporizador se
  * cancela y conserva participante + rol (nunca se llegó a eliminar).
  *

@@ -1,7 +1,7 @@
 export interface RecentRoom {
   roomId: string;
-  hostName: string;
-  role: 'host' | 'guest';
+  leaderName: string;
+  role: 'leader' | 'guest';
   lastJoined: number;
   roomName?: string;
   roomDescription?: string;
@@ -23,21 +23,21 @@ export function getRecentRooms(): RecentRoom[] {
   }
 }
 
-export function saveRecentRoom(roomId: string, hostName: string, role: 'host' | 'guest'): void {
+export function saveRecentRoom(roomId: string, leaderName: string, role: 'leader' | 'guest'): void {
   try {
     const cleanId = roomId.toUpperCase().trim();
     const prev = getRecentRooms().find((r) => r.roomId === cleanId);
     const list = getRecentRooms().filter((r) => r.roomId !== cleanId);
     list.unshift({
       roomId: cleanId,
-      hostName,
+      leaderName,
       role,
       lastJoined: Date.now(),
       roomName: prev?.roomName,
       roomDescription: prev?.roomDescription,
     });
     localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(list.slice(0, MAX_RECENT)));
-    if (hostName.trim()) localStorage.setItem(LAST_USERNAME_KEY, hostName.trim());
+    if (leaderName.trim()) localStorage.setItem(LAST_USERNAME_KEY, leaderName.trim());
   } catch {
     // storage full / unavailable
   }

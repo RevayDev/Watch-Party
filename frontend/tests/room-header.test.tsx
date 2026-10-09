@@ -13,7 +13,7 @@ describe('RoomHeader — reloj de sala y temporizador', () => {
       <RoomHeader
         roomId="TEST12"
         participantCount={3}
-        isHost={true}
+        isLeader={true}
         createdAt={createdAt}
         timerEndsAt={timerEndsAt}
       />

@@ -12,9 +12,9 @@ export interface ParticipantDetailProps {
   isSameUser: (p: IParticipant) => boolean;
   canModerateTarget: (p: IParticipant) => boolean;
   canModerate: boolean;
-  /** Solo el host gestiona roles (promover/degradar cohost, pasar sala). */
+  /** Solo el anfitrión gestiona roles (promover/degradar co-anfitrión, pasar sala). */
   canManageRoles?: boolean;
-  isHost?: boolean;
+  isLeader?: boolean;
   isRenaming: boolean;
   newNameVal: string;
   setNewNameVal: (v: string) => void;
@@ -23,7 +23,7 @@ export interface ParticipantDetailProps {
   saveRename: () => void;
   onKickUser?: (targetUserName: string, targetUserId?: string) => void;
   onBanUser?: (targetUserName: string, targetUserId?: string) => void;
-  onToggleCoHost?: (targetUserName: string, makeCoHost: boolean) => void;
+  onToggleCoLeader?: (targetUserName: string, makeCoLeader: boolean) => void;
   onTransferHost?: (targetUserName: string, targetUserId?: string) => void;
   onSelectNone: () => void;
 }
@@ -37,7 +37,7 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
   canModerateTarget,
   canModerate,
   canManageRoles = false,
-  isHost = false,
+  isLeader = false,
   isRenaming,
   newNameVal,
   setNewNameVal,
@@ -46,12 +46,12 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
   saveRename,
   onKickUser,
   onBanUser,
-  onToggleCoHost,
+  onToggleCoLeader,
   onTransferHost,
   onSelectNone,
 }) => {
-  const isTargetHost = detailView.isHost || detailView.role === 'host';
-  const isTargetCoHost = !isTargetHost && detailView.role === 'cohost';
+  const isTargetHost = detailView.isLeader || detailView.role === 'leader';
+  const isTargetCoLeader = !isTargetHost && detailView.role === 'coleader';
   return (
     <BottomSheet
       open={open}
@@ -75,10 +75,10 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
             <h3>{detailView.name}</h3>
             {isSameUser(detailView) ? (
               <span className="part-name-tag">(Tú)</span>
-            ) : detailView.isHost || detailView.role === 'host' ? (
-              <span className="part-name-tag">(Host)</span>
-            ) : detailView.role === 'cohost' ? (
-              <span className="part-name-tag">(Co-Host)</span>
+            ) : detailView.isLeader || detailView.role === 'leader' ? (
+              <span className="part-name-tag">(Anfitrión)</span>
+            ) : detailView.role === 'coleader' ? (
+              <span className="part-name-tag">(Co-anfitrión)</span>
             ) : null}
           </div>
           <span className="part-detail-status">● En línea</span>
@@ -113,7 +113,7 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
           <div className="part-rename-modal__actions">
             <button
               type="button"
-              className="host-exit-modal__cancel-btn"
+              className="leader-exit-modal__cancel-btn"
               onClick={() => setIsRenaming(false)}
             >
               Cancelar
@@ -185,26 +185,29 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
               <button
                 type="button"
                 className="part-outline-action-btn"
+                title={isTargetCoLeader ? 'Quitar rol de co-anfitrión' : 'Dar rol de co-anfitrión'}
                 onClick={() => {
-                  onToggleCoHost?.(detailView.name, !isTargetCoHost);
+                  onToggleCoLeader?.(detailView.name, !isTargetCoLeader);
                 }}
               >
-                {isTargetCoHost ? <ShieldOff size={14} /> : <Shield size={14} />}
-                <span>{isTargetCoHost ? 'Quitar cohost' : 'Hacer cohost'}</span>
+                {isTargetCoLeader ? <ShieldOff size={14} /> : <Shield size={14} />}
+                <span>{isTargetCoLeader ? 'Quitar co-anfitrión' : 'Co-anfitrión'}</span>
               </button>
-              {isHost && (
+              {isLeader && (
                 <button
                   type="button"
                   className="part-outline-action-btn"
                   onClick={() => {
-                    if (
-                      window.confirm(
-                        `¿Pasar la sala a ${detailView.name}? Perderás el control de anfitrión.`
-                      )
-                    ) {
-                      onTransferHost?.(detailView.name, detailView.userId);
-                      onSelectNone();
-                    }
+                    confirmAction({
+                      title: 'Pasar sala',
+                      message: `¿Pasar la sala a ${detailView.name}? Perderás el control de anfitrión y quedarás como co-anfitrión.`,
+                      confirmLabel: 'Pasar sala',
+                    }).then((ok) => {
+                      if (ok) {
+                        onTransferHost?.(detailView.name, detailView.userId);
+                        onSelectNone();
+                      }
+                    });
                   }}
                 >
                   <Crown size={14} />
@@ -225,10 +228,10 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
           <div className="part-info-item">
             <span className="part-info-label">Rol</span>
             <span className="part-info-value">
-              {detailView.isHost || detailView.role === 'host'
-                ? 'Host'
-                : detailView.role === 'cohost'
-                  ? 'Co-Host'
+              {detailView.isLeader || detailView.role === 'leader'
+                ? 'Anfitrión'
+                : detailView.role === 'coleader'
+                  ? 'Co-anfitrión'
                   : 'Miembro'}
             </span>
           </div>

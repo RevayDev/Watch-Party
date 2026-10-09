@@ -134,7 +134,7 @@ export const proxyFetch = (
         // Determine base URL for resolving relative paths in the playlist
         const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
         // Absolute proxy origin so it also works when frontend and backend live on different domains
-        const proxyOrigin = `${req.protocol}://${req.get('host')}`;
+        const proxyOrigin = `${req.protocol}://${req.get('leader')}`;
         const toProxy = (absoluteUrl: string) => `${proxyOrigin}/api/proxy?url=${encodeURIComponent(absoluteUrl)}`;
 
         // Rewrite each line that is a URL or relative path to route through our proxy

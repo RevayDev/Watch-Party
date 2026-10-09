@@ -50,7 +50,7 @@ export function freshPositions(roomId: string): PositionReport[] {
 
 export function seniorityOf(
   rep: PositionReport,
-  participants: Array<{ userId?: string; name: string; joinedAt?: Date | string; isHost?: boolean }>,
+  participants: Array<{ userId?: string; name: string; joinedAt?: Date | string; isLeader?: boolean }>,
 ): number {
   const match = participants.find((p) => {
     if (rep.userId && p.userId) return p.userId === rep.userId;
@@ -68,7 +68,7 @@ export function seniorityOf(
  */
 export function resolveRoomTime(
   roomId: string,
-  participants: Array<{ userId?: string; name: string; joinedAt?: Date | string; isHost?: boolean }>,
+  participants: Array<{ userId?: string; name: string; joinedAt?: Date | string; isLeader?: boolean }>,
 ): { currentTime: number; isPlaying: boolean } | null {
   const reports = freshPositions(roomId);
   if (reports.length === 0) return null;
@@ -114,7 +114,7 @@ export function setPlaybackSnapshot(roomId: string, currentTime: number, isPlayi
 /** Tiempo sincronizado para un recién llegado (consenso primero, snapshot como fallback). */
 export function resolveSyncedPlayback(
   roomId: string,
-  participants: Array<{ userId?: string; name: string; joinedAt?: Date | string; isHost?: boolean }>,
+  participants: Array<{ userId?: string; name: string; joinedAt?: Date | string; isLeader?: boolean }>,
 ): { currentTime: number; isPlaying: boolean } | null {
   const consensus = resolveRoomTime(roomId, participants);
   if (consensus) return consensus;

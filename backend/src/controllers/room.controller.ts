@@ -6,7 +6,7 @@ import { RoomService } from '../services/room.service.js';
 import { DemoCapacityError, maxUsersForRoom } from '../services/room.service.js';
 import { IVideoMetadata } from '../types/room.types.js';
 import { findBannedEntry, isNameTaken } from '../domain/room.entity.js';
-import { AuthClaim, requireHost } from '../domain/auth-policy.js';
+import { AuthClaim, requireLeader, requireModerator } from '../domain/auth-policy.js';
 import { sanitizeRoomSettings } from '../domain/settings-policy.js';
 import {
   DEMO_ROOM_FULL_MESSAGE,
@@ -23,7 +23,7 @@ const PROBE_USER_AGENT =
 
 /**
  * Claim de autorización desde los headers del contrato REST:
- * `x-host-secret`, `x-user-id`, `x-user-name` (misma regla que sockets).
+ * `x-leader-secret`, `x-user-id`, `x-user-name` (misma regla que sockets).
  */
 function claimFromHeaders(req: Request): AuthClaim {
   const pick = (name: string): string | undefined => {
@@ -33,7 +33,7 @@ function claimFromHeaders(req: Request): AuthClaim {
     return trimmed ? trimmed : undefined;
   };
   return {
-    hostSecret: pick('x-host-secret'),
+    leaderSecret: pick('x-leader-secret'),
     requesterUserId: pick('x-user-id'),
     requesterName: pick('x-user-name'),
   };
@@ -152,24 +152,24 @@ async function resolveFallbackVideoName(cleanUrl: string, isHls: boolean, driveF
 export class RoomController {
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { hostName, isTemporary } = req.body;
-      if (!hostName || typeof hostName !== 'string' || hostName.trim().length === 0) {
-        res.status(400).json({ error: 'hostName is required' });
+      const { leaderName, isTemporary } = req.body;
+      if (!leaderName || typeof leaderName !== 'string' || leaderName.trim().length === 0) {
+        res.status(400).json({ error: 'leaderName is required' });
         return;
       }
 
       const userId = requestUserId(req);
 
-      const { room, hostSecret } = await RoomService.createRoom({
-        hostName,
+      const { room, leaderSecret } = await RoomService.createRoom({
+        leaderName,
         isTemporary: isTemporary !== undefined ? Boolean(isTemporary) : true,
         userId,
       });
 
       res.status(201).json({
         roomId: room.roomId,
-        hostName: room.hostName,
-        hostSecret,
+        leaderName: room.leaderName,
+        leaderSecret,
         status: room.status,
         isTemporary: room.isTemporary !== false,
         createdAt: room.createdAt,
@@ -200,7 +200,7 @@ export class RoomController {
 
       res.json({
         roomId: room.roomId,
-        hostName: room.hostName,
+        leaderName: room.leaderName,
         status: room.status,
         isTemporary: room.isTemporary !== false,
         settings: room.settings,
@@ -250,9 +250,9 @@ export class RoomController {
 
       // ── Approval-gated rooms: do NOT add the guest to participants here.
       // The socket 'join-room' handler holds them in the waiting list until the
-      // host/co-host approves. Adding them here would bypass the approval gate.
+      // leader/co-leader approves. Adding them here would bypass the approval gate.
       const requireApproval = existing.settings?.requireApproval === true;
-      const isHostName = existing.hostName.toLowerCase() === trimmedName.toLowerCase();
+      const isLeaderName = existing.leaderName.toLowerCase() === trimmedName.toLowerCase();
       // Identidad estable: el rejoin con el mismo userId nunca pasa por la puerta.
       const alreadyParticipant = (existing.participants || []).some((p) => {
         if (userId && p.userId) return p.userId === userId;
@@ -271,10 +271,10 @@ export class RoomController {
         return;
       }
 
-      if (requireApproval && !isHostName && !alreadyParticipant) {
+      if (requireApproval && !isLeaderName && !alreadyParticipant) {
         res.json({
           roomId: existing.roomId,
-          hostName: existing.hostName,
+          leaderName: existing.leaderName,
           status: existing.status,
           participants: existing.participants,
           pendingApproval: true,
@@ -301,7 +301,7 @@ export class RoomController {
 
       res.json({
         roomId: room.roomId,
-        hostName: room.hostName,
+        leaderName: room.leaderName,
         status: room.status,
         participants: room.participants,
       });
@@ -345,11 +345,11 @@ export class RoomController {
         return;
       }
 
-      // Solo el host (secreto válido o rol host del servidor). Se limpia el
-      // archivo ya subido por multer para no dejar huérfanos en disco.
-      if (!requireHost(room, claimFromHeaders(req))) {
+      // Anfitrión o co-anfitrión (secreto válido o rol del servidor). Se limpia
+      // el archivo ya subido por multer para no dejar huérfanos en disco.
+      if (!requireModerator(room, claimFromHeaders(req))) {
         RoomService.removeOldVideoFile(file.filename);
-        res.status(403).json({ error: 'Solo el anfitrión puede subir el video de la sala.' });
+        res.status(403).json({ error: 'Solo el anfitrión o un co-anfitrión puede subir el video de la sala.' });
         return;
       }
 
@@ -395,9 +395,9 @@ export class RoomController {
         return;
       }
 
-      // Solo el host (secreto válido o rol host del servidor).
-      if (!requireHost(room, claimFromHeaders(req))) {
-        res.status(403).json({ error: 'Solo el anfitrión puede configurar el video de la sala.' });
+      // Anfitrión o co-anfitrión (secreto válido o rol del servidor).
+      if (!requireModerator(room, claimFromHeaders(req))) {
+        res.status(403).json({ error: 'Solo el anfitrión o un co-anfitrión puede configurar el video de la sala.' });
         return;
       }
 
@@ -448,7 +448,7 @@ export class RoomController {
 
   /**
    * Delete room and cleanup all associated files on disk.
-   * Solo el host (secreto válido o rol host del servidor).
+   * Solo el leader (secreto válido o rol leader del servidor).
    */
   public static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -464,7 +464,7 @@ export class RoomController {
         return;
       }
 
-      if (!requireHost(room, claimFromHeaders(req))) {
+      if (!requireLeader(room, claimFromHeaders(req))) {
         res.status(403).json({ error: 'Solo el anfitrión puede eliminar la sala.' });
         return;
       }
@@ -483,7 +483,7 @@ export class RoomController {
 
   /**
    * Update room settings (estrictos + atómicos).
-   * Solo el host. Payload inválido → 400 con mensaje claro, sin aplicar nada.
+   * Solo el leader. Payload inválido → 400 con mensaje claro, sin aplicar nada.
    * Acepta `{ settings: {...} }` o el objeto de ajustes directamente.
    */
   public static async updateSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -500,7 +500,7 @@ export class RoomController {
         return;
       }
 
-      if (!requireHost(room, claimFromHeaders(req))) {
+      if (!requireLeader(room, claimFromHeaders(req))) {
         res.status(403).json({ error: 'Solo el anfitrión puede cambiar los ajustes de la sala.' });
         return;
       }

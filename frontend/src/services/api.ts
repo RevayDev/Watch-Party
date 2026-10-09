@@ -15,12 +15,12 @@ export class ApiService {
    * Request backend to create a new room.
    */
   static async createRoom(
-    hostName: string,
+    leaderName: string,
     isTemporary: boolean = true
-  ): Promise<{ roomId: string; hostSecret: string; hostName: string; isTemporary?: boolean }> {
+  ): Promise<{ roomId: string; leaderSecret: string; leaderName: string; isTemporary?: boolean }> {
     const userId = getStoredUserId();
-    const body: { hostName: string; isTemporary: boolean; userId?: string } = {
-      hostName,
+    const body: { leaderName: string; isTemporary: boolean; userId?: string } = {
+      leaderName,
       isTemporary,
     };
     if (userId) body.userId = userId;
@@ -29,7 +29,7 @@ export class ApiService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(userId ? { 'x-user-id': userId, 'x-user-name': hostName.trim() } : {}),
+        ...(userId ? { 'x-user-id': userId, 'x-user-name': leaderName.trim() } : {}),
       },
       body: JSON.stringify(body),
     });

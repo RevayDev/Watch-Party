@@ -15,8 +15,8 @@ export const Participants: React.FC<ParticipantsProps> = ({
   participants,
   currentUserName,
   currentUserId,
-  isHost,
-  isCoHost = false,
+  isLeader,
+  isCoLeader = false,
   kickedUsers = [],
   joinRequests = [],
   settings,
@@ -32,7 +32,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
   onKickUser,
   onBanUser,
   onUnbanUser,
-  onToggleCoHost,
+  onToggleCoLeader,
   onTransferHost,
   onRenameUser,
   onApproveJoin,
@@ -67,11 +67,11 @@ export const Participants: React.FC<ParticipantsProps> = ({
     setIsRenaming(false);
   };
 
-  // Can the current user moderate (Host or Co-host)?
-  const canModerate = isHost || isCoHost;
-  // Solo el host gestiona roles (promover/degradar cohost, pasar sala).
+  // Can the current user moderate (Host or Co-leader)?
+  const canModerate = isLeader || isCoLeader;
+  // Solo el anfitrión gestiona roles (promover/degradar co-anfitrión, pasar sala).
   // La moderación normal (mute/kick/ban) sigue con canModerate.
-  const canManageRoles = isHost;
+  const canManageRoles = isLeader;
 
   // Filter participants by search query
   const filteredParticipants = useMemo(() => {
@@ -106,7 +106,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
       return;
     }
     if (canModerate) {
-      // Afitrión / Co-Afitrión can turn OFF microphone
+      // Anfitrión / Co-anfitrión can turn OFF microphone
       onMuteUser?.(p.name, p.socketId);
     }
   };
@@ -118,14 +118,14 @@ export const Participants: React.FC<ParticipantsProps> = ({
       return;
     }
     if (canModerate) {
-      // Afitrión / Co-Afitrión can turn OFF camera
+      // Anfitrión / Co-anfitrión can turn OFF camera
       onDisableCamUser?.(p.name, p.socketId);
     }
   };
 
   // ── Floating action buttons rendered next to the person's name ────────────
   const canModerateTarget = (p: IParticipant) =>
-    canModerate && !isSameUser(p) && !(p.isHost || p.role === 'host');
+    canModerate && !isSameUser(p) && !(p.isLeader || p.role === 'leader');
 
   const openRename = (p: IParticipant) => {
     setSelectedParticipant(p);
@@ -271,7 +271,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
           canModerateTarget={canModerateTarget}
           canModerate={canModerate}
           canManageRoles={canManageRoles}
-          isHost={isHost}
+          isLeader={isLeader}
           isRenaming={isRenaming}
           newNameVal={newNameVal}
           setNewNameVal={setNewNameVal}
@@ -280,7 +280,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
           saveRename={saveRename}
           onKickUser={onKickUser}
           onBanUser={onBanUser}
-          onToggleCoHost={onToggleCoHost}
+          onToggleCoLeader={onToggleCoLeader}
           onTransferHost={onTransferHost}
           onSelectNone={() => setSelectedParticipant(null)}
         />

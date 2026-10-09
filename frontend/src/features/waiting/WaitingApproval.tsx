@@ -16,7 +16,7 @@ interface WaitingApprovalProps {
 }
 
 /**
- * Full-screen "waiting for host approval" lobby.
+ * Full-screen "waiting for leader approval" lobby.
  * Shows a live camera preview with mic/cam toggles so the guest can set up
  * before being admitted. Media is local-only: nothing is sent until approved.
  */

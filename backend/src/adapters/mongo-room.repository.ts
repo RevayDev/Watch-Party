@@ -30,8 +30,8 @@ export class MongoRoomRepository implements RoomRepository {
       const created = await RoomModel.create(room);
       return created.toObject() as unknown as IRoom;
     }
-    existing.hostName = room.hostName;
-    existing.hostSecret = room.hostSecret;
+    existing.leaderName = room.leaderName;
+    existing.leaderSecret = room.leaderSecret;
     existing.status = room.status;
     existing.isTemporary = room.isTemporary;
     existing.video = room.video as never;

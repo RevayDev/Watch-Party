@@ -16,7 +16,7 @@ vi.mock('../src/features/room/hooks/useRoomSocket', () => ({
     pendingMediaPrefRef: { current: { micOn: false, camOn: true } },
     roomData: {
       roomId: 'ABC123',
-      hostName: 'Ana',
+      leaderName: 'Ana',
       status: 'active',
       isTemporary: true,
       video: null,
@@ -27,9 +27,9 @@ vi.mock('../src/features/room/hooks/useRoomSocket', () => ({
     loading: false,
     error: '',
     joined: true,
-    isHost: true,
-    showHostExitModal: false,
-    setShowHostExitModal: vi.fn(),
+    isLeader: true,
+    showLeaderExitModal: false,
+    setShowLeaderExitModal: vi.fn(),
     showMemberExitModal: false,
     setShowMemberExitModal: vi.fn(),
     messages: [],
@@ -100,7 +100,7 @@ vi.mock('../src/features/room/hooks/useRoomSocket', () => ({
 vi.mock('../src/components/RoomHeader', () => ({ RoomHeader: () => null }));
 vi.mock('../src/features/player/VideoPlayer', () => ({ VideoPlayer: () => null }));
 vi.mock('../src/components/CameraGrid', () => ({ CameraGrid: () => null }));
-vi.mock('../src/components/HostExitModal', () => ({ HostExitModal: () => null }));
+vi.mock('../src/components/LeaderExitModal', () => ({ LeaderExitModal: () => null }));
 vi.mock('../src/components/MemberExitModal', () => ({ MemberExitModal: () => null }));
 vi.mock('../src/features/waiting/WaitingApproval', () => ({ WaitingApproval: () => null }));
 vi.mock('../src/features/room/components/RoomControls', () => ({ RoomControls: () => null }));
@@ -144,7 +144,7 @@ const modalBase = {
 };
 
 function hostOnlyCheckbox(): HTMLInputElement {
-  const title = screen.getByText('Solo el anfitrión controla el video');
+  const title = screen.getByText('Control solo de anfitriones');
   const box = title.closest('.room-settings__box');
   expect(box).not.toBeNull();
   const input = box!.querySelector('input[type="checkbox"]');
@@ -182,14 +182,14 @@ describe('RoomSettingsModal (hostOnlySync)', () => {
 const beatriz = {
   name: 'Ana',
   userId: 'u1',
-  isHost: true,
-  role: 'host' as const,
+  isLeader: true,
+  role: 'leader' as const,
   joinedAt: new Date().toISOString(),
 };
 const beto = {
   name: 'Beto',
   userId: 'u2',
-  isHost: false,
+  isLeader: false,
   role: 'member' as const,
   joinedAt: new Date().toISOString(),
 };
@@ -206,17 +206,17 @@ const participantsBase = {
   isCameraOn: false,
 };
 
-describe('Participants (transfer-host + roles solo-host)', () => {
-  it("el host ve 'Pasar sala' y transfiere con confirm", async () => {
+describe('Participants (transfer-leader + roles solo-leader)', () => {
+  it("el leader ve 'Pasar sala' y transfiere con confirm", async () => {
     const onTransferHost = vi.fn();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     await act(async () => {
       render(
         <Participants
           {...participantsBase}
-          isHost
+          isLeader
           onTransferHost={onTransferHost}
-          onToggleCoHost={vi.fn()}
+          onToggleCoLeader={vi.fn()}
           onKickUser={vi.fn()}
         />
       );
@@ -234,23 +234,23 @@ describe('Participants (transfer-host + roles solo-host)', () => {
     confirmSpy.mockRestore();
   });
 
-  it("el host ve 'Hacer cohost' y lo cancela sin confirm", async () => {
+  it("el leader ve 'Co-anfitrión' y cancela el traspaso sin confirm", async () => {
     const onTransferHost = vi.fn();
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     await act(async () => {
       render(
         <Participants
           {...participantsBase}
-          isHost
+          isLeader
           onTransferHost={onTransferHost}
-          onToggleCoHost={vi.fn()}
+          onToggleCoLeader={vi.fn()}
         />
       );
     });
     await act(async () => {
       fireEvent.click(screen.getByText('Beto'));
     });
-    expect(screen.getByRole('button', { name: /Hacer cohost/ })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^Co-anfitrión$/ })).toBeDefined();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Pasar sala/ }));
     });
@@ -258,15 +258,15 @@ describe('Participants (transfer-host + roles solo-host)', () => {
     (window.confirm as unknown as { mockRestore: () => void }).mockRestore();
   });
 
-  it("el cohost NO ve 'Pasar sala' ni 'Hacer cohost' pero conserva moderación (Expulsar)", async () => {
+  it("el coleader NO ve 'Pasar sala' ni botones de co-anfitrión pero conserva moderación (Expulsar)", async () => {
     await act(async () => {
       render(
         <Participants
           {...participantsBase}
-          isHost={false}
-          isCoHost
+          isLeader={false}
+          isCoLeader
           onTransferHost={vi.fn()}
-          onToggleCoHost={vi.fn()}
+          onToggleCoLeader={vi.fn()}
           onKickUser={vi.fn()}
         />
       );
@@ -275,9 +275,8 @@ describe('Participants (transfer-host + roles solo-host)', () => {
       fireEvent.click(screen.getByText('Beto'));
     });
     expect(screen.queryByRole('button', { name: /Pasar sala/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Hacer cohost/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Quitar cohost/ })).toBeNull();
-    // Moderación normal intacta para el cohost
+    expect(screen.queryByRole('button', { name: /co-anfitrión/i })).toBeNull();
+    // Moderación normal intacta para el coleader
     expect(screen.getByRole('button', { name: /Expulsar/ })).toBeDefined();
   });
 
@@ -288,7 +287,7 @@ describe('Participants (transfer-host + roles solo-host)', () => {
           {...participantsBase}
           currentUserName="Beto"
           currentUserId="u2"
-          isHost={false}
+          isLeader={false}
           onTransferHost={vi.fn()}
         />
       );
@@ -304,7 +303,7 @@ describe('Participants (transfer-host + roles solo-host)', () => {
 describe('Room (toggle hostOnlySync emite el patch)', () => {
   it("onToggleHostOnlySync emite 'update-room-settings' con hostOnlySync:true", async () => {
     await act(async () => {
-      render(<Room roomId="ABC123" userName="Ana" isHost onLeave={vi.fn()} />);
+      render(<Room roomId="ABC123" userName="Ana" isLeader onLeave={vi.fn()} />);
     });
     const checkbox = hostOnlyCheckbox();
     expect(checkbox.checked).toBe(false);

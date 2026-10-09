@@ -90,8 +90,8 @@ function matchesWildcard(entry: string, origin: string): boolean {
     return false;
   }
   if (url.protocol !== 'https:') return false;
-  const host = url.hostname.toLowerCase();
-  return host.length > suffix.length && host.endsWith(suffix);
+  const leader = url.hostname.toLowerCase();
+  return leader.length > suffix.length && leader.endsWith(suffix);
 }
 
 function matchesAllowed(origin: string, allowed: string[]): boolean {
@@ -108,7 +108,7 @@ function matchesAllowed(origin: string, allowed: string[]): boolean {
  *   dominio custom www/apex y previews `https://*.vercel.app`).
  * - Dev misma máquina → loopback :5173/:4173 (Vite dev y `vite preview`,
  *   cuyo build usa VITE_API_URL contra el backend remoto).
- * - Dev móvil/LAN (flujo oficial, `vite host:true` + socket a
+ * - Dev móvil/LAN (flujo oficial, `vite leader:true` + socket a
  *   `http://<hostname>:4000`) → IP privada, solo no-producción y solo si
  *   ALLOW_LAN_DEV no es 'false'. En producción la LAN nunca entra.
  */
@@ -119,7 +119,7 @@ export function isOriginAllowed(origin: string | undefined): boolean {
   if (matchesAllowed(origin, allowed)) return true;
 
   if (process.env.NODE_ENV !== 'production') {
-    const host = hostnameOf(origin);
+    const leader = hostnameOf(origin);
     const port = (() => {
       try {
         return new URL(origin).port;
@@ -128,12 +128,12 @@ export function isOriginAllowed(origin: string | undefined): boolean {
       }
     })();
     const isLoopback =
-      (host === 'localhost' || host === '127.0.0.1') && DEV_LOOPBACK_PORTS.includes(port);
+      (leader === 'localhost' || leader === '127.0.0.1') && DEV_LOOPBACK_PORTS.includes(port);
     if (isLoopback) return true;
     if (
       isLanDevEnabled() &&
-      host !== null &&
-      /^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/.test(host)
+      leader !== null &&
+      /^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/.test(leader)
     ) {
       return true;
     }
@@ -156,7 +156,7 @@ export const corsOptions: CorsOptions = {
     'Content-Type',
     'Authorization',
     'Range',
-    'x-host-secret',
+    'x-leader-secret',
     'x-user-id',
     'x-user-name',
   ],

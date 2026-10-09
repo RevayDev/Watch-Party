@@ -13,8 +13,8 @@ datasource db {
 model Room {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   roomId       String   @unique
-  hostName     String
-  hostSecret   String
+  leaderName   String
+  leaderSecret String
   status       String   @default("waiting")
   isTemporary  Boolean?
   plan         String?

@@ -41,7 +41,7 @@ function makeIo() {
 }
 
 function joinMember(socketId: string, roomId = 'ABC123', userName = 'Ana', pending = false) {
-  activeUsers.set(socketId, { socketId, roomId, userName, isHost: false, pending });
+  activeUsers.set(socketId, { socketId, roomId, userName, isLeader: false, pending });
 }
 
 beforeEach(() => {
@@ -71,7 +71,7 @@ describe('chat: send-message', () => {
     joinMember('s-spoof', 'ABC123', 'Ana');
     registerChatReactionsHandlers(io, sock.socket);
 
-    (sock.handlers.get('send-message') as any)({ roomId: 'ABC123', text: 'hola, soy el host', userName: 'Anfitrión' });
+    (sock.handlers.get('send-message') as any)({ roomId: 'ABC123', text: 'hola, soy el leader', userName: 'Anfitrión' });
 
     expect(roomEmits).toHaveLength(1);
     expect(roomEmits[0].payload).toMatchObject({ user: 'Ana' });
@@ -171,15 +171,15 @@ describe('webrtc relay', () => {
   it('webrtc-offer se reenvía al target con el senderSocketId', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-caller');
-    activeUsers.set('s-caller', { socketId: 's-caller', roomId: 'ROOM1', userName: 'Ana', isHost: false });
-    activeUsers.set('s-target', { socketId: 's-target', roomId: 'ROOM1', userName: 'Bob', isHost: false });
+    activeUsers.set('s-caller', { socketId: 's-caller', roomId: 'ROOM1', userName: 'Ana', isLeader: false });
+    activeUsers.set('s-target', { socketId: 's-target', roomId: 'ROOM1', userName: 'Bob', isLeader: false });
     registerWebrtcRelayHandlers(io, sock.socket);
 
     (sock.handlers.get('webrtc-offer') as any)({
       targetSocketId: 's-target',
       offer: { sdp: 'x' },
       callerName: 'Ana',
-      callerIsHost: false,
+      callerIsLeader: false,
     });
 
     expect(roomEmits).toHaveLength(1);
@@ -190,8 +190,8 @@ describe('webrtc relay', () => {
   it('answer e ice-candidate se reenvían al target', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-a');
-    activeUsers.set('s-a', { socketId: 's-a', roomId: 'ROOM1', userName: 'Ana', isHost: false });
-    activeUsers.set('s-b', { socketId: 's-b', roomId: 'ROOM1', userName: 'Bob', isHost: false });
+    activeUsers.set('s-a', { socketId: 's-a', roomId: 'ROOM1', userName: 'Ana', isLeader: false });
+    activeUsers.set('s-b', { socketId: 's-b', roomId: 'ROOM1', userName: 'Bob', isLeader: false });
     registerWebrtcRelayHandlers(io, sock.socket);
 
     (sock.handlers.get('webrtc-answer') as any)({ targetSocketId: 's-b', answer: { sdp: 'y' } });
@@ -203,15 +203,15 @@ describe('webrtc relay', () => {
   it('webrtc-offer entre salas distintas se descarta (anti-reflector)', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-x');
-    activeUsers.set('s-x', { socketId: 's-x', roomId: 'ROOM1', userName: 'Ana', isHost: false });
-    activeUsers.set('s-y', { socketId: 's-y', roomId: 'ROOM2', userName: 'Bob', isHost: false });
+    activeUsers.set('s-x', { socketId: 's-x', roomId: 'ROOM1', userName: 'Ana', isLeader: false });
+    activeUsers.set('s-y', { socketId: 's-y', roomId: 'ROOM2', userName: 'Bob', isLeader: false });
     registerWebrtcRelayHandlers(io, sock.socket);
 
     (sock.handlers.get('webrtc-offer') as any)({
       targetSocketId: 's-y',
       offer: { sdp: 'x' },
       callerName: 'Ana',
-      callerIsHost: false,
+      callerIsLeader: false,
     });
 
     expect(roomEmits).toHaveLength(0);
@@ -229,7 +229,7 @@ describe('webrtc relay', () => {
   it('peer-media-state sin roomId no emite', () => {
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-a');
-    activeUsers.set('s-a', { socketId: 's-a', roomId: 'ABC123', userName: 'Ana', isHost: false });
+    activeUsers.set('s-a', { socketId: 's-a', roomId: 'ABC123', userName: 'Ana', isLeader: false });
     registerWebrtcRelayHandlers(io, sock.socket);
 
     (sock.handlers.get('peer-media-state') as any)({ userName: 'Ana', isCameraOn: true, isMicOn: true });
@@ -241,7 +241,7 @@ describe('webrtc relay', () => {
   it('peer-media-state válido se difunde a la sala', () => {
     const { io } = makeIo();
     const sock = makeSocket('s-a');
-    activeUsers.set('s-a', { socketId: 's-a', roomId: 'ABC123', userName: 'Ana', isHost: false });
+    activeUsers.set('s-a', { socketId: 's-a', roomId: 'ABC123', userName: 'Ana', isLeader: false });
     registerWebrtcRelayHandlers(io, sock.socket);
 
     (sock.handlers.get('peer-media-state') as any)({

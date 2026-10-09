@@ -50,22 +50,22 @@ async function fire(handlers: Map<string, (...args: any[]) => unknown>, event: s
   for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
-/** Sala con host + miembro + cohost y `hostOnlySync` al valor pedido. */
+/** Sala con leader + miembro + coleader y `hostOnlySync` al valor pedido. */
 async function setupRoom(hostOnlySync?: boolean) {
-  const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+  const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
   created.push(room.roomId);
-  await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+  await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
   await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
   await RoomService.joinRoom(room.roomId, 'Beto', 'Web', 'u-beto');
-  await RoomService.setParticipantRole(room.roomId, 'Beto', 'cohost');
+  await RoomService.setParticipantRole(room.roomId, 'Beto', 'coleader');
   if (hostOnlySync !== undefined) {
     await RoomService.updateSettings(room.roomId, { hostOnlySync });
   }
-  return { roomId: room.roomId, hostSecret };
+  return { roomId: room.roomId, leaderSecret };
 }
 
 function joinActive(socketId: string, roomId: string, userName: string, userId: string) {
-  activeUsers.set(socketId, { socketId, roomId, userName, userId, isHost: false });
+  activeUsers.set(socketId, { socketId, roomId, userName, userId, isLeader: false });
 }
 
 beforeAll(() => {
@@ -113,11 +113,11 @@ describe('sync-video con hostOnlySync bloqueado (true)', () => {
     });
   });
 
-  it('cohost permitido', async () => {
+  it('coleader permitido', async () => {
     const { roomId } = await setupRoom(true);
     const { io } = makeIo();
-    const sock = makeSocket('s-cohost-ok');
-    joinActive('s-cohost-ok', roomId, 'Beto', 'u-beto');
+    const sock = makeSocket('s-coleader-ok');
+    joinActive('s-coleader-ok', roomId, 'Beto', 'u-beto');
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId, action: 'pause', currentTime: 20 });
@@ -128,11 +128,11 @@ describe('sync-video con hostOnlySync bloqueado (true)', () => {
     expect(sock.emitted.filter((e) => e.event === 'action-denied')).toHaveLength(0);
   });
 
-  it('host permitido', async () => {
+  it('leader permitido', async () => {
     const { roomId } = await setupRoom(true);
     const { io } = makeIo();
-    const sock = makeSocket('s-host-ok');
-    joinActive('s-host-ok', roomId, 'Host', 'u-host');
+    const sock = makeSocket('s-leader-ok');
+    joinActive('s-leader-ok', roomId, 'Host', 'u-leader');
     registerSyncPlaybackHandlers(io, sock.socket);
 
     await fire(sock.handlers, 'sync-video', { roomId, action: 'seek', currentTime: 30 });

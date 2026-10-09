@@ -6,8 +6,8 @@ import {
   UnbanUserUseCase,
 } from '../../application/moderate-user.usecase.js';
 import { RoomService } from '../../services/room.service.js';
-import { findRequesterParticipant, requireHost, requireModerator } from '../../domain/auth-policy.js';
-import { isHostParticipant } from '../../domain/room.entity.js';
+import { findRequesterParticipant, requireLeader, requireModerator } from '../../domain/auth-policy.js';
+import { isLeaderParticipant } from '../../domain/room.entity.js';
 import { activeMediaStates, activeUsers } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 import { dropPosition } from '../../domain/playback-policy.js';
@@ -17,7 +17,7 @@ const MODERATOR_ONLY = 'Solo el anfitrión o un co-anfitrión puede realizar est
 
 /** Handler de moderación y roles. Nombres de eventos y payloads idénticos al original. */
 export function registerModerationHandlers(io: Server, socket: Socket): void {
-  // Mute a specific user remotely (Host or Co-host)
+  // Mute a specific user remotely (Host or Co-leader)
   socket.on(
     'moderate-mute-user',
     async (data: { roomId: string; targetSocketId?: string; targetUserName: string } & PrivilegedPayload) => {
@@ -39,7 +39,7 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // Disable camera of a specific user remotely (Host or Co-host)
+  // Disable camera of a specific user remotely (Host or Co-leader)
   socket.on(
     'moderate-disable-camera',
     async (data: { roomId: string; targetSocketId?: string; targetUserName: string } & PrivilegedPayload) => {
@@ -61,7 +61,7 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // Mute all participants (Host or Co-host)
+  // Mute all participants (Host or Co-leader)
   socket.on('moderate-mute-all', async (data: { roomId: string } & PrivilegedPayload) => {
     const { roomId } = data;
     if (!roomId) return;
@@ -77,7 +77,7 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
     io.to(cleanRoomId).emit('force-mute-all');
   });
 
-  // Disable all cameras (Host or Co-host)
+  // Disable all cameras (Host or Co-leader)
   socket.on('moderate-disable-all-cameras', async (data: { roomId: string } & PrivilegedPayload) => {
     const { roomId } = data;
     if (!roomId) return;
@@ -109,15 +109,15 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
         return;
       }
 
-      // El host no puede ser expulsado por un cohost: solo el propio host
-      // (secreto válido o participante host) puede expulsar al anfitrión.
-      const targetIsHost = (room?.participants || []).some((p) => {
-        if (targetUserId && p.userId) return p.userId === targetUserId && isHostParticipant(p);
+      // El leader no puede ser expulsado por un coleader: solo el propio leader
+      // (secreto válido o participante leader) puede expulsar al anfitrión.
+      const targetLeader = (room?.participants || []).some((p) => {
+        if (targetUserId && p.userId) return p.userId === targetUserId && isLeaderParticipant(p);
         return (
-          p.name.toLowerCase() === targetUserName.trim().toLowerCase() && isHostParticipant(p)
+          p.name.toLowerCase() === targetUserName.trim().toLowerCase() && isLeaderParticipant(p)
         );
       });
-      if (targetIsHost && !requireHost(room, resolveSocketClaim(socket, data))) {
+      if (targetLeader && !requireLeader(room, resolveSocketClaim(socket, data))) {
         denySocket(socket, 'kick-user', 'No puedes expulsar al anfitrión.');
         return;
       }
@@ -184,16 +184,16 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // Toggle Co-host Role
+  // Toggle Co-leader Role
   socket.on(
     'set-role',
-    async (data: { roomId: string; targetUserName: string; role: 'cohost' | 'member' } & PrivilegedPayload) => {
+    async (data: { roomId: string; targetUserName: string; role: 'coleader' | 'member' } & PrivilegedPayload) => {
       const { roomId, targetUserName, role } = data;
       if (!roomId || !targetUserName) return;
       const cleanRoomId = roomId.toUpperCase().trim();
 
       const room = await RoomService.getRoomById(cleanRoomId);
-      if (!requireHost(room, resolveSocketClaim(socket, data))) {
+      if (!requireLeader(room, resolveSocketClaim(socket, data))) {
         denySocket(socket, 'set-role', 'Solo el anfitrión puede dar o quitar roles.');
         return;
       }
@@ -209,9 +209,9 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // Transferencia de sala: solo el host actual puede regalar la sala.
+  // Transferencia de sala: solo el leader actual puede regalar la sala.
   socket.on(
-    'transfer-host',
+    'transfer-leader',
     async (
       data: { roomId: string; targetUserName?: string; targetUserId?: string } & PrivilegedPayload
     ) => {
@@ -221,12 +221,12 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
       const cleanRoomId = roomId.toUpperCase().trim();
 
       const room = await RoomService.getRoomById(cleanRoomId);
-      if (!requireHost(room, resolveSocketClaim(socket, data))) {
-        denySocket(socket, 'transfer-host', 'Solo el anfitrión puede transferir la sala.');
+      if (!requireLeader(room, resolveSocketClaim(socket, data))) {
+        denySocket(socket, 'transfer-leader', 'Solo el anfitrión puede transferir la sala.');
         return;
       }
 
-      // ¿Está el nuevo host conectado? (misma sala, no pending; userId o nombre lower)
+      // ¿Está el nuevo leader conectado? (misma sala, no pending; userId o nombre lower)
       let targetSocketId: string | undefined;
       for (const [sid, u] of activeUsers.entries()) {
         if (u.roomId !== cleanRoomId || u.pending) continue;
@@ -241,52 +241,52 @@ export function registerModerationHandlers(io: Server, socket: Socket): void {
         }
       }
 
-      const previousHostName = room?.hostName;
-      let result: Awaited<ReturnType<typeof RoomService.transferHost>>;
+      const previousLeaderName = room?.leaderName;
+      let result: Awaited<ReturnType<typeof RoomService.transferLeader>>;
       if (!targetSocketId) {
         console.warn(
-          `⚠️ transfer-host: nuevo anfitrión sin socket activo en sala [${cleanRoomId}]; no se rota el secreto.`
+          `⚠️ transfer-leader: nuevo anfitrión sin socket activo en sala [${cleanRoomId}]; no se rota el secreto.`
         );
-        result = await RoomService.transferHost(
+        result = await RoomService.transferLeader(
           cleanRoomId,
           { userId: targetUserId, name: targetUserName },
           { rotateSecret: false }
         );
       } else {
-        result = await RoomService.transferHost(cleanRoomId, {
+        result = await RoomService.transferLeader(cleanRoomId, {
           userId: targetUserId,
           name: targetUserName,
         });
       }
-      if (!result.room || !result.newHostName) {
-        denySocket(socket, 'transfer-host', 'No se encontró al participante.');
+      if (!result.room || !result.newLeaderName) {
+        denySocket(socket, 'transfer-leader', 'No se encontró al participante.');
         return;
       }
 
-      // Sincroniza flags isHost del directorio efímero (misma sala).
+      // Sincroniza flags isLeader del directorio efímero (misma sala).
       for (const [, u] of activeUsers.entries()) {
         if (u.roomId !== cleanRoomId || u.pending) continue;
         const isNewHost =
           (targetUserId && u.userId === targetUserId) ||
-          u.userName.toLowerCase() === result.newHostName.toLowerCase();
+          u.userName.toLowerCase() === result.newLeaderName.toLowerCase();
         if (isNewHost) {
-          u.isHost = true;
+          u.isLeader = true;
         } else if (
-          previousHostName &&
-          u.userName.toLowerCase() === previousHostName.trim().toLowerCase()
+          previousLeaderName &&
+          u.userName.toLowerCase() === previousLeaderName.trim().toLowerCase()
         ) {
-          u.isHost = false;
+          u.isLeader = false;
         }
       }
 
-      // Entrega el secreto rotado solo al nuevo host conectado.
-      if (targetSocketId && result.hostSecret) {
-        io.to(targetSocketId).emit('host-secret', { hostSecret: result.hostSecret });
+      // Entrega el secreto rotado solo al nuevo leader conectado.
+      if (targetSocketId && result.leaderSecret) {
+        io.to(targetSocketId).emit('leader-secret', { leaderSecret: result.leaderSecret });
       }
 
-      console.log(`👑 Sala [${cleanRoomId}] transferida a ${result.newHostName}`);
-      io.to(cleanRoomId).emit('host-changed', {
-        newHostName: result.newHostName,
+      console.log(`👑 Sala [${cleanRoomId}] transferida a ${result.newLeaderName}`);
+      io.to(cleanRoomId).emit('leader-changed', {
+        newLeaderName: result.newLeaderName,
         participants: result.room.participants || [],
       });
     }

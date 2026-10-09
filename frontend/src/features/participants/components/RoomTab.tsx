@@ -29,8 +29,8 @@ export const RoomTab: React.FC<RoomTabProps> = ({
     <div className="part-list">
       {filteredParticipants.map((p, idx) => {
         const isMe = isSameUser(p);
-        const isHostUser = p.isHost || p.role === 'host';
-        const isCoHostUser = !isHostUser && p.role === 'cohost';
+        const isLeaderUser = p.isLeader || p.role === 'leader';
+        const isCoLeaderUser = !isLeaderUser && p.role === 'coleader';
         const media = getParticipantMediaState(p);
         const isSelected = selectedName === p.name;
 
@@ -59,13 +59,13 @@ export const RoomTab: React.FC<RoomTabProps> = ({
             <div className="part-info">
               <div className="part-name-row">
                 <span className="part-name">{p.name}</span>
-                {(isMe || isHostUser || isCoHostUser) && (
+                {(isMe || isLeaderUser || isCoLeaderUser) && (
                   <span className="part-name-tag">
                     {isMe
                       ? '(Tú)'
-                      : isHostUser
-                        ? '(Host)'
-                        : '(Co-Host)'}
+                      : isLeaderUser
+                        ? '(Anfitrión)'
+                        : '(Co-anfitrión)'}
                   </span>
                 )}
               </div>

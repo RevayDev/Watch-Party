@@ -98,7 +98,7 @@ afterAll(async () => {
 
 describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () => {
   it('dos play idénticos seguidos del mismo socket → se emite uno', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-dedup');
@@ -106,7 +106,7 @@ describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () 
       socketId: 's-dedup',
       roomId: room.roomId,
       userName: 'Host',
-      isHost: true,
+      isLeader: true,
     });
     registerSyncPlaybackHandlers(io, sock.socket);
 
@@ -117,7 +117,7 @@ describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () 
   });
 
   it('eventos distintos consecutivos sí se procesan (seek ≠ play, tiempos distintos)', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-dedup2');
@@ -125,7 +125,7 @@ describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () 
       socketId: 's-dedup2',
       roomId: room.roomId,
       userName: 'Host',
-      isHost: true,
+      isLeader: true,
     });
     registerSyncPlaybackHandlers(io, sock.socket);
 
@@ -139,7 +139,7 @@ describe('sync-video: dedup de duplicados consecutivos idénticos (<500ms)', () 
 
 describe('sync-video: validación de payloads (sin romper clientes legítimos)', () => {
   it('payloads inválidos se ignoran sin emitir ni lanzar', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-valid');
@@ -155,7 +155,7 @@ describe('sync-video: validación de payloads (sin romper clientes legítimos)',
   });
 
   it('payload legítimo sigue emitiéndose con el formato original', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-legit');
@@ -163,7 +163,7 @@ describe('sync-video: validación de payloads (sin romper clientes legítimos)',
       socketId: 's-legit',
       roomId: room.roomId,
       userName: 'Host',
-      isHost: true,
+      isLeader: true,
     });
     registerSyncPlaybackHandlers(io, sock.socket);
 
@@ -179,7 +179,7 @@ describe('sync-video: validación de payloads (sin romper clientes legítimos)',
 
 describe('sync-video: solo miembros (anti inyección externa)', () => {
   it('socket ajeno a la sala no sincroniza', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-outsider');
@@ -187,7 +187,7 @@ describe('sync-video: solo miembros (anti inyección externa)', () => {
       socketId: 's-outsider',
       roomId: 'OTRASALA',
       userName: 'Troll',
-      isHost: false,
+      isLeader: false,
     });
     registerSyncPlaybackHandlers(io, sock.socket);
 
@@ -197,23 +197,23 @@ describe('sync-video: solo miembros (anti inyección externa)', () => {
   });
 });
 
-describe('video-changed / upload-progress: validación + dedup (con host)', () => {
-  it('video-changed válido del host se emite; sin originalName/fileName se descarta', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+describe('video-changed / upload-progress: validación + dedup (con leader)', () => {
+  it('video-changed válido del leader se emite; sin originalName/fileName se descarta', async () => {
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
     const { io, roomEmits } = makeIo();
     const sock = makeSocket('s-vc');
     activeUsers.set('s-vc', {
       socketId: 's-vc',
       roomId: room.roomId,
       userName: 'Host',
-      isHost: true,
-      userId: 'u-host',
+      isLeader: true,
+      userId: 'u-leader',
     });
     registerSyncPlaybackHandlers(io, sock.socket);
     const video = { originalName: 'peli.mp4', fileName: 'abc.mp4', mimeType: 'video/mp4', sizeBytes: 10 };
-    const auth = { hostSecret };
+    const auth = { leaderSecret };
 
     await fire(sock.handlers, 'video-changed', { roomId: room.roomId, video, ...auth });
     await fire(sock.handlers, 'video-changed', { roomId: room.roomId, video, ...auth }); // duplicado idéntico
@@ -226,21 +226,21 @@ describe('video-changed / upload-progress: validación + dedup (con host)', () =
     expect(emitted[0].payload).toMatchObject({ video });
   });
 
-  it('upload-progress del host: 0-100 y null pasan; fuera de rango se descarta; idénticos se dedupan', async () => {
-    const { room, hostSecret } = await RoomService.createRoom({ hostName: 'Host' });
+  it('upload-progress del leader: 0-100 y null pasan; fuera de rango se descarta; idénticos se dedupan', async () => {
+    const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
-    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-host');
+    await RoomService.joinRoom(room.roomId, 'Host', 'Web', 'u-leader');
     const { io } = makeIo();
     const sock = makeSocket('s-up');
     activeUsers.set('s-up', {
       socketId: 's-up',
       roomId: room.roomId,
       userName: 'Host',
-      isHost: true,
-      userId: 'u-host',
+      isLeader: true,
+      userId: 'u-leader',
     });
     registerSyncPlaybackHandlers(io, sock.socket);
-    const auth = { hostSecret };
+    const auth = { leaderSecret };
 
     await fire(sock.handlers, 'upload-progress', { roomId: room.roomId, progress: 50, fileName: 'peli.mp4', ...auth });
     await fire(sock.handlers, 'upload-progress', { roomId: room.roomId, progress: 50, fileName: 'peli.mp4', ...auth });
@@ -257,7 +257,7 @@ describe('video-changed / upload-progress: validación + dedup (con host)', () =
 
 describe('playback-heartbeat: throttle mínimo 1/2s (excedente se ignora)', () => {
   it('dos heartbeats inmediatos del mismo socket → solo el primero alimenta el consenso', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-hb');
@@ -265,7 +265,7 @@ describe('playback-heartbeat: throttle mínimo 1/2s (excedente se ignora)', () =
       socketId: 's-hb',
       roomId: room.roomId,
       userName: 'Ana',
-      isHost: false,
+      isLeader: false,
       userId: 'u-ana',
     });
     registerSyncPlaybackHandlers(io, sock.socket);
@@ -278,7 +278,7 @@ describe('playback-heartbeat: throttle mínimo 1/2s (excedente se ignora)', () =
   });
 
   it('heartbeats inválidos no alimentan el consenso', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     const { io } = makeIo();
     const sock = makeSocket('s-hb2');
@@ -286,7 +286,7 @@ describe('playback-heartbeat: throttle mínimo 1/2s (excedente se ignora)', () =
       socketId: 's-hb2',
       roomId: room.roomId,
       userName: 'Ana',
-      isHost: false,
+      isLeader: false,
       userId: 'u-ana',
     });
     registerSyncPlaybackHandlers(io, sock.socket);
@@ -301,7 +301,7 @@ describe('playback-heartbeat: throttle mínimo 1/2s (excedente se ignora)', () =
 
 describe('anónimos: nombre en uso por otro participante → rechazo (sin fusionar)', () => {
   it('REST join sin userId frente a nombre registrado → 409', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
 
@@ -317,7 +317,7 @@ describe('anónimos: nombre en uso por otro participante → rechazo (sin fusion
   });
 
   it('socket join-room sin userId frente a nombre registrado → join-rejected name-taken', async () => {
-    const { room } = await RoomService.createRoom({ hostName: 'Host' });
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);
     await RoomService.joinRoom(room.roomId, 'Ana', 'Web', 'u-ana');
 

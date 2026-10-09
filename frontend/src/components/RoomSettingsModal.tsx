@@ -101,7 +101,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
       })
     : null;
 
-  // Rol B: interruptores de rendimiento. Solo emiten si hay editor (host);
+  // Rol B: interruptores de rendimiento. Solo emiten si hay editor (leader);
   // el servidor valida la whitelist y difunde `room-settings-updated`.
   const perfDisabled = !canEdit || !onUpdatePerf;
   const duckPct = clampDuckPct(duckingLevelPct);
@@ -114,7 +114,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
       className="modal-card--settings"
     >
         <div className="modal-card__header">
-          <h3 className="host-exit-modal__title">Configuración de la sala</h3>
+          <h3 className="leader-exit-modal__title">Configuración de la sala</h3>
         </div>
 
         <div className="room-settings__columns">
@@ -209,7 +209,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             </div>
           </div>
 
-          {/* COLUMNA 2 — Opciones + Rendimiento */}
+          {/* COLUMNA 2 — Opciones */}
           <div className="room-settings__column">
             {/* Sala temporal */}
             <div className="room-settings__box">
@@ -261,16 +261,15 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               </div>
 
               <p className="room-settings__box-desc">
-                Los invitados que se unan quedarán en espera hasta que tú
-                apruebes su entrada desde la lista de participantes.
+                Los invitados esperan tu aprobación en Participantes.
               </p>
             </div>
 
-            {/* Solo el anfitrión controla el video */}
+            {/* Solo anfitriones controlan el video */}
             <div className="room-settings__box">
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">
-                  Solo el anfitrión controla el video
+                  Control solo de anfitriones
                 </span>
 
                 <label className="part-switch" style={{ margin: 0 }}>
@@ -285,13 +284,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               </div>
 
               <p className="room-settings__box-desc">
-                Cuando está activo, solo el anfitrión y los co-anfitriones
-                pueden reproducir, pausar o mover el video.
+                Activo: solo anfitrión y co-anfitriones controlan el video.
               </p>
             </div>
+          </div>
 
-            {/* Rendimiento (rol B, persistido en ajustes de sala) */}
-            <div className="room-settings__box room-settings__box--perf">
+          {/* Rendimiento (rol B): ancho completo en PC */}
+          <div className="room-settings__box room-settings__box--perf room-settings__box--full">
               <div className="room-settings__box-head room-settings__box-head--title">
                 <span className="room-settings__box-title">Rendimiento</span>
               </div>
@@ -316,8 +315,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 </label>
               </div>
               <p className="room-settings__box-desc">
-                Cámaras remotas solo con audio y avisos de posición cada 15 s
-                (ideal con conexión débil).
+                Audio en cámaras remotas y avisos cada 15 s.
               </p>
 
               {/* Avisos en pantalla completa */}
@@ -335,7 +333,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 </label>
               </div>
               <p className="room-settings__box-desc">
-                Muestra los avisos del chat dentro del vídeo en pantalla completa.
+                Avisos del chat sobre el vídeo en pantalla completa.
               </p>
 
               {/* Reacciones */}
@@ -353,7 +351,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 </label>
               </div>
               <p className="room-settings__box-desc">
-                Muestra las reacciones flotantes sobre el vídeo.
+                Emojis flotantes sobre el vídeo.
               </p>
 
               {/* Efectos visuales (combo Interestellar + animaciones largas) */}
@@ -371,8 +369,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 </label>
               </div>
               <p className="room-settings__box-desc">
-                Muestra el combo Interestellar y las animaciones largas (las
-                reacciones normales siguen visibles).
+                Combo Interestellar y animaciones largas.
               </p>
 
               {/* Atenuación al hablar (ducking dinámico) */}
@@ -390,7 +387,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 </label>
               </div>
               <p className="room-settings__box-desc">
-                Baja el volumen del vídeo mientras hablas por el micrófono.
+                Baja el vídeo mientras hablas.
               </p>
               <div className="perf-slider-row">
                 <label className="room-settings__label" htmlFor="perf-duck-level">
@@ -411,14 +408,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 <span className="perf-slider-value">{duckPct}%</span>
               </div>
             </div>
-          </div>
         </div>
 
         {/* Actions */}
         <div className="room-settings__actions">
           <button
             type="button"
-            className="host-exit-modal__cancel-btn"
+            className="leader-exit-modal__cancel-btn"
             onClick={onClose}
           >
             Cancelar

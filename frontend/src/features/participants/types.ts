@@ -9,8 +9,8 @@ export interface ParticipantsProps {
   participants: IParticipant[];
   currentUserName: string;
   currentUserId?: string;
-  isHost: boolean;
-  isCoHost?: boolean;
+  isLeader: boolean;
+  isCoLeader?: boolean;
   kickedUsers?: IKickedParticipant[];
   joinRequests?: IJoinRequest[];
   settings?: IRoomSettings;
@@ -29,7 +29,7 @@ export interface ParticipantsProps {
   onKickUser?: (targetUserName: string, targetUserId?: string) => void;
   onBanUser?: (targetUserName: string, targetUserId?: string) => void;
   onUnbanUser?: (targetUserName: string, targetUserId?: string) => void;
-  onToggleCoHost?: (targetUserName: string, makeCoHost: boolean) => void;
+  onToggleCoLeader?: (targetUserName: string, makeCoLeader: boolean) => void;
   onTransferHost?: (targetUserName: string, targetUserId?: string) => void;
   onRenameUser?: (
     oldName: string,
