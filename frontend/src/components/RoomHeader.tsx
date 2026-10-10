@@ -15,8 +15,6 @@ interface RoomHeaderProps {
   timerEndsAt?: string | null;
   /** Estado de la sala (demo: se muestra como píldora informativa). */
   roomStatus?: 'waiting' | 'active' | 'closed';
-  /** Duración del vídeo en segundos, si la hay (demo: se muestra). */
-  videoDurationSeconds?: number | null;
   onOpenSettings?: () => void;
   onLeaveClick?: () => void;
   /** Abre/cierra el panel de participantes (igual que el botón de abajo) */
@@ -34,7 +32,6 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   roomDescription,
   timerEndsAt,
   roomStatus,
-  videoDurationSeconds = null,
   onOpenSettings,
   onOpenParticipants,
   participantsActive = false,
@@ -265,17 +262,9 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
         </button>
 
 
-        {demo && videoDurationSeconds !== null && videoDurationSeconds !== undefined && (
-          <div
-            className="header__room-pill"
-            title="Duración del vídeo"
-            data-testid="video-duration"
-          >
-            <span className="header__pill-label">{formatRemaining(videoDurationSeconds * 1000)}</span>
-          </div>
-        )}
-
         {/* Clock Pill: Penúltimo elemento (antes de Configuración) */}
+        {/* Nota: la pill de duración del vídeo se quitó a propósito: con el
+            reloj ya hay un solo contador en el header. */}
         <div className="header__share-wrap" ref={clockRef}>
           <button
             onClick={() => setShowClockMenu((v) => !v)}

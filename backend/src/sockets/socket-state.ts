@@ -13,3 +13,10 @@ export const activeUsers = new Map<string, SocketUser>();
 
 /** Estados de medios por socket.id y por nombre en minúsculas */
 export const activeMediaStates = new Map<string, { isCameraOn: boolean; isMicOn: boolean }>();
+
+/**
+ * Último trigger de cinemática (combo Interestellar) por sala. El servidor
+ * serializa: solo la primera propuesta dentro de la ventana gana y se
+ * reenvía, para que toda la sala vea las mismas frases.
+ */
+export const lastCinematicTrigger = new Map<string, number>();

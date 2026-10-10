@@ -80,6 +80,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const timersRef = useRef<Map<string, ToastTimers>>(new Map());
+  // Dedup: el mismo aviso (tipo+título+mensaje) dentro de 1.5 s se ignora.
+  // Evita toasts duplicados por eventos socket repetidos (p. ej. user-joined).
+  const lastNotifyRef = useRef<{ key: string; at: number }>({ key: '', at: 0 });
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -107,6 +110,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const notifyFn = useCallback(
     (type: ToastType, message: string, title?: string, onClick?: () => void) => {
+      const key = `${type}|${title ?? ''}|${message}`;
+      const now = Date.now();
+      if (lastNotifyRef.current.key === key && now - lastNotifyRef.current.at < 1500) return;
+      lastNotifyRef.current = { key, at: now };
       const id = Math.random().toString(36).substring(2, 9);
       setToasts((prev) => {
         const next = [...prev, { id, type, title, message, onClick }];

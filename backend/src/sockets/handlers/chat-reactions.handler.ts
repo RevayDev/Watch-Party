@@ -1,14 +1,19 @@
 import { Server, Socket } from 'socket.io';
 import { checkSocketRateLimit } from '../socket-limits.js';
-import { activeUsers } from '../socket-state.js';
+import { activeUsers, lastCinematicTrigger } from '../socket-state.js';
 
 // Anti-spam por socket (el excedente se ignora en silencio): ~8 mensajes,
 // ~20 reacciones y ~10 typing por ventana de 10s. Sin librerías nuevas.
 const MESSAGE_LIMIT = { max: 8, windowMs: 10_000 };
 const REACTION_LIMIT = { max: 20, windowMs: 10_000 };
 const TYPING_LIMIT = { max: 10, windowMs: 10_000 };
+const CINEMATIC_LIMIT = { max: 5, windowMs: 10_000 };
 const MAX_MESSAGE_CHARS = 500;
 const MAX_EMOJI_CHARS = 20;
+const MAX_COMBO_ID_CHARS = 64;
+const MAX_QUOTE_CHARS = 200;
+// Solo el primer trigger dentro de la ventana se reenvía a la sala.
+const CINEMATIC_WINDOW_MS = 8000;
 
 /**
  * Anti-raid: solo un miembro real de la sala (ni fantasma, ni en espera)
@@ -84,4 +89,62 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
 
     io.to(cleanRoomId).emit('typing', { user: serverName, timestamp: Date.now() });
   });
+
+  // 8c. Cinemática del combo Interestellar: quien completa el combo propone
+  // sus 3 frases. El servidor solo deja pasar la PRIMERA propuesta dentro de
+  // la ventana y la reenvía a la sala: todos ven exactamente lo mismo, como
+  // con el video. Efímero, sin persistencia.
+  socket.on(
+    'cinematic-trigger',
+    (
+      data:
+        | { roomId: string; comboId: string; quotes: unknown; userName?: string }
+        | undefined
+    ) => {
+      if (!data) return;
+      const { roomId, comboId, quotes } = data;
+      if (typeof roomId !== 'string' || !roomId.trim()) return;
+      if (typeof comboId !== 'string' || !comboId.trim()) return;
+      if (!Array.isArray(quotes) || quotes.length !== 3) return;
+      if (!checkSocketRateLimit(socket.id, 'cinematic-trigger', CINEMATIC_LIMIT.max, CINEMATIC_LIMIT.windowMs)) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+      const serverName = memberNameOf(socket.id, cleanRoomId);
+      if (!serverName) return;
+      const cleanQuotes = quotes.map((q) =>
+        typeof q === 'string' ? q.trim().slice(0, MAX_QUOTE_CHARS) : ''
+      );
+      if (cleanQuotes.some((q) => !q)) return;
+      const now = Date.now();
+      if (now - (lastCinematicTrigger.get(cleanRoomId) ?? 0) < CINEMATIC_WINDOW_MS) return;
+      lastCinematicTrigger.set(cleanRoomId, now);
+
+      io.to(cleanRoomId).emit('cinematic-trigger', {
+        comboId: comboId.trim().slice(0, MAX_COMBO_ID_CHARS),
+        quotes: cleanQuotes,
+        user: serverName,
+      });
+    }
+  );
+
+  // 8d. Cierre compartido de la cinemática: quien la omite lo emite y se
+  // reenvía a la sala para que se cierre en todos y siga la película.
+  // Idempotente (cerrar dos veces no hace nada); sin ventana temporal.
+  socket.on(
+    'cinematic-skip',
+    (data: { roomId: string; comboId: string; userName?: string } | undefined) => {
+      if (!data) return;
+      const { roomId, comboId } = data;
+      if (typeof roomId !== 'string' || !roomId.trim()) return;
+      if (typeof comboId !== 'string' || !comboId.trim()) return;
+      if (!checkSocketRateLimit(socket.id, 'cinematic-skip', CINEMATIC_LIMIT.max, CINEMATIC_LIMIT.windowMs)) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+      const serverName = memberNameOf(socket.id, cleanRoomId);
+      if (!serverName) return;
+
+      io.to(cleanRoomId).emit('cinematic-skip', {
+        comboId: comboId.trim().slice(0, MAX_COMBO_ID_CHARS),
+        user: serverName,
+      });
+    }
+  );
 }

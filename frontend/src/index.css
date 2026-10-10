@@ -2822,7 +2822,7 @@ a.home-faq-hl--frontend {
 .leader-exit-modal__opt-btn--danger .leader-exit-modal__btn-icon {
   color: #f87171;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .leader-exit-modal__btn-text {
@@ -3372,6 +3372,146 @@ a.home-faq-hl--frontend {
   z-index: 1000;
   white-space: nowrap;
   animation: toastSlideIn 0.3s ease forwards;
+}
+
+/* ── Ambient Intro (bienvenida cinematográfica al entrar a la sala) ── */
+/* Capa dentro del reproductor: cubre el video, una capa por encima. */
+.ambient-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 2rem;
+  overflow: hidden;
+  background: #05070d;
+  text-align: center;
+  /* Entrada suave de toda la capa. */
+  animation: ambientIn 1.2s ease;
+}
+
+/* Fondo cinematográfico: encuadre panorámico que mantiene visible el
+   agujero negro (derecha) y la estación (centro-izquierda). Aparece con
+   fundido al cargar para evitar parpadeos; sin filtros de color. */
+.ambient-intro__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 60% 42%;
+  opacity: 0;
+  transform: scale(1.06);
+  transition: opacity 2.5s ease;
+  animation: ambientDrift 14s ease-out forwards;
+  pointer-events: none;
+}
+
+.ambient-intro__bg--visible {
+  opacity: 1;
+}
+
+/* Degradado oscuro sutil para legibilidad de frases y controles. */
+.ambient-intro__shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(5, 7, 13, 0.55), transparent 30%, transparent 62%, rgba(5, 7, 13, 0.7)),
+    radial-gradient(ellipse 70% 60% at 50% 50%, transparent 40%, rgba(5, 7, 13, 0.55));
+}
+
+.ambient-intro__stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 68% 8%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 84% 34%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 32% 62%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 52% 78%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 8% 84%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1px 1px at 92% 72%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 44% 12%, rgba(255, 255, 255, 0.5), transparent);
+}
+
+.ambient-intro__vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 90% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55));
+}
+
+.ambient-intro__quote {
+  position: relative;
+  margin: 0;
+  max-width: 34rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 2.6vw, 1.6rem);
+  line-height: 1.6;
+  color: #f1f5f9;
+  text-wrap: balance;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.9);
+  /* Cuadro de fondo para legibilidad sobre el agujero negro. */
+  background: rgba(5, 7, 13, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  padding: 1rem 1.75rem;
+  /* Aparición lenta del mensaje. */
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 1.4s ease,
+    transform 1.4s ease;
+}
+
+.ambient-intro__quote--visible {
+  opacity: 1;
+  transform: translateY(0);
+  /* Entrada espejo de la salida: viene desde arriba; la salida va hacia abajo. */
+  animation: ambientQuoteIn 1.4s ease;
+}
+
+.ambient-intro__skip {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  background: rgba(5, 7, 13, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 9999px;
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  transition:
+    background var(--trans-fast),
+    border-color var(--trans-fast),
+    transform var(--trans-fast);
+}
+
+.ambient-intro__skip:hover {
+  color: #fff;
+  background: rgba(5, 7, 13, 0.9);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.ambient-intro__skip:active {
+  transform: scale(0.96);
 }
 
 /* ── Mobile visibility utilities ── */
@@ -4997,11 +5137,6 @@ a.home-faq-hl--frontend {
 
 .part-header__icon {
   color: var(--color-primary-light);
-}
-
-.part-count {
-  color: var(--color-primary-light);
-  font-weight: 800;
 }
 
 .part-icon-btn {
@@ -7253,41 +7388,6 @@ a.home-faq-hl--frontend {
 
 /* 6. Combo Interestellar (solo visual, ~4 s + fade). Translúcido sobre la
    peli, centrado; no intercepta clics. Sin efectos = no se renderiza. */
-.interstellar-combo {
-  position: absolute;
-  inset: 0;
-  z-index: 2147483644;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  pointer-events: none;
-  animation: interstellarFade 4s ease forwards;
-}
-.interstellar-combo__emojis {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  opacity: 0.55;
-}
-.interstellar-combo__emoji {
-  font-size: clamp(3rem, 8vmin, 5rem);
-  line-height: 1;
-  filter: saturate(1.2);
-}
-.interstellar-combo__title {
-  margin: 0;
-  font-size: clamp(1.2rem, 3vmin, 2rem);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #e0e7ff;
-  text-shadow:
-    0 0 18px rgba(129, 140, 248, 0.9),
-    0 0 42px rgba(168, 85, 247, 0.6);
-  animation: interstellarGlow 4s ease forwards;
-}
 /* keyframes → src/styles/animations.css */
 
 /* 7. Sin efectos visuales: reacciones normales siguen pero sin animación larga. */
@@ -7313,13 +7413,8 @@ a.home-faq-hl--frontend {
 /* 8. Respeta prefers-reduced-motion en todo lo animado por este bloque. */
 @media (prefers-reduced-motion: reduce) {
   .player-fs-toast,
-  .player-live-badge,
-  .interstellar-combo,
-  .interstellar-combo__title {
+  .player-live-badge {
     animation: none;
-  }
-  .interstellar-combo {
-    opacity: 0.9;
   }
   .floating-reaction {
     animation-duration: 1.2s;

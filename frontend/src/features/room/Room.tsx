@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { RoomHeader } from '../../components/RoomHeader';
 import { VideoPlayer } from '../player/VideoPlayer';
@@ -25,6 +25,23 @@ export interface RoomProps {
  */
 export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialIsLeader, onLeave }) => {
   const r = useRoomSocket({ roomId, userName, initialIsLeader, onLeave });
+  // Secuencia cinematográfica: NO sale sola al entrar; solo con el trigger
+  // compartido del combo Interestellar (el servidor deja pasar uno por
+  // ventana: toda la sala ve las mismas frases). Cada trigger suma una
+  // secuencia con key propia; las reconexiones no la re-disparan.
+  // Omitir la cierra para TODOS (el hook emite `cinematic-skip`) y la
+  // peli sigue.
+  const [cineSeq, setCineSeq] = useState(0);
+  const lastCineIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = r.cineTrigger?.comboId ?? null;
+    if (id && id !== lastCineIdRef.current) {
+      lastCineIdRef.current = id;
+      setCineSeq((c) => c + 1);
+    }
+  }, [r.cineTrigger]);
+  const activeCine =
+    r.cineTrigger && r.cineTrigger.comboId !== r.cineDismissedId ? r.cineTrigger : null;
 
 
 
@@ -95,7 +112,6 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
         roomDescription={r.roomData.settings?.description}
         timerEndsAt={r.roomData.settings?.timerEndsAt}
         roomStatus={r.roomData.status}
-        videoDurationSeconds={r.roomData.video?.durationSeconds ?? null}
         onOpenSettings={() => r.setShowRoomSettings(true)}
         onOpenParticipants={() => r.setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
         participantsActive={r.sideTabView === 'participants'}
@@ -127,7 +143,14 @@ onVideoReady={r.handleVideoReady}
             reactionsEnabled={r.reactionsEnabled}
             visualEffects={r.visualEffects}
             fullscreenToastsEnabled={r.fullscreenToasts}
-            interestellarActive={r.interestellarActive}
+            cinematicKey={activeCine ? cineSeq : 0}
+            cinematicQuotes={activeCine?.quotes ?? null}
+            onCinematicDone={(skipped) => {
+              // Lee el trigger vigente al pulsar (no el del render): si llegó
+              // otro combo mientras tanto, se cierra el que se está viendo.
+              const id = r.cineTrigger?.comboId ?? null;
+              if (id) r.dismissCinematic(id, skipped === true);
+            }}
           />
           {/* Pill "Reconectando…" (Rol A): solo overlay sobre el player.
               Visible al reconectar el socket o con calidad crítica (nivel 3:

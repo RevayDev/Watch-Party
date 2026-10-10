@@ -616,3 +616,90 @@ describe('useRoomSocket (hostOnlySync + leader-secret)', () => {
     expect(mockSocket.off).toHaveBeenCalledWith('leader-secret', expect.any(Function));
   });
 });
+
+describe('useRoomSocket (cinemática compartida del combo)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function fireCombo(mockSocket: MockSocket) {
+    act(() => {
+      mockSocket._fire('reaction', { id: 'r1', emoji: '🪐', user: 'Ana', xOffset: 0 });
+    });
+    act(() => {
+      mockSocket._fire('reaction', { id: 'r2', emoji: '✨', user: 'Beto', xOffset: 0 });
+    });
+  }
+
+  it('al completar el combo emite cinematic-trigger con 3 frases', async () => {
+    const { mockSocket } = setup(false);
+    await waitForSubscribed(mockSocket);
+    fireCombo(mockSocket);
+    const calls = mockSocket.emit.mock.calls.filter(([event]) => event === 'cinematic-trigger');
+    expect(calls).toHaveLength(1);
+    const payload = calls[0][1] as { roomId: string; comboId: string; quotes: string[] };
+    expect(payload.roomId).toBe('ABC123');
+    expect(typeof payload.comboId).toBe('string');
+    expect(payload.quotes).toHaveLength(3);
+  });
+
+  it('al recibir cinematic-trigger guarda las frases compartidas', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitForSubscribed(mockSocket);
+    expect(result.current.cineTrigger).toBeNull();
+    act(() => {
+      mockSocket._fire('cinematic-trigger', { comboId: 'c1', quotes: ['A', 'B', 'C'] });
+    });
+    expect(result.current.cineTrigger).toEqual({ comboId: 'c1', quotes: ['A', 'B', 'C'] });
+  });
+
+  it('ignora triggers inválidos o repetidos', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      mockSocket._fire('cinematic-trigger', { comboId: '', quotes: ['A', 'B', 'C'] });
+    });
+    act(() => {
+      mockSocket._fire('cinematic-trigger', { comboId: 'c1', quotes: ['A', 'B'] });
+    });
+    expect(result.current.cineTrigger).toBeNull();
+    act(() => {
+      mockSocket._fire('cinematic-trigger', { comboId: 'c1', quotes: ['A', 'B', 'C'] });
+    });
+    act(() => {
+      mockSocket._fire('cinematic-trigger', { comboId: 'c1', quotes: ['X', 'Y', 'Z'] });
+    });
+    expect(result.current.cineTrigger).toEqual({ comboId: 'c1', quotes: ['A', 'B', 'C'] });
+  });
+
+  it('dismissCinematic emite cinematic-skip y marca el cierre', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      result.current.dismissCinematic('c1', true);
+    });
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'cinematic-skip',
+      expect.objectContaining({ roomId: 'ABC123', comboId: 'c1' })
+    );
+    expect(result.current.cineDismissedId).toBe('c1');
+  });
+
+  it('al recibir cinematic-skip cierra la secuencia (sigue la peli)', async () => {
+    const { mockSocket, result } = setup(false);
+    await waitForSubscribed(mockSocket);
+    act(() => {
+      mockSocket._fire('cinematic-trigger', { comboId: 'c9', quotes: ['A', 'B', 'C'] });
+    });
+    expect(result.current.cineDismissedId).toBeNull();
+    act(() => {
+      mockSocket._fire('cinematic-skip', { comboId: 'c9' });
+    });
+    expect(result.current.cineDismissedId).toBe('c9');
+  });
+});

@@ -156,10 +156,7 @@ export const Participants: React.FC<ParticipantsProps> = ({
         {/* Header with Title and Close Button */}
         <div className="part-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="part-header__title">
-            <h2>
-              Participantes{' '}
-              <span className="part-count">({participants.length})</span>
-            </h2>
+            <h2>Participantes</h2>
           </div>
           {onClose && (
             <button

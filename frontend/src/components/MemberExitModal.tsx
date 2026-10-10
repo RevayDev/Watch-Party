@@ -1,6 +1,5 @@
 import React from 'react';
 import { BottomSheet } from '../shared/components/BottomSheet';
-import { LogOut } from 'lucide-react';
 
 interface MemberExitModalProps {
   isOpen: boolean;
@@ -34,8 +33,7 @@ export const MemberExitModal: React.FC<MemberExitModalProps> = ({
           onClick={onConfirmLeave}
           className="leader-exit-modal__opt-btn leader-exit-modal__opt-btn--danger"
         >
-          <div className="leader-exit-modal__btn-text" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <LogOut size={18} />
+          <div className="leader-exit-modal__btn-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
             <strong>Sí, salir de la sala</strong>
           </div>
         </button>

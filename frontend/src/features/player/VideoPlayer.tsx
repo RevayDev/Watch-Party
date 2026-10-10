@@ -17,6 +17,7 @@ function hashReactionId(id: string): number {
   return h;
 }
 import { BottomSheet } from '../../shared/components/BottomSheet';
+import { AmbientIntro } from '../room/components/AmbientIntro';
 import { isDemoMode } from '../../shared/demo';
 import { VideoUploadPicker } from './VideoUploadPicker';
 import { useToasts } from '../../services/notifications';
@@ -52,12 +53,17 @@ interface VideoPlayerProps {
   duckingLevelPct?: number;
   /** Rol B: mostrar reacciones flotantes (default ON). */
   reactionsEnabled?: boolean;
-  /** Efectos visuales: combo Interestellar + animaciones largas (default ON). */
+  /** Efectos visuales: animaciones largas (default ON). */
   visualEffects?: boolean;
-  /** Combo Interestellar activo (lo detecta el padre, useRoomSocket). */
-  interestellarActive?: boolean;
   /** Rol B: espejo de avisos dentro del player en fullscreen (default ON). */
   fullscreenToastsEnabled?: boolean;
+  /** Cinemática del combo Interestellar (0 = oculta). Se muestra dentro del
+      video, una capa por encima, y pausa la película mientras dura. */
+  cinematicKey?: number;
+  /** Frases compartidas por la sala para la cinemática (las vean todos igual). */
+  cinematicQuotes?: [string, string, string] | null;
+  /** `skipped` = true si alguien la omitió (Room lo reenvía a la sala). */
+  onCinematicDone?: (skipped: boolean) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -79,8 +85,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   duckingLevelPct = 30,
   reactionsEnabled = true,
   visualEffects = true,
-  interestellarActive = false,
   fullscreenToastsEnabled = true,
+  cinematicKey = 0,
+  cinematicQuotes = null,
+  onCinematicDone,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,6 +115,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const isApplyingRemote = useRef(false);
+  // Cinemática del combo: mientras se muestra, los play/pause/seek locales
+  // no se emiten (los gestiona el efecto de más abajo).
+  const cineHoldRef = useRef(false);
+  // Este cliente pausó el video por la cinemática (para reanudarlo al salir).
+  const cinePausedRef = useRef(false);
   // Supresión extendida del auto-play grupal: el `play()` es asíncrono y el
   // evento `play`/`seeked` del elemento puede llegar tras los 300 ms base.
   const suppressUntilRef = useRef(0);
@@ -181,12 +194,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const fsToast = mirrorToasts.length > 0 ? mirrorToasts[mirrorToasts.length - 1] : null;
   const fsToastExtra = Math.max(0, mirrorToasts.length - 1);
 
-  // ── Combo Interestellar (solo visual) ────────────────────────────────
+  // ── Combo Interestellar ─────────────────────────────────────────────
   // Si llegan 🪐 y ✨ de DOS usuarios distintos en 5 s (ventana por
-  // timestamp de llegada), se muestra el overlay especial ~4 s con fade.
-  // `visualEffects === false` lo apaga; las reacciones normales siguen.
-  // El estado viene del padre (useRoomSocket) a través de la prop
-  // interestellarActive.
+  // timestamp de llegada), el padre dispara la cinemática compartida.
+  // `visualEffects === false` la apaga; las reacciones normales siguen.
 
   // Borde en vivo = última acción grupal conocida (remoteAction/sentAt que ya
   // recibe el cliente) + tiempo transcurrido. Ticker local de 1 s que NO
@@ -466,8 +477,41 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }, 300);
   }, [remoteAction]);
 
+  // Cinemática del combo: pausa la película mientras se muestra y la reanuda
+  // al cerrarse (solo si la pausamos nosotros). Con control (isLeader) el
+  // pause/play se emite al grupo; sin control solo se pausa en local y se
+  // sigue el sync remoto como siempre.
+  useEffect(() => {
+    const active = (cinematicKey ?? 0) > 0;
+    const hasSource = !!(videoFileName || videoDirectUrl);
+    if (active) {
+      cineHoldRef.current = true;
+      const vid = videoRef.current;
+      if (vid && hasSource && !vid.paused) {
+        cinePausedRef.current = true;
+        vid.pause();
+        if (isLeader) onSyncAction('pause', vid.currentTime);
+      }
+      return;
+    }
+    if (cinePausedRef.current) {
+      cinePausedRef.current = false;
+      const vid = videoRef.current;
+      if (vid && hasSource && vid.paused) {
+        vid.play().catch(() => {});
+        if (isLeader) onSyncAction('play', vid.currentTime);
+      }
+      // El eco del play local llega asíncrono: mantiene la supresión un poco.
+      window.setTimeout(() => {
+        cineHoldRef.current = false;
+      }, 500);
+    } else {
+      cineHoldRef.current = false;
+    }
+  }, [cinematicKey, isLeader, onSyncAction, videoFileName, videoDirectUrl]);
+
   const isLocalEchoSuppressed = () =>
-    isApplyingRemote.current || Date.now() < suppressUntilRef.current;
+    isApplyingRemote.current || cineHoldRef.current || Date.now() < suppressUntilRef.current;
 
   const handlePlay = () => {
     if (isLocalEchoSuppressed() || !videoRef.current) return;
@@ -881,20 +925,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Combo Interestellar: 🪐 + ✨ de dos usuarios distintos en 5 s.
-          Solo visual (~4 s + fade). visualEffects OFF lo apaga. */}
-      {visualEffects && interestellarActive && (
-        <div className="interstellar-combo" aria-hidden="true">
-          <div className="interstellar-combo__emojis">
-            <span className="interstellar-combo__emoji">🪐</span>
-            <span className="interstellar-combo__emoji">✨</span>
-          </div>
-          <p className="interstellar-combo__title">Interestellar</p>
-        </div>
+      {/* Cinemática del combo: imagen + frases + audio dentro del video,
+          una capa por encima. Pausa la película (efecto de más arriba). */}
+      {(cinematicKey ?? 0) > 0 && onCinematicDone && (
+        <AmbientIntro
+          key={cinematicKey}
+          quotes={cinematicQuotes ?? undefined}
+          onDone={onCinematicDone}
+        />
       )}
 
-      {/* Espejo de avisos en fullscreen (rol B): 1 visible + contador de ráfaga */}
-      {fullscreenToastsEnabled && fsToast && (
+      {/* Espejo de avisos en fullscreen (rol B): 1 visible + contador de ráfaga.
+          Solo en fullscreen nativo: ahí los toasts del root no se ven. En modo
+          normal el espejo duplicaría el aviso (dos notificaciones). */}
+      {fullscreenToastsEnabled && isFullscreen && fsToast && (
         <div className="player-fs-toasts" role="status" aria-live="polite">
           <div className={`player-fs-toast player-fs-toast--${fsToast.type}`}>
             <div className="player-fs-toast__body">

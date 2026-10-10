@@ -5,6 +5,8 @@ import {
   isInterstellarEmoji,
   INTERSTELLAR_WINDOW_MS,
   INTERSTELLAR_DURATION_MS,
+  AMBIENT_QUOTES,
+  pickAmbientQuotes,
   type InterstellarEvent,
 } from '../src/features/player/interstellar';
 
@@ -100,6 +102,24 @@ describe('interstellar.ts', () => {
     it('exporta las constantes esperadas', () => {
       expect(INTERSTELLAR_WINDOW_MS).toBe(5000);
       expect(INTERSTELLAR_DURATION_MS).toBe(4000);
+    });
+  });
+
+  describe('frases compartidas de la cinemática', () => {
+    it('AMBIENT_QUOTES tiene 10 frases no vacías', () => {
+      expect(AMBIENT_QUOTES).toHaveLength(10);
+      for (const q of AMBIENT_QUOTES) {
+        expect(q.trim().length).toBeGreaterThan(0);
+      }
+    });
+
+    it('pickAmbientQuotes devuelve 3 distintas del array', () => {
+      const picked = pickAmbientQuotes();
+      expect(picked).toHaveLength(3);
+      for (const q of picked) {
+        expect(AMBIENT_QUOTES).toContain(q);
+      }
+      expect(new Set(picked).size).toBe(3);
     });
   });
 });

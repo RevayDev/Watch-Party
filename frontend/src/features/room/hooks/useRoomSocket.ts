@@ -16,6 +16,7 @@ import {
   INTERSTELLAR_DURATION_MS,
   checkInterstellarCombo,
   isInterstellarEmoji,
+  pickAmbientQuotes,
   type InterstellarEvent,
 } from '../../player/interstellar';
 
@@ -115,6 +116,17 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
   const interstellarHistoryRef = useRef<InterstellarEvent[]>([]);
   const interstellarSeenRef = useRef<Set<string>>(new Set());
   const interestellarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cinemática compartida: el servidor serializa los triggers (solo el
+  // primero en la ventana gana) para que toda la sala vea las mismas frases.
+  const [cineTrigger, setCineTrigger] = useState<{
+    comboId: string;
+    quotes: [string, string, string];
+  } | null>(null);
+  const cineSeenRef = useRef<Set<string>>(new Set());
+  // Omitir la cierra para todos: quien omite lo emite y el servidor lo
+  // reenvía; al recibirlo cada sala la cierra y reanuda su video.
+  // (El callback vive junto a `socket`, más abajo: TDZ si se crea aquí.)
+  const [cineDismissedId, setCineDismissedId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [remoteAction, setRemoteAction] = useState<RemoteSyncAction | null>(null);
   // Último consenso de playback ya aplicado: `room-state` llega en cada
@@ -238,6 +250,18 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
 
   // WebRTC hook for Voice and Camera
   const socket = getSocket();
+  // Cierre compartido de la cinemática: quien omite lo emite (`cinematic-
+  // skip`) y al recibirlo cada sala la cierra y reanuda su video.
+  const dismissCinematic = useCallback(
+    (comboId: string | null, broadcast: boolean) => {
+      if (!comboId) return;
+      if (broadcast) {
+        socket.emit('cinematic-skip', { roomId, comboId, userName: myNameRef.current });
+      }
+      setCineDismissedId(comboId);
+    },
+    [roomId, socket]
+  );
   const {
     localStream,
     remotePeers,
@@ -571,6 +595,15 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
           INTERSTELLAR_DURATION_MS
         );
         history.length = 0; // reiniciar ventana tras disparar
+        // Quien completa el combo propone sus 3 frases; el servidor solo
+        // deja pasar la primera propuesta (ventana de 8 s) y la reenvía a
+        // la sala: todos ven lo mismo, como con el video.
+        socket.emit('cinematic-trigger', {
+          roomId,
+          comboId: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+          quotes: pickAmbientQuotes(),
+          userName: myNameRef.current,
+        });
       } else {
         history.push(incoming);
       }
@@ -578,6 +611,32 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       interstellarHistoryRef.current = history.filter(
         (ev) => Date.now() - ev.at <= INTERSTELLAR_WINDOW_MS * 2
       );
+    };
+
+    // ── Cinemática compartida: el servidor reenvía UN solo trigger por
+    // ventana (el primero que llega gana). Se muestra tal cual: mismas
+    // frases para toda la sala. Sin validación estricta no se muestra nada.
+    const handleCinematicEvent = (data: { comboId?: unknown; quotes?: unknown } | undefined) => {
+      const comboId = typeof data?.comboId === 'string' ? data.comboId.trim().slice(0, 64) : '';
+      const raw = Array.isArray(data?.quotes) ? data.quotes : [];
+      if (!comboId || raw.length !== 3) return;
+      const quotes = raw.map((q) => (typeof q === 'string' ? q.trim().slice(0, 200) : ''));
+      if (quotes.some((q) => !q)) return;
+      if (cineSeenRef.current.has(comboId)) return;
+      cineSeenRef.current.add(comboId);
+      if (cineSeenRef.current.size > 20) {
+        const first = cineSeenRef.current.values().next().value;
+        if (first !== undefined) cineSeenRef.current.delete(first);
+      }
+      setCineTrigger({ comboId, quotes: quotes as [string, string, string] });
+    };
+
+    // ── Cierre compartido: alguien omitió la cinemática → se cierra aquí
+    // también (aunque el trigger aún no haya llegado) y el video sigue.
+    const handleCinematicSkip = (data: { comboId?: unknown } | undefined) => {
+      const comboId = typeof data?.comboId === 'string' ? data.comboId.trim().slice(0, 64) : '';
+      if (!comboId) return;
+      setCineDismissedId(comboId);
     };
 
 
@@ -804,6 +863,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     socket.on('upload-progress', handleUploadProgressEvent);
     socket.on('chat-message', handleChatMessage);
     socket.on('reaction', handleReactionEvent);
+    socket.on('cinematic-trigger', handleCinematicEvent);
+    socket.on('cinematic-skip', handleCinematicSkip);
     socket.on('typing', handleTypingEvent);
     socket.on('force-mute-user', handleForceMuteUser);
     socket.on('force-disable-camera', handleForceDisableCamera);
@@ -853,6 +914,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       socket.off('upload-progress', handleUploadProgressEvent);
       socket.off('chat-message', handleChatMessage);
       socket.off('reaction', handleReactionEvent);
+      socket.off('cinematic-trigger', handleCinematicEvent);
+      socket.off('cinematic-skip', handleCinematicSkip);
       socket.off('typing', handleTypingEvent);
       socket.off('force-mute-user', handleForceMuteUser);
       socket.off('force-disable-camera', handleForceDisableCamera);
@@ -1239,6 +1302,9 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     duckingEnabled,
     duckingLevelPct,
     interestellarActive,
+    cineTrigger,
+    cineDismissedId,
+    dismissCinematic,
     heartbeatInterval,
     handleLeaveClick,
     handleLeaveOnlyMe,

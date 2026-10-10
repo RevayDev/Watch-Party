@@ -366,46 +366,6 @@
 }
 
 /* ==========================================================================
-   Combo Interestellar (solo visual, ~4 s + fade)
-   ========================================================================== */
-@keyframes interstellarGlow {
-  0% {
-    opacity: 0;
-    text-shadow: 0 0 4px rgba(129, 140, 248, 0.2);
-  }
-  15% {
-    opacity: 1;
-    text-shadow: 0 0 18px rgba(129, 140, 248, 0.9), 0 0 42px rgba(168, 85, 247, 0.6);
-  }
-  70% {
-    opacity: 1;
-    text-shadow: 0 0 24px rgba(129, 140, 248, 1), 0 0 60px rgba(168, 85, 247, 0.8);
-  }
-  100% {
-    opacity: 0;
-    text-shadow: 0 0 4px rgba(129, 140, 248, 0.2);
-  }
-}
-
-@keyframes interstellarFade {
-  0% {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  12% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  75% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.02);
-  }
-}
-
-/* ==========================================================================
    Indicador "está escribiendo" (chat): avatares apilados + 3 bolitas
    ========================================================================== */
 
@@ -502,5 +462,55 @@
   .typing-indicator__dot {
     animation: none;
     opacity: 0.8;
+  }
+}
+
+/* Entrada de cada frase: espejo de la salida (entra desde arriba). */
+@keyframes ambientQuoteIn {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-intro {
+    animation: none;
+  }
+  .ambient-intro__quote,
+  .ambient-intro__quote--visible {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Entrada suave de la capa cinematográfica. */
+@keyframes ambientIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Fondo de la intro: asentamiento cinematográfico lento (Ken Burns sutil). */
+@keyframes ambientDrift {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-intro__bg {
+    animation: none;
+    transform: none;
   }
 }

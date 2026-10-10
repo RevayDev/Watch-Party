@@ -8,6 +8,35 @@
 export const INTERSTELLAR_WINDOW_MS = 5000;
 export const INTERSTELLAR_DURATION_MS = 4000;
 
+/**
+ * Frases cinematográficas de la secuencia del combo. Viven aquí (no en el
+ * componente) porque quien completa el combo elige 3 y las comparte por
+ * socket: toda la sala ve exactamente las mismas, como con el video.
+ */
+export const AMBIENT_QUOTES = [
+  'No entres dócil en esa buena noche.',
+  'El amor es lo único que trasciende el tiempo y el espacio.',
+  'La humanidad nació en la Tierra; no estaba destinada a morir aquí.',
+  'Solíamos mirar al cielo y preguntarnos.',
+  'No es posible.',
+  'No. Es necesario.',
+  'Quédate.',
+  'Una hora allí son siete años aquí.',
+  'El tiempo puede estirarse, pero no retroceder.',
+  'No me dejes ir así, Murph.',
+] as const;
+
+/** Elige 3 frases distintas al azar para una secuencia. */
+export function pickAmbientQuotes(): [string, string, string] {
+  const pool: string[] = [...AMBIENT_QUOTES];
+  const out: string[] = [];
+  while (out.length < 3 && pool.length > 0) {
+    const i = Math.floor(Math.random() * pool.length);
+    out.push(pool.splice(i, 1)[0]);
+  }
+  return out as [string, string, string];
+}
+
 export const INTERSTELLAR_EMOJIS = ['🪐', '✨'] as const;
 export type InterstellarEmoji = (typeof INTERSTELLAR_EMOJIS)[number];
 

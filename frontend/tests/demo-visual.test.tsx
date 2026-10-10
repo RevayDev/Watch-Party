@@ -58,13 +58,12 @@ describe('RoomHeader en demo', () => {
     participantCount: 3,
     isLeader: true,
     roomStatus: 'active' as const,
-    videoDurationSeconds: 125,
     onOpenSettings: vi.fn(),
     onOpenParticipants: vi.fn(),
     onLeaveClick: vi.fn(),
   };
 
-  it('muestra capacidad X/5 y duración del vídeo', async () => {
+  it('muestra capacidad X/5 y un solo contador (el reloj)', async () => {
     await act(async () => {
       render(<RoomHeader {...baseProps} />);
     });
@@ -74,11 +73,12 @@ describe('RoomHeader en demo', () => {
       'title',
       '3 de 5 participantes — ver lista',
     );
-    // 125 s → formato m:ss reutilizado (2:05)
-    expect(screen.getByTestId('video-duration')).toHaveTextContent('2:05');
+    // Sin pill de duración del vídeo: solo queda el reloj.
+    expect(screen.queryByTestId('video-duration')).toBeNull();
+    expect(document.querySelector('.header__timer-pill__label')).not.toBeNull();
   });
 
-  it('sin vídeo no muestra duración; sin estado no muestra píldora', async () => {
+  it('sin estado no muestra píldora extra', async () => {
     await act(async () => {
       render(
         <RoomHeader
@@ -86,7 +86,6 @@ describe('RoomHeader en demo', () => {
           participantCount={1}
           isLeader={false}
           roomStatus={undefined}
-          videoDurationSeconds={null}
         />,
       );
     });
