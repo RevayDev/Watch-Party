@@ -9,6 +9,13 @@ function loadHls(): Promise<typeof import('hls.js')> {
   if (!hlsModulePromise) hlsModulePromise = import('hls.js');
   return hlsModulePromise;
 }
+
+/** Hash determinista (djb2): varía el balanceo de cada reacción por su id. */
+function hashReactionId(id: string): number {
+  let h = 5381;
+  for (let i = 0; i < id.length; i++) h = ((h * 33) ^ id.charCodeAt(i)) >>> 0;
+  return h;
+}
 import { BottomSheet } from '../../shared/components/BottomSheet';
 import { isDemoMode } from '../../shared/demo';
 import { VideoUploadPicker } from './VideoUploadPicker';
@@ -847,16 +854,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           Con visualEffects OFF las reacciones siguen pero sin animación larga. */}
       {reactionsEnabled && reactions.length > 0 && (
         <div className={`reactions-overlay${visualEffects ? '' : ' reactions-overlay--static'}`} aria-hidden="true">
-          {reactions.map((r) => (
-            <div
-              key={r.id}
-              className={`floating-reaction${visualEffects ? '' : ' floating-reaction--static'}`}
-              style={{ '--x-offset': `${r.xOffset ?? 0}px`, '--float-duration': `${r.floatDuration ?? 4.2}s` } as React.CSSProperties}
-            >
-              <span>{r.emoji}</span>
-              {r.user && <span className="floating-reaction__user">{r.user}</span>}
-            </div>
-          ))}
+          {reactions.map((r) => {
+            // Variación determinista por id: cada emoji balancea con su propio
+            // ritmo/fase/tamaño (efecto partículas tipo YouTube en vivo).
+            // El delay negativo desincroniza la fase desde el primer frame.
+            const h = hashReactionId(r.id);
+            const swayDuration = `${(0.9 + ((h % 500) / 1000)).toFixed(3)}s`;
+            const swayDelay = `${(-((h >> 3) % 1200) / 1000).toFixed(3)}s`;
+            const swayScale = (0.85 + ((h >> 5) % 30) / 100).toFixed(3);
+            return (
+              <div
+                key={r.id}
+                className={`floating-reaction${visualEffects ? '' : ' floating-reaction--static'}`}
+                style={{ '--x-offset': `${r.xOffset ?? 0}px`, '--float-duration': `${r.floatDuration ?? 4.2}s` } as React.CSSProperties}
+              >
+                <span
+                  className="floating-reaction__emoji"
+                  style={{ '--sway-duration': swayDuration, '--sway-delay': swayDelay, '--sway-scale': swayScale } as React.CSSProperties}
+                >
+                  {r.emoji}
+                </span>
+                {r.user && <span className="floating-reaction__user">{r.user}</span>}
+              </div>
+            );
+          })}
         </div>
       )}
 

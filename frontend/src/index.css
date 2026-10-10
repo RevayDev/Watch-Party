@@ -3697,8 +3697,14 @@ a.home-faq-hl--frontend {
   display: flex;
   flex-direction: column;
   align-items: center;
-  animation: floatUpAndFade var(--float-duration, 3.8s) cubic-bezier(0.12, 0.75, 0.45, 1) forwards;
+  animation: floatUpAndFade var(--float-duration, 3.8s) cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
   will-change: transform, opacity;
+}
+
+.floating-reaction__emoji {
+  display: inline-block;
+  animation: reactionSway var(--sway-duration, 1.15s) ease-in-out var(--sway-delay, 0s) infinite alternate;
+  will-change: transform;
 }
 
 .floating-reaction__user {
@@ -3738,6 +3744,9 @@ a.home-faq-hl--frontend {
 @media (prefers-reduced-motion: reduce) {
   .floating-reaction {
     animation: floatUpAndFade 1.2s linear forwards;
+  }
+  .floating-reaction__emoji {
+    animation: none;
   }
   .upload-progress__bar--indeterminate {
     animation: none;
@@ -7294,6 +7303,9 @@ a.home-faq-hl--frontend {
   gap: 0.3rem;
   font-size: 1.4rem;
 }
+.floating-reaction--static .floating-reaction__emoji {
+  animation: none;
+}
 .reactions-overlay--static .floating-reaction--static {
   margin-bottom: 0.2rem;
 }
@@ -7312,5 +7324,8 @@ a.home-faq-hl--frontend {
   .floating-reaction {
     animation-duration: 1.2s;
     animation-timing-function: linear;
+  }
+  .floating-reaction__emoji {
+    animation: none;
   }
 }

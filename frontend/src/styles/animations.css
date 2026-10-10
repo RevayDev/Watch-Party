@@ -150,6 +150,17 @@
   }
 }
 
+/* Balanceo lateral + giro suave del emoji (la subida la lleva el contenedor).
+   Cada item define --sway-duration/--sway-delay/--sway-scale propias. */
+@keyframes reactionSway {
+  from {
+    transform: translateX(-9px) rotate(-9deg) scale(var(--sway-scale, 1));
+  }
+  to {
+    transform: translateX(9px) rotate(9deg) scale(var(--sway-scale, 1));
+  }
+}
+
 @keyframes toastSlideIn {
   from {
     opacity: 0;
