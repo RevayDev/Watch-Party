@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { IRoom, IParticipant, IVideoMetadata, IJoinRequest, IKickedParticipant } from '../types/room.types.js';
+import { IRoom, IParticipant, IVideoMetadata, IJoinRequest, IKickedParticipant, IMusicQueueEntry } from '../types/room.types.js';
 
 export interface RoomDocument extends IRoom, Document {}
 
@@ -45,8 +45,28 @@ const VideoMetadataSchema = new Schema<IVideoMetadata>(
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
     durationSeconds: { type: Number, default: 0 },
-    sourceType: { type: String, enum: ['file', 'url', 'hls'], default: 'file' },
+    sourceType: { type: String, enum: ['file', 'url', 'hls', 'spotify'], default: 'file' },
     directUrl: { type: String, default: null },
+  },
+  { _id: false }
+);
+
+const MusicQueueEntrySchema = new Schema<IMusicQueueEntry>(
+  {
+    id: { type: String, required: true },
+    trackId: { type: String, required: true },
+    name: { type: String, required: true },
+    artists: { type: String, required: true },
+    albumArt: { type: String },
+    durationMs: { type: Number },
+    uri: { type: String },
+    openUrl: { type: String },
+    kind: { type: String, enum: ['track'], default: 'track' },
+    proposedBy: { type: String, required: true },
+    proposedByUserId: { type: String },
+    status: { type: String, enum: ['queued', 'pending'], default: 'queued' },
+    votes: { type: [String], default: [] },
+    createdAt: { type: Date, default: Date.now },
   },
   { _id: false }
 );
@@ -108,6 +128,14 @@ const RoomSchema = new Schema<RoomDocument>(
         allowMicReactivation: true,
         allowCamReactivation: true,
       },
+    },
+    musicQueue: {
+      type: [MusicQueueEntrySchema],
+      default: [],
+    },
+    musicNowPlaying: {
+      type: Object,
+      default: null,
     },
   },
   {

@@ -174,8 +174,178 @@ export class ApiService {
     });
   }
 
+  // ── Panel Admin (ADMIN_TOKEN por header; el token lo escribe el usuario,
+  // nunca va en el código) ──────────────────────────────────────────────
+  private static adminHeaders(token: string): Record<string, string> {
+    return { 'Content-Type': 'application/json', 'x-admin-token': token };
+  }
+
+  private static async adminFetch<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: { ...ApiService.adminHeaders(token), ...(init?.headers || {}) },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error del panel de administración');
+    }
+    return response.json();
+  }
+
+  static adminListRooms(token: string): Promise<{ rooms: any[]; total: number }> {
+    return ApiService.adminFetch(token, '/admin/rooms');
+  }
+
+  static adminGetRoom(roomId: string, token: string): Promise<any> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}`);
+  }
+
+  static adminUpdateSettings(
+    roomId: string,
+    token: string,
+    settings: Partial<IRoomSettings>
+  ): Promise<{ message: string; settings: IRoomSettings }> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify({ settings }),
+    });
+  }
+
+  static adminDeleteRoom(roomId: string, token: string): Promise<{ message: string; roomId: string }> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}`, { method: 'DELETE' });
+  }
+
+  static adminKick(
+    roomId: string,
+    token: string,
+    body: { targetUserName?: string; targetUserId?: string; ban?: boolean }
+  ): Promise<any> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}/kick`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  static adminUnban(
+    roomId: string,
+    token: string,
+    body: { targetUserName?: string; targetUserId?: string }
+  ): Promise<any> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}/unban`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  static adminSetRole(
+    roomId: string,
+    token: string,
+    body: { targetUserName: string; role: 'coleader' | 'member' }
+  ): Promise<any> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}/role`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  static adminTransferLeader(
+    roomId: string,
+    token: string,
+    body: { targetUserName?: string; targetUserId?: string }
+  ): Promise<any> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}/transfer-leader`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  static adminRename(
+    roomId: string,
+    token: string,
+    body: { oldName?: string; targetUserId?: string; newName: string }
+  ): Promise<any> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}/rename`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  static adminMute(
+    roomId: string,
+    token: string,
+    body: { kind: 'mic' | 'camera'; targetUserName?: string; targetUserId?: string }
+  ): Promise<any> {
+    return ApiService.adminFetch(token, `/admin/rooms/${roomId}/mute`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  // ── Spotify ("Potify" fase 1) ──────────────────────────────────────────
+  static async spotifyStatus(roomId: string): Promise<{ configured: boolean; connected: boolean; roomId: string }> {
+    const response = await fetch(`${API_BASE_URL}/spotify/status?roomId=${encodeURIComponent(roomId)}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo consultar Spotify');
+    }
+    return response.json();
+  }
+
+  static async spotifyAuthUrl(roomId: string): Promise<{ authUrl: string }> {
+    const response = await fetch(`${API_BASE_URL}/spotify/auth-url?roomId=${encodeURIComponent(roomId)}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Spotify no está configurado');
+    }
+    return response.json();
+  }
+
+  static async spotifyDisconnect(roomId: string): Promise<{ connected: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/spotify/disconnect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo desconectar Spotify');
+    }
+    return response.json();
+  }
+
+  static async spotifyResolve(url: string): Promise<{ kind: string; id: string; embedUrl: string; openUrl: string }> {
+    const response = await fetch(`${API_BASE_URL}/spotify/resolve?url=${encodeURIComponent(url)}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Enlace de Spotify inválido');
+    }
+    return response.json();
+  }
+
+  /**
+   * Busca pistas de Spotify para la cola musical de la sala.
+   * GET /api/spotify/search?q=&roomId=&limit=. Lanza Error(error) si !ok.
+   */
+  static async spotifySearch(
+    query: string,
+    roomId: string,
+    limit?: number
+  ): Promise<{ tracks: import('../types/room').IMusicTrack[] }> {
+    const params = new URLSearchParams({ q: query, roomId });
+    if (typeof limit === 'number' && Number.isFinite(limit)) {
+      params.set('limit', String(limit));
+    }
+    const response = await fetch(`${API_BASE_URL}/spotify/search?${params.toString()}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'No se pudo buscar en Spotify');
+    }
+    return response.json();
+  }
+
   /**
    * Set video from direct URL, Google Drive or .m3u8 HLS playlist
+   * (o enlace de Spotify: el backend lo detecta y lo guarda como `spotify`).
    */
   static async setVideoUrl(
     roomId: string,

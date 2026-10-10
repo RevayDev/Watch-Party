@@ -11,13 +11,20 @@ const Home = lazy(() =>
 const Room = lazy(() =>
   import('./features/room/Room').then((m) => ({ default: m.Room }))
 );
+const AdminPanel = lazy(() =>
+  import('./features/admin/AdminPanel').then((m) => ({ default: m.AdminPanel }))
+);
 
-type ViewState = 'home' | 'room';
+type ViewState = 'home' | 'room' | 'admin';
 
-/** Ruta manual (sin router): `?room=` o `/`. */
+/** Ruta manual (sin router): `?room=`, `?admin` (o `/admin`) o `/`. */
 function routeFromLocation(): { view: ViewState; roomId: string | null } {
   if (typeof window === 'undefined') return { view: 'home', roomId: null };
-  const roomParam = new URLSearchParams(window.location.search).get('room');
+  const params = new URLSearchParams(window.location.search);
+  if (window.location.pathname === '/admin' || params.has('admin')) {
+    return { view: 'admin', roomId: null };
+  }
+  const roomParam = params.get('room');
   return { view: 'home', roomId: roomParam ? roomParam.toUpperCase() : null };
 }
 
@@ -31,6 +38,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     const applyRoute = () => {
       const route = routeFromLocation();
+      if (route.view === 'admin') {
+        setView('admin');
+        return;
+      }
       if (route.roomId) setCurrentRoomId(route.roomId);
     };
     applyRoute();
@@ -113,6 +124,10 @@ export const App: React.FC = () => {
           isLeader={isLeader}
           onLeave={handleBackToHome}
         />
+      )}
+
+      {view === 'admin' && (
+        <AdminPanel onLeave={handleBackToHome} />
       )}
       </Suspense>
       </div>

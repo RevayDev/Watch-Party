@@ -16,7 +16,7 @@ import {
 import { registerJoinApprovalHandlers } from '../src/sockets/handlers/join-approval.handler.js';
 import { activeUsers } from '../src/sockets/socket-state.js';
 import { clearAllPendingGraces, hasPendingGrace } from '../src/sockets/disconnect-grace.js';
-import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
+import { backupRoomsFile, clearMemoryRoomStore, restoreRoomsFile } from './helpers.js';
 
 /**
  * SUBAGENTE 3 (TESTER) — verificación INTEGRADA demo-free y huecos.
@@ -124,6 +124,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   setDemoModeOverride(true);
+  clearMemoryRoomStore();
   activeUsers.clear();
   clearAllPendingGraces();
 });
@@ -317,23 +318,30 @@ describe('integrado privacidad: sin código no se entra; sin listado; sin fugas'
     expect(JSON.stringify(ok.body)).not.toContain(room.leaderSecret);
   });
 
-  it('PROBADO: no existe endpoint de listado de salas en el backend', () => {
+  it('PROBADO: ningún listado público de salas (solo el panel admin con token)', () => {
     const roomRoutes = fs.readFileSync(path.join(BACKEND_SRC, 'routes', 'room.routes.ts'), 'utf-8');
     const demoRoutes = fs.readFileSync(path.join(BACKEND_SRC, 'routes', 'demo.routes.ts'), 'utf-8');
+    const adminRoutes = fs.readFileSync(path.join(BACKEND_SRC, 'routes', 'admin.routes.ts'), 'utf-8');
     const app = fs.readFileSync(path.join(BACKEND_SRC, 'app.ts'), 'utf-8');
     expect(roomRoutes).not.toMatch(/router\.get\(['"]\/['"]/);
-    expect(roomRoutes + demoRoutes + app).not.toMatch(/listRooms|getAllRooms|findAll/);
-    // Montajes /api conocidos: rooms, demo (solo availability) y proxy. Nada más lista salas.
+    // Las rutas públicas no listan; el listado vive solo tras requireAdmin.
+    expect(roomRoutes + demoRoutes).not.toMatch(/listRooms|getAllRooms|findAll/);
+    expect(adminRoutes).toContain('requireAdmin');
+    // Montajes /api conocidos: rooms, demo (solo availability), proxy y admin/spotify.
     expect(app).toContain("app.use('/api/rooms'");
     expect(app).toContain("app.use('/api/demo'");
+    expect(app).toContain("app.use('/api/admin'");
   });
 
   it('PROBADO: el frontend Home no consume ningún listado (solo availability + create/join por código)', () => {
     const api = fs.readFileSync(path.join(FRONTEND_SRC, 'services', 'api.ts'), 'utf-8');
     const home = fs.readFileSync(path.join(FRONTEND_SRC, 'features', 'home', 'Home.tsx'), 'utf-8');
-    expect(api).not.toMatch(/listRooms|getAllRooms|allRooms/i);
+    // El único listado del frontend es el del panel admin (exige token por header).
+    expect(api).toMatch(/x-admin-token/);
+    expect(home).not.toMatch(/adminListRooms|getAllRooms|allRooms/i);
     expect(home).not.toContain('fetch(');
     expect(home).not.toContain('/api/rooms');
+    expect(home).not.toContain('/api/admin');
     expect(home).toContain('getDemoAvailability');
   });
 

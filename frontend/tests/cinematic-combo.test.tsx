@@ -90,7 +90,6 @@ vi.mock('../src/features/room/hooks/useRoomSocket', () => ({
     visualEffects: true,
     duckingEnabled: true,
     duckingLevelPct: 30,
-    interestellarActive: false,
     cineTrigger: comboState.trigger,
     cineDismissedId: roomStubs.dismissedId,
     dismissCinematic: roomStubs.dismissCinematic,

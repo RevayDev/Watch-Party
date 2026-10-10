@@ -38,6 +38,10 @@ async function startServer() {
     },
   });
 
+  // El panel admin REST emite eventos en tiempo real: expone `io` a los
+  // controllers vía `req.app.get('io')` (ausente en tests → se omite el emit).
+  app.set('io', io);
+
   // Attach socket handlers
   setupSocketHandlers(io);
 

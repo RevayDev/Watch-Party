@@ -44,6 +44,10 @@ class RoutingRoomRepository implements RoomRepository {
     return this.active().findTimerCandidates();
   }
 
+  findAll(): Promise<IRoom[]> {
+    return this.active().findAll();
+  }
+
   count(): Promise<number> {
     return this.active().count();
   }

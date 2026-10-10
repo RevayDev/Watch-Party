@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { IRoomData, IRoomSettings, ChatMessage, ReactionItem, TypingPayload } from '../../../types/room';
+import { IRoomData, IRoomSettings, IMusicTrack, IMusicQueueEntry, IMusicNowPlaying, ChatMessage, ReactionItem, TypingPayload } from '../../../types/room';
 import { ApiService } from '../../../services/api';
 import { getSocket, disconnectSocket } from '../../../services/socket';
 import { removeRecentRoom, updateRecentRoomMeta } from '../../../services/recentRooms';
@@ -13,7 +13,6 @@ import { playJoinSound, playLeaveSound, playChatSound } from '../utils/sounds';
 import { clampDuckPct, DUCK_DEFAULT_PCT, heartbeatIntervalMs } from '../../../shared/perf';
 import {
   INTERSTELLAR_WINDOW_MS,
-  INTERSTELLAR_DURATION_MS,
   checkInterstellarCombo,
   isInterstellarEmoji,
   pickAmbientQuotes,
@@ -111,11 +110,11 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
   // Indicador "escribiendo": mapa userName -> timestamp del último `typing`.
   // Expira a los 4 s sin refresco (ver efecto de poda más abajo).
   const [typingMap, setTypingMap] = useState<Record<string, number>>({});
-  // Estado del combo Interestellar: se activa cuando 🪐 + ✨ de usuarios distintos en 5 s.
-  const [interestellarActive, setInterestellarActive] = useState(false);
+  // Historial del combo Interestellar (🪐 + ✨ de usuarios distintos en 5 s).
+  // Sin estado visual local: quien completa el combo emite `cinematic-trigger`
+  // y la cinemática compartida la muestra el servidor a toda la sala.
   const interstellarHistoryRef = useRef<InterstellarEvent[]>([]);
   const interstellarSeenRef = useRef<Set<string>>(new Set());
-  const interestellarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Cinemática compartida: el servidor serializa los triggers (solo el
   // primero en la ventana gana) para que toda la sala vea las mismas frases.
   const [cineTrigger, setCineTrigger] = useState<{
@@ -128,14 +127,17 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
   // (El callback vive junto a `socket`, más abajo: TDZ si se crea aquí.)
   const [cineDismissedId, setCineDismissedId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  // ── Cola musical colaborativa (Spotify) ───────────────────────────────
+  const [musicQueue, setMusicQueue] = useState<IMusicQueueEntry[]>([]);
+  const [musicNowPlaying, setMusicNowPlaying] = useState<IMusicNowPlaying | null>(null);
   const [remoteAction, setRemoteAction] = useState<RemoteSyncAction | null>(null);
   // Último consenso de playback ya aplicado: `room-state` llega en cada
   // (re)join con la misma posición y reaplicarlo corta el video. Solo se
   // re-aplica si cambia play/pause o el salto supera la tolerancia (2 s).
   const lastConsensusRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
 
-  // Active side panel tab: null | 'chat' | 'participants'
-  const [activeSideTab, setActiveSideTab] = useState<'chat' | 'participants' | null>(null);
+  // Active side panel tab: null | 'chat' | 'participants' | 'music'
+  const [activeSideTab, setActiveSideTab] = useState<'chat' | 'participants' | 'music' | null>(null);
   // Show emoji reactions popup over toolbar
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   // Toggle collapse right cameras strip accordion
@@ -160,11 +162,11 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     showEmojiPicker
   );
   // Keep the last opened tab so the drawer still renders content while closing
-  const lastSideTabRef = useRef<'chat' | 'participants'>('chat');
+  const lastSideTabRef = useRef<'chat' | 'participants' | 'music'>('chat');
   if (activeSideTab) lastSideTabRef.current = activeSideTab;
   const sideTabView = activeSideTab ?? lastSideTabRef.current;
   // Ref mirror of the open side tab (socket handlers read it without stale closures)
-  const activeSideTabRef = useRef<'chat' | 'participants' | null>(null);
+  const activeSideTabRef = useRef<'chat' | 'participants' | 'music' | null>(null);
   activeSideTabRef.current = activeSideTab;
 
   // Auto-hide toolbar and header on inactivity (like YouTube / Netflix / Google Meet)
@@ -347,6 +349,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
         const data = await ApiService.getRoom(roomId);
         if (isMounted) {
           setRoomData(data);
+          setMusicQueue(data.musicQueue ?? []);
+          setMusicNowPlaying(data.musicNowPlaying ?? null);
           if (data.leaderName.toLowerCase() === myName.toLowerCase()) {
             setIsLeader(true);
             // Preserva el leaderSecret ya guardado para esta sala, si existe
@@ -378,7 +382,20 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       joinRequests?: any[];
       kickedUsers?: any[];
       playback?: { currentTime: number; isPlaying: boolean } | null;
+      musicQueue?: IMusicQueueEntry[];
+      queue?: IMusicQueueEntry[];
+      musicNowPlaying?: IMusicNowPlaying | null;
+      nowPlaying?: IMusicNowPlaying | null;
     }) => {
+      const nextQueue = state.musicQueue ?? state.queue ?? roomDataRef.current?.musicQueue ?? [];
+      const nextNowPlaying =
+        state.musicNowPlaying !== undefined
+          ? state.musicNowPlaying
+          : state.nowPlaying !== undefined
+            ? state.nowPlaying
+            : roomDataRef.current?.musicNowPlaying ?? null;
+      setMusicQueue(nextQueue);
+      setMusicNowPlaying(nextNowPlaying);
       setRoomData((prev) =>
         prev
           ? {
@@ -389,6 +406,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
               settings: state.settings || prev.settings,
               joinRequests: state.joinRequests || prev.joinRequests,
               kickedUsers: state.kickedUsers || prev.kickedUsers,
+              musicQueue: nextQueue,
+              musicNowPlaying: nextNowPlaying,
             }
           : null
       );
@@ -511,8 +530,25 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       }
     };
 
-    const handleVideoChanged = (data: { video: any }) => {
-      setRoomData((prev) => (prev ? { ...prev, video: data.video, status: 'active' } : null));
+    const handleVideoChanged = (data: {
+      video: any;
+      musicQueue?: IMusicQueueEntry[];
+      queue?: IMusicQueueEntry[];
+      musicNowPlaying?: IMusicNowPlaying | null;
+      nowPlaying?: IMusicNowPlaying | null;
+    }) => {
+      const nextQueue = data.musicQueue ?? data.queue ?? roomDataRef.current?.musicQueue ?? [];
+      const nextNowPlaying =
+        data.musicNowPlaying !== undefined
+          ? data.musicNowPlaying
+          : data.nowPlaying !== undefined
+            ? data.nowPlaying
+            : roomDataRef.current?.musicNowPlaying ?? null;
+      setMusicQueue(nextQueue);
+      setMusicNowPlaying(nextNowPlaying);
+      setRoomData((prev) =>
+        prev ? { ...prev, video: data.video, status: 'active', musicQueue: nextQueue, musicNowPlaying: nextNowPlaying } : null
+      );
       setRemoteAction(null);
       setMessages((prev) => [
         ...prev,
@@ -588,12 +624,6 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
         if (first !== undefined) lastIds.delete(first);
       }
       if (checkInterstellarCombo(history, incoming, true)) {
-        setInterestellarActive(true);
-        if (interestellarTimerRef.current) clearTimeout(interestellarTimerRef.current);
-        interestellarTimerRef.current = setTimeout(
-          () => setInterestellarActive(false),
-          INTERSTELLAR_DURATION_MS
-        );
         history.length = 0; // reiniciar ventana tras disparar
         // Quien completa el combo propone sus 3 frases; el servidor solo
         // deja pasar la primera propuesta (ventana de 8 s) y la reenvía a
@@ -845,6 +875,27 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       notify('warning', data.message || 'No tienes permiso para realizar esa acción.', 'Acción denegada');
     };
 
+    // ── Cola musical: broadcast del servidor tras cada mutación ──────────
+    const handleMusicQueueUpdated = (data: {
+      queue?: IMusicQueueEntry[];
+      musicQueue?: IMusicQueueEntry[];
+      nowPlaying?: IMusicNowPlaying | null;
+      musicNowPlaying?: IMusicNowPlaying | null;
+    }) => {
+      const nextQueue = data?.queue ?? data?.musicQueue ?? roomDataRef.current?.musicQueue ?? [];
+      const nextNowPlaying =
+        data?.nowPlaying !== undefined
+          ? data.nowPlaying
+          : data?.musicNowPlaying !== undefined
+            ? data.musicNowPlaying
+            : roomDataRef.current?.musicNowPlaying ?? null;
+      setMusicQueue(nextQueue);
+      setMusicNowPlaying(nextNowPlaying);
+      setRoomData((prev) =>
+        prev ? { ...prev, musicQueue: nextQueue, musicNowPlaying: nextNowPlaying } : prev
+      );
+    };
+
     // Nuevo leader: el servidor envía el secreto para acreditarse en próximos emits.
     const handleHostSecret = (data: { leaderSecret?: string }) => {
       if (data?.leaderSecret) {
@@ -881,6 +932,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     socket.on('join-requests-updated', handleJoinRequestsUpdated);
     socket.on('settings-error', handleSettingsError);
     socket.on('action-denied', handleActionDenied);
+    socket.on('music-queue-updated', handleMusicQueueUpdated);
     socket.on('leader-secret', handleHostSecret);
 
     // ── Estado de conexión (pill "Reconectando…", Rol A) ───────────────────
@@ -932,6 +984,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       socket.off('join-requests-updated', handleJoinRequestsUpdated);
       socket.off('settings-error', handleSettingsError);
       socket.off('action-denied', handleActionDenied);
+      socket.off('music-queue-updated', handleMusicQueueUpdated);
       socket.off('leader-secret', handleHostSecret);
       socket.off('disconnect', handleSocketDisconnect);
       socket.off('reconnect_attempt', handleReconnectAttempt);
@@ -1215,6 +1268,46 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     socket.emit('send-reaction', { roomId, emoji, userName: myName });
   };
 
+  // ── Música/Spotify: emits colaborativos (el servidor valida y difunde
+  // `music-queue-updated`; los errores llegan por `action-denied`) ─────────
+  const musicAdd = (track: IMusicTrack) => {
+    socket.emit('music-add', { roomId, track, ...buildSocketAuth(roomId, myName) });
+  };
+
+  const musicVote = (entryId: string) => {
+    socket.emit('music-vote', { roomId, entryId, ...buildSocketAuth(roomId, myName) });
+  };
+
+  const musicRemove = (entryId: string) => {
+    socket.emit('music-remove', { roomId, entryId, ...buildSocketAuth(roomId, myName) });
+  };
+
+  const musicReorder = (order: string[]) => {
+    socket.emit('music-reorder', { roomId, order, ...buildSocketAuth(roomId, myName) });
+  };
+
+  const musicApprove = (entryId: string) => {
+    socket.emit('music-approve', { roomId, entryId, ...buildSocketAuth(roomId, myName) });
+  };
+
+  const musicNext = () => {
+    socket.emit('music-next', { roomId, ...buildSocketAuth(roomId, myName) });
+  };
+
+  const musicStop = () => {
+    socket.emit('music-stop', { roomId, ...buildSocketAuth(roomId, myName) });
+  };
+
+  const searchMusic = async (query: string): Promise<IMusicTrack[] | null> => {
+    try {
+      const res = await ApiService.spotifySearch(query, roomId);
+      return res.tracks ?? [];
+    } catch (err: any) {
+      notify('error', err.message || 'No se pudo buscar en Spotify', 'Música');
+      return null;
+    }
+  };
+
   // ¿Soy co-anfitrión? (el anfitrión también cambia video: ver VideoPlayer).
   const isCohost = useMemo(() => {
     const list = roomData?.participants ?? [];
@@ -1301,7 +1394,6 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     visualEffects,
     duckingEnabled,
     duckingLevelPct,
-    interestellarActive,
     cineTrigger,
     cineDismissedId,
     dismissCinematic,
@@ -1317,6 +1409,16 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     handleVideoReady,
     handleSendMessage,
     handleReaction,
+    musicQueue,
+    musicNowPlaying,
+    musicAdd,
+    musicVote,
+    musicRemove,
+    musicReorder,
+    musicApprove,
+    musicNext,
+    musicStop,
+    searchMusic,
     handleCancelWaiting,
   };
 }

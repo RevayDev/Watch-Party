@@ -9,8 +9,11 @@ import { RoomSettingsModal } from '../../components/RoomSettingsModal';
 import { WaitingApproval } from '../waiting/WaitingApproval';
 import { useRoomSocket } from './hooks/useRoomSocket';
 import { buildSocketAuth } from '../../shared/utils';
+import { ApiService } from '../../services/api';
 import { RoomControls } from './components/RoomControls';
 import { RoomDrawer } from './components/RoomDrawer';
+import { DEFAULT_AMBIENT_SPOTIFY_URL } from './components/SpotifyListenButton';
+import { useBarPrefs } from './hooks/useBarPrefs';
 
 export interface RoomProps {
   roomId: string;
@@ -25,6 +28,43 @@ export interface RoomProps {
  */
 export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialIsLeader, onLeave }) => {
   const r = useRoomSocket({ roomId, userName, initialIsLeader, onLeave });
+  // Enlace público de lo que suena en Spotify (footer + chat lo comparten).
+  const spotifyVideo = r.roomData?.video?.sourceType === 'spotify' ? r.roomData.video : null;
+  const spotifyOpenUrl = spotifyVideo
+    ? (spotifyVideo.fileName?.includes('open.spotify.com')
+      ? spotifyVideo.fileName
+      : spotifyVideo.directUrl ?? null)
+    : null;
+  const canPlayAmbient = r.isLeader || r.isCohost;
+  const handlePlayAmbient = () =>
+    r.handleSetVideoUrl(DEFAULT_AMBIENT_SPOTIFY_URL, 'Música ambiente de espera');
+  // Spotify conectado (pestaña Música): se consulta al montar/cambiar el video.
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const spotifyVideoKey = spotifyVideo ? (spotifyVideo.fileName ?? spotifyVideo.directUrl ?? '') : '';
+  useEffect(() => {
+    let alive = true;
+    ApiService.spotifyStatus(roomId)
+      .then((s) => {
+        if (alive) setSpotifyConnected(s.connected === true);
+      })
+      .catch(() => {
+        if (alive) setSpotifyConnected(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [roomId, spotifyVideoKey]);
+  const handleMusicConnect = async () => {
+    try {
+      const { authUrl } = await ApiService.spotifyAuthUrl(roomId);
+      window.open(authUrl, '_self');
+    } catch {
+      // Sin red: no se puede vincular; el panel muestra el error de búsqueda.
+    }
+  };
+  const isModerator = r.isLeader || r.isCohost;
+  // Estilo personal de la barra (local, por usuario: nunca se emite a la sala).
+  const barPrefs = useBarPrefs();
   // Secuencia cinematográfica: NO sale sola al entrar; solo con el trigger
   // compartido del combo Interestellar (el servidor deja pasar uno por
   // ventana: toda la sala ve las mismas frases). Cada trigger suma una
@@ -202,11 +242,34 @@ onVideoReady={r.handleVideoReady}
           toggleCamera={r.toggleCamera}
           socket={r.socket}
           roomId={roomId}
+          spotifyOpenUrl={spotifyOpenUrl}
+          canPlayAmbient={canPlayAmbient}
+          onPlayAmbient={handlePlayAmbient}
+          musicQueue={r.musicQueue}
+          musicNowPlaying={r.musicNowPlaying}
+          musicSettings={r.roomData.settings}
+          musicIsModerator={isModerator}
+          musicSpotifyConnected={spotifyConnected}
+          onMusicSearch={r.searchMusic}
+          onMusicAdd={r.musicAdd}
+          onMusicVote={r.musicVote}
+          onMusicRemove={r.musicRemove}
+          onMusicReorder={r.musicReorder}
+          onMusicApprove={r.musicApprove}
+          onMusicNext={r.musicNext}
+          onMusicStop={r.musicStop}
+          onMusicConnect={() => void handleMusicConnect()}
         />
       </main>
 
       {/* ── Bottom Bar (text buttons) ── */}
       <RoomControls
+        roomId={roomId}
+        spotifyOpenUrl={spotifyOpenUrl}
+        canPlayAmbient={canPlayAmbient}
+        onPlayAmbient={handlePlayAmbient}
+        layout={barPrefs.layout}
+        showLabels={barPrefs.showLabels}
         isMicOn={r.isMicOn}
         isCameraOn={r.isCameraOn}
         toggleMic={r.toggleMic}
@@ -282,6 +345,21 @@ onVideoReady={r.handleVideoReady}
         duckingEnabled={r.duckingEnabled}
         duckingLevelPct={r.duckingLevelPct}
         onUpdatePerf={r.handleUpdatePerfSettings}
+        roomId={roomId}
+        musicEnabled={r.roomData.settings?.musicEnabled === true}
+        musicAllowSearch={r.roomData.settings?.musicAllowSearch !== false}
+        musicCanAdd={r.roomData.settings?.musicCanAdd ?? 'anyone'}
+        musicQueueMode={r.roomData.settings?.musicQueueMode ?? 'fifo'}
+        musicCanRemove={r.roomData.settings?.musicCanRemove ?? 'proposer'}
+        musicAllowReorder={r.roomData.settings?.musicAllowReorder !== false}
+        musicRequireApproval={r.roomData.settings?.musicRequireApproval === true}
+        musicMaxPerUser={r.roomData.settings?.musicMaxPerUser ?? 3}
+        barShowLabels={barPrefs.showLabels}
+        barLayout={barPrefs.layout}
+        onBarPrefsChange={(patch) => {
+          if (patch.showLabels !== undefined) barPrefs.setShowLabels(patch.showLabels);
+          if (patch.layout !== undefined) barPrefs.setLayout(patch.layout);
+        }}
       />
     </div>
   );

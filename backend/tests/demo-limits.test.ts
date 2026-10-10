@@ -18,7 +18,7 @@ import {
 import { registerJoinApprovalHandlers } from '../src/sockets/handlers/join-approval.handler.js';
 import { activeUsers } from '../src/sockets/socket-state.js';
 import { clearAllPendingGraces } from '../src/sockets/disconnect-grace.js';
-import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
+import { backupRoomsFile, clearMemoryRoomStore, restoreRoomsFile } from './helpers.js';
 
 /**
  * Cobertura demo-free (tareas 2–7): flag, topes 5 salas / 5 usuarios con
@@ -101,6 +101,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  clearMemoryRoomStore();
   activeUsers.clear();
   clearAllPendingGraces();
 });

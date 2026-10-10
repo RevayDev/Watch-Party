@@ -23,6 +23,24 @@ model Room {
   joinRequests Json?    // IJoinRequest[]
   kickedUsers  Json?    // IKickedParticipant[]
   settings     Json?    // IRoomSettings
+  musicQueue      Json?    // IMusicQueueEntry[]
+  musicNowPlaying Json?    // IMusicNowPlaying | null
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+/// Conexión Spotify por sala (OAuth). El refreshToken va cifrado
+/// (AES-256-GCM con SPOTIFY_TOKEN_KEY): jamás en claro en la base.
+/// NO se borra al expirar la sala (solo disconnect/revocación explícita).
+model SpotifyConnection {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  roomId               String   @unique
+  spotifyUserId        String?
+  displayName          String?
+  scope                String
+  refreshTokenEnc      String
+  accessTokenEnc       String?
+  accessTokenExpiresAt Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }

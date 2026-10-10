@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { memoryRoomRepository } from '../src/adapters/memory-room.repository.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,4 +46,14 @@ export async function restoreRoomsFile(): Promise<void> {
   } catch {
     // mejor esfuerzo: nunca debe romper el resultado de los tests
   }
+}
+
+/**
+ * Vacía el store en memoria del backend (lo que se cargó de data/rooms.json
+ * o se creó en tests anteriores). Sin esto, salas reales dejadas en el
+ * fichero por el desarrollador contaminan los conteos (`countLiveRooms`).
+ * NO borra el fichero de disco: solo el estado en memoria.
+ */
+export function clearMemoryRoomStore(): void {
+  memoryRoomRepository.__clearForTests();
 }

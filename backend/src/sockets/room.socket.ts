@@ -6,8 +6,10 @@ import { registerSyncPlaybackHandlers } from './handlers/sync-playback.handler.j
 import { registerVideoReadyHandlers, clearVideoReady } from './handlers/video-ready.handler.js';
 import { registerChatReactionsHandlers } from './handlers/chat-reactions.handler.js';
 import { registerModerationHandlers } from './handlers/moderation.handler.js';
+import { registerMusicQueueHandlers } from './handlers/music-queue.handler.js';
 import { registerWebrtcRelayHandlers } from './handlers/webrtc-relay.handler.js';
 import { registerSettingsHandlers } from './handlers/settings.handler.js';
+import { clearCinematicTrigger } from './socket-state.js';
 import { recordWsConnect, recordWsDisconnect } from '../services/metrics.service.js';
 
 // Re-export de compatibilidad: la regla pura vive en domain/playback-policy.ts.
@@ -33,6 +35,7 @@ export function setupSocketHandlers(io: Server): void {
     registerVideoReadyHandlers(io, socket);
     registerChatReactionsHandlers(io, socket);
     registerModerationHandlers(io, socket);
+    registerMusicQueueHandlers(io, socket);
     registerWebrtcRelayHandlers(io, socket);
     registerSettingsHandlers(io, socket);
   });
@@ -55,6 +58,7 @@ export function setupSocketHandlers(io: Server): void {
         roomPlayback.delete(cleanRoomId);
         roomPositions.delete(cleanRoomId);
         clearVideoReady(cleanRoomId);
+        clearCinematicTrigger(cleanRoomId);
         // Video is only removed when the room is temporary (deleteRoom handles that)
         await RoomService.deleteRoom(cleanRoomId, false);
       }

@@ -18,6 +18,8 @@ export interface RoomRepository {
   delete(roomId: string): Promise<boolean>;
   /** Salas crudas candidatas a cierre por temporizador (el filtrado fino es de dominio). */
   findTimerCandidates(): Promise<IRoom[]>;
+  /** Todas las salas (panel admin: solo-lectura; el controlador sanitiza). */
+  findAll(): Promise<IRoom[]>;
   /** Nº de salas vivas en este store (cuota de la demo; solo conteo, sin datos). */
   count(): Promise<number>;
 }

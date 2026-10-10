@@ -6,7 +6,6 @@
  */
 
 export const INTERSTELLAR_WINDOW_MS = 5000;
-export const INTERSTELLAR_DURATION_MS = 4000;
 
 /**
  * Frases cinematográficas de la secuencia del combo. Viven aquí (no en el

@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { corsOptions } from './config/cors.js';
 import roomRoutes from './routes/room.routes.js';
 import demoRoutes from './routes/demo.routes.js';
+import adminRoutes from './routes/admin.routes.js';
+import spotifyRoutes from './routes/spotify.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
 import docsRoutes from './routes/docs.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
@@ -51,6 +53,11 @@ export function createApp(): Express {
 
   // Routes
   app.use('/api/rooms', roomRoutes);
+
+  // Panel admin (ADMIN_TOKEN) + Spotify (OAuth en servidor). Mismo paraguas
+  // anti-abuso que rooms/demo (en test se autobypassea).
+  app.use('/api/admin', globalLimiter, adminRoutes);
+  app.use('/api/spotify', globalLimiter, spotifyRoutes);
 
   // Documentación OpenAPI + Swagger UI (sin rate-limit: es documentación).
   // UI en /api/docs, JSON crudo en /api/docs/json.

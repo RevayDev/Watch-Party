@@ -20,3 +20,12 @@ export const activeMediaStates = new Map<string, { isCameraOn: boolean; isMicOn:
  * reenvía, para que toda la sala vea las mismas frases.
  */
 export const lastCinematicTrigger = new Map<string, number>();
+
+/**
+ * Libera el estado de cinemática de una sala al cerrarla/eliminarla o cuando
+ * queda vacía. Sin esto el mapa crece indefinidamente (una entrada por sala).
+ */
+export function clearCinematicTrigger(roomId: string): void {
+  if (typeof roomId !== 'string' || !roomId.trim()) return;
+  lastCinematicTrigger.delete(roomId.toUpperCase().trim());
+}

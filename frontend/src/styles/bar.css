@@ -1,0 +1,30 @@
+/* ── Barra inferior: zonas + distribución por gusto del usuario ────────
+   Grupos: izquierda (micro/cámara) · centro (reacciones, participantes,
+   chat, ocultar) · derecha (música) · final (salir). Solo presentación:
+   botones, estados y menú móvil quedan intactos. */
+
+.meet-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* Sin etiquetas: oculta los textos pero conserva el DOM (tests estables). */
+.meet-bottom-bar--no-labels .meet-bar-label {
+  display: none;
+}
+
+@media (min-width: 1024px) and (min-height: 551px) {
+  /* En PC la barra aprovecha el ancho: izquierda/centro/derecha/final
+     repartidos en vez de la píldora centrada. El `!important` es para ganar
+     a la cápsula centrada `!important` del modo landscape bajito; en ese
+     modo (y en móvil) la barra sigue en píldora centrada a propósito.
+     La animación de ocultar (`bars-hidden --hidden`, más específica) sigue
+     funcionando: solo se fuerza ancho/márgenes/reparto. */
+  .meet-bottom-bar--spread {
+    width: auto !important;
+    margin-left: 1rem !important;
+    margin-right: 1rem !important;
+    justify-content: space-between !important;
+  }
+}

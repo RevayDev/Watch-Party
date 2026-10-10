@@ -7,6 +7,8 @@ import { DemoCapacityError, maxUsersForRoom } from '../services/room.service.js'
 import { IVideoMetadata } from '../types/room.types.js';
 import { findBannedEntry, isNameTaken } from '../domain/room.entity.js';
 import { AuthClaim, requireLeader, requireModerator } from '../domain/auth-policy.js';
+import { parseSpotifyUrl, toEmbedUrl, defaultSpotifyName } from '../domain/spotify.js';
+import { clearCinematicTrigger } from '../sockets/socket-state.js';
 import { sanitizeRoomSettings } from '../domain/settings-policy.js';
 import {
   DEMO_ROOM_FULL_MESSAGE,
@@ -402,6 +404,38 @@ export class RoomController {
       }
 
       let cleanUrl = url.trim();
+
+      // Spotify ("Potify" fase 1): el enlace se guarda como fuente `spotify`
+      // con el reproductor embebido. Sin probe de red: el embed lo resuelve el
+      // navegador y el sync de transporte lo gestiona el cliente como con el video.
+      const spotifyRef = parseSpotifyUrl(cleanUrl);
+      if (spotifyRef) {
+        const videoMetadata: IVideoMetadata = {
+          originalName:
+            typeof title === 'string' && title.trim()
+              ? title.trim()
+              : defaultSpotifyName(spotifyRef),
+          fileName: cleanUrl,
+          mimeType: 'audio/spotify',
+          sizeBytes: 0,
+          durationSeconds: 0,
+          sourceType: 'spotify',
+          directUrl: toEmbedUrl(spotifyRef),
+        };
+        const updatedRoom = await RoomService.updateRoomVideo(roomId, videoMetadata);
+        console.log(`🎵 Música Spotify configurada en sala [${roomId}]: ${videoMetadata.originalName} (${spotifyRef.kind})`);
+        res.json({
+          message: 'Música de Spotify configurada correctamente',
+          video: updatedRoom?.video,
+          status: updatedRoom?.status,
+        });
+        return;
+      }
+      if (/open\.spotify\.com/i.test(cleanUrl)) {
+        res.status(400).json({ error: 'No es un enlace válido de Spotify (usa track, playlist, álbum o episodio).' });
+        return;
+      }
+
       // Google Drive link conversion helper (e.g. drive.google.com/file/d/ID/view -> direct stream)
       const driveMatch = cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
         || cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
@@ -474,6 +508,7 @@ export class RoomController {
         res.status(404).json({ error: 'Room not found' });
         return;
       }
+      clearCinematicTrigger(roomId);
 
       res.json({ message: 'Sala y archivos de video eliminados exitosamente', roomId });
     } catch (error) {
@@ -535,6 +570,12 @@ export class RoomController {
 
       if (!room || !room.video) {
         res.status(404).json({ error: 'Video no encontrado en esta sala' });
+        return;
+      }
+
+      // Spotify se reproduce en el embed del cliente (iframe), no por stream.
+      if (room.video.sourceType === 'spotify') {
+        res.status(400).json({ error: 'La música de Spotify se reproduce en el reproductor embebido de la sala.' });
         return;
       }
 

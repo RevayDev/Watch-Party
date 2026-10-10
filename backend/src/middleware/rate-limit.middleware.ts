@@ -127,4 +127,11 @@ export const proxyLimiter = createRateLimiter({
   message: 'Límite de solicitudes de streaming/proxy excedido.',
 });
 
+// Búsqueda de Spotify: máximo 30 peticiones por minuto por IP
+export const spotifySearchLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Has alcanzado el límite de búsquedas de Spotify por minuto.',
+});
+
 

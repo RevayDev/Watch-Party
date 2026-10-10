@@ -52,6 +52,16 @@ export interface IRoomSettings {
   duckingEnabled?: boolean;
   /** Nivel de atenuación en % (10–60, default 30). */
   duckingLevel?: number;
+  /** Música/Spotify (whitelist del servidor). */
+  musicEnabled?: boolean;
+  musicAllowSearch?: boolean;
+  musicCanAdd?: 'anyone' | 'moderator';
+  musicQueueMode?: 'fifo' | 'votes';
+  musicCanRemove?: 'proposer' | 'moderator';
+  musicAllowReorder?: boolean;
+  musicRequireApproval?: boolean;
+  /** Máx. propuestas por usuario (1–20). */
+  musicMaxPerUser?: number;
 }
 
 export interface IVideoMetadata {
@@ -60,7 +70,7 @@ export interface IVideoMetadata {
   mimeType: string;
   sizeBytes: number;
   durationSeconds?: number;
-  sourceType?: 'file' | 'url' | 'hls';
+  sourceType?: 'file' | 'url' | 'hls' | 'spotify';
   directUrl?: string;
 }
 
@@ -78,6 +88,47 @@ export interface IRoomData {
   kickedUsers?: IKickedParticipant[];
   settings?: IRoomSettings;
   createdAt: string;
+  /** Cola musical colaborativa (Spotify). */
+  musicQueue?: IMusicQueueEntry[];
+  musicNowPlaying?: IMusicNowPlaying | null;
+}
+
+/** Pista de Spotify (búsqueda / propuestas). */
+export interface IMusicTrack {
+  id: string;
+  name: string;
+  artists: string;
+  albumArt?: string;
+  durationMs?: number;
+  uri?: string;
+  openUrl?: string;
+}
+
+/** Entrada de la cola musical. */
+export interface IMusicQueueEntry {
+  id: string;
+  trackId: string;
+  name: string;
+  artists: string;
+  albumArt?: string;
+  durationMs?: number;
+  proposedBy: string;
+  votes: string[];
+  status: 'queued' | 'pending';
+}
+
+/** Lo que suena ahora (cola musical). */
+export interface IMusicNowPlaying {
+  id: string;
+  trackId: string;
+  name: string;
+  artists: string;
+  albumArt?: string;
+  durationMs?: number;
+  proposedBy: string;
+  votes: string[];
+  status: 'queued' | 'pending';
+  startedAt: string;
 }
 
 export interface ChatMessage {

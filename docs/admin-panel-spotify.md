@@ -1,8 +1,9 @@
 # Panel Admin y Spotify — Especificación funcional
 
-> Estado: **propuesta**. Ninguna de las dos funcionalidades existe hoy en el
-> código. El antiguo panel admin (`/api/admin/metrics`) se eliminó; solo queda
-> `ADMIN_TOKEN` en `backend/.env` como reserva de autenticación.
+> Estado: **implementado** (fases 1, 2 y Spotify fase 1). El antiguo panel
+> admin (`/api/admin/metrics`) se eliminó; el panel actual vive en
+> `/api/admin/*` con `ADMIN_TOKEN` (ver `backend/.env.example`) y la vista
+> `?admin` del frontend. Detalles de endpoints en `/api/docs` (OpenAPI).
 
 ---
 
@@ -108,6 +109,45 @@ reproducción sin cuenta de Spotify.
 
 ## 3. Orden de implementación sugerido
 
-1. Panel Admin solo-lectura (salas + usuarios) con `ADMIN_TOKEN`.
-2. Acciones de sala (ajustes, cerrar) y de usuario (expulsar, rol, mute).
-3. Spotify fase 1 (enlace + sync + OAuth básico).
+1. Panel Admin solo-lectura (salas + usuarios) con `ADMIN_TOKEN`. ✅
+   (`GET /api/admin/rooms`, `GET /api/admin/rooms/:roomId`, `RoomService.listRooms()`)
+2. Acciones de sala (ajustes, cerrar) y de usuario (expulsar, rol, mute). ✅
+   (`PATCH/DELETE /api/admin/rooms/:roomId…`, `POST …/kick|unban|role|transfer-leader|rename|mute`;
+   emiten los mismos eventos socket que la moderación en sala)
+3. Spotify fase 1 (enlace + sync + OAuth básico). ✅ → endurecido en fase B:
+   OAuth con `state` anti-CSRF de un solo uso (10 min) + conexión persistente
+   cifrada (`persistent` en `/status`; ver `docs/spotify-queue.md`) + búsqueda
+   `GET /api/spotify/search` (client-credentials, gates `musicEnabled` /
+   `musicAllowSearch`).
+   (`sourceType: 'spotify'` con embed, `GET /api/spotify/resolve|status|auth-url|callback|search`,
+   `POST …/disconnect`; sin pestaña en "Cambiar": el acceso es el icono Spotify
+   del footer y de la barra del chat)
+
+Notas de la implementación:
+
+- El transporte fino (play/pausa/seek remoto sobre el embed) y el ducking
+  por mic no aplican al iframe de Spotify sin SDK Premium: la sala comparte
+  la misma fuente (`video-changed`) y cada embed la reproduce. Cola votada,
+  letras y modo DJ siguen fuera de alcance.
+- Sin `ADMIN_TOKEN` en el servidor, `/api/admin/*` responde 503; sin
+  `SPOTIFY_CLIENT_ID/SECRET`, la pestaña muestra "no configurado".
+- Icono Spotify en el footer de la sala y en la barra del chat
+  (`SpotifyListenButton`, junto a Salir y junto a Enviar): música ambiente
+  mientras entra la gente + vincular cuenta estilo Instagram (pantalla oficial
+  de Autorizar de Spotify vía OAuth). Sin cuenta vinculada redirige a
+  vincularla (`window.open(authUrl, '_self')`, el callback vuelve a `?room=`);
+  vinculada + anfitrión + nada sonando pone el ambiente en toda la sala
+  (`video-changed`, playlist `DEFAULT_AMBIENT_SPOTIFY_URL`); sonando Spotify
+  abre lo que suena en pestaña nueva; miembro sin nada sonando lo abre en su
+  propio Spotify. Sin OAuth en el servidor el ambiente igual funciona (embed
+  público). El modal "Cambiar" vuelve a 2 pestañas (Subir/Enlace).
+
+## 4. Barra inferior por zonas y gusto personal
+
+- Zonas: izquierda (micro/cámara), centro (reacciones, participantes, chat,
+  ocultar), derecha (música), final (salir), con etiquetas visibles en PC.
+- En PC (≥1024px) la barra se reparte a lo ancho por defecto; en móvil
+  sigue la píldora centrada solo-iconos.
+- Cada usuario configura su vista en Configuración → "Tu vista de la
+  barra": textos sí/no y distribuida/centrada. Es local (`localStorage`,
+  `useBarPrefs`), jamás se emite a la sala.

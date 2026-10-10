@@ -39,6 +39,8 @@ export class MongoRoomRepository implements RoomRepository {
     existing.joinRequests = (room.joinRequests || []) as never;
     existing.kickedUsers = (room.kickedUsers || []) as never;
     existing.settings = room.settings as never;
+    existing.musicQueue = (room.musicQueue || []) as never;
+    existing.musicNowPlaying = (room.musicNowPlaying ?? null) as never;
     existing.updatedAt = room.updatedAt;
     await existing.save();
     return existing.toObject() as unknown as IRoom;
@@ -53,6 +55,11 @@ export class MongoRoomRepository implements RoomRepository {
     const rooms = await RoomModel.find({
       'settings.timerEndsAt': { $exists: true, $ne: null },
     }).lean();
+    return rooms as unknown as IRoom[];
+  }
+
+  async findAll(): Promise<IRoom[]> {
+    const rooms = await RoomModel.find({}).lean();
     return rooms as unknown as IRoom[];
   }
 

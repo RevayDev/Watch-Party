@@ -98,8 +98,17 @@ export class MemoryRoomRepository implements RoomRepository {
     return [...this.rooms.values()];
   }
 
+  async findAll(): Promise<IRoom[]> {
+    return [...this.rooms.values()];
+  }
+
   async count(): Promise<number> {
     return this.rooms.size;
+  }
+
+  /** Vacía el store en memoria (solo para tests). No persiste ni borra el fichero. */
+  __clearForTests(): void {
+    this.rooms.clear();
   }
 }
 

@@ -302,6 +302,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return;
     }
 
+    // Spotify se reproduce en su embed (iframe): sin <video>, sin HLS ni proxy.
+    if (videoSourceType === 'spotify') {
+      setPlaybackError(null);
+      lastLoadKeyRef.current = null;
+      if (hlsInstanceRef.current) {
+        hlsInstanceRef.current.destroy();
+        hlsInstanceRef.current = null;
+      }
+      return;
+    }
+
     const backendBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
     const isExternal = (videoSourceType === 'url' || videoSourceType === 'hls') && !!videoDirectUrl;
     // External URLs go through the backend CORS proxy so hls.js/XHR are not blocked
@@ -819,6 +830,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               HLS LIVE/STREAM
             </span>
           )}
+          {video.sourceType === 'spotify' && (
+            <span style={{ marginLeft: '0.5rem', background: '#1DB954', color: '#fff', fontSize: '0.68rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 700 }}>
+              SPOTIFY
+            </span>
+          )}
         </div>
 
         <div className="player-container__topbar">
@@ -972,24 +988,39 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      <video
-        ref={videoRef}
-        key={video.fileName || video.directUrl}
-        className="player-container__video"
-        controls
-        playsInline
-        preload="auto"
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onSeeked={handleSeeked}
-        onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => setIsBuffering(false)}
-        onCanPlay={() => setIsBuffering(false)}
-        onLoadedData={handleLoadedData}
-        onError={handleVideoElementError}
-      >
-        Tu navegador no soporta reproducción de video HTML5.
-      </video>
+      {/* Spotify: embed oficial en vez de <video>. Toda la sala carga la
+          misma fuente (sync de fuente vía `video-changed`); el transporte
+          (play/pausa/seek fino) lo controla cada embed — sin SDK Premium no
+          hay control remoto del audio, igual que el ducking por mic. */}
+      {video.sourceType === 'spotify' && videoDirectUrl ? (
+        <iframe
+          key={video.fileName || videoDirectUrl}
+          className="spotify-embed"
+          src={videoDirectUrl}
+          title={video.originalName}
+          loading="lazy"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          key={video.fileName || video.directUrl}
+          className="player-container__video"
+          controls
+          playsInline
+          preload="auto"
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onSeeked={handleSeeked}
+          onWaiting={() => setIsBuffering(true)}
+          onPlaying={() => setIsBuffering(false)}
+          onCanPlay={() => setIsBuffering(false)}
+          onLoadedData={handleLoadedData}
+          onError={handleVideoElementError}
+        >
+          Tu navegador no soporta reproducción de video HTML5.
+        </video>
+      )}
 
       {/* Change-video modal: upload a file OR paste a link (also reachable from the error overlay) */}
       {isLeader && (

@@ -10,8 +10,6 @@ const INTRO_BG_SRC = '/interstellar-background.png';
 const PEAK_VOLUME = 0.22;
 /** Si los metadatos del audio no llegan, la secuencia dura esto (3 frases). */
 const FALLBACK_TOTAL_MS = 10000;
-/** Si `play()` no se resuelve ni falla (se cuelga), se pide un toque. */
-const PLAY_TIMEOUT_MS = 2500;
 /** Espera máxima a los metadatos antes de arrancar con la duración estimada. */
 const META_WAIT_MS = 3000;
 const TICK_MS = 100;
@@ -30,12 +28,6 @@ function tryPlay(audio: HTMLAudioElement): Promise<void> {
   } catch {
     return Promise.reject(new Error('reproducción no disponible'));
   }
-}
-
-function delayReject(ms: number): Promise<never> {
-  return new Promise((_, reject) => {
-    window.setTimeout(() => reject(new Error('timeout de reproducción')), ms);
-  });
 }
 
 interface AmbientIntroProps {
@@ -68,7 +60,6 @@ export const AmbientIntro: React.FC<AmbientIntroProps> = ({ onDone, quotes: shar
   const [skipped, setSkipped] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timersRef = useRef<number[]>([]);
-  const totalUsedRef = useRef<number | null>(null);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
@@ -142,9 +133,7 @@ export const AmbientIntro: React.FC<AmbientIntroProps> = ({ onDone, quotes: shar
     const beginOnce = () => {
       if (begun) return;
       begun = true;
-      const total = totalMs ?? FALLBACK_TOTAL_MS;
-      totalUsedRef.current = total;
-      begin(total);
+      begin(totalMs ?? FALLBACK_TOTAL_MS);
     };
 
     const onMeta = () => {
@@ -170,26 +159,14 @@ export const AmbientIntro: React.FC<AmbientIntroProps> = ({ onDone, quotes: shar
     };
     waitMeta();
 
-    // El audio se suma cuando puede; si lo bloquean o falla, las frases
-    // siguen igual y simplemente no suena.
-    let audioStarted = false;
-    const maybeStartAudio = () => {
-      if (audioStarted) return;
-      const total = totalUsedRef.current;
-      if (total === null) {
-        later(maybeStartAudio, TICK_MS);
-        return;
-      }
-      audioStarted = true;
-      ramp(PEAK_VOLUME, total * 0.3, () => {
-        later(() => ramp(0, total * 0.3, finish), total * 0.4);
-      });
-    };
-    Promise.race([tryPlay(audio), delayReject(PLAY_TIMEOUT_MS)])
-      .then(() => maybeStartAudio())
-      .catch(() => {
-        /* sin audio: la secuencia visual continúa igual */
-      });
+    // El audio se suma cuando puede; si lo bloquean, falla o se cuelga, las
+    // frases siguen igual y simplemente no suena. La envolvente de volumen
+    // (subida/meseta/bajada) la gestiona UNA sola vez `begin()` — aquí solo
+    // se intenta el `play()`, sin rampa duplicada ni timer extra sin rastrear
+    // (ese timer colgaba los tests con fake-timers al no pasar por `later`).
+    tryPlay(audio).catch(() => {
+      /* sin audio: la secuencia visual continúa igual */
+    });
 
     return () => {
       timersRef.current.forEach((t) => window.clearTimeout(t));

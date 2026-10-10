@@ -51,6 +51,8 @@ export function fromPrismaRoom(row: {
   joinRequests: unknown;
   kickedUsers: unknown;
   settings: unknown;
+  musicQueue?: unknown;
+  musicNowPlaying?: unknown;
   createdAt: Date;
   updatedAt: Date;
 }): IRoom {
@@ -66,6 +68,8 @@ export function fromPrismaRoom(row: {
     joinRequests: (row.joinRequests as IRoom['joinRequests']) ?? undefined,
     kickedUsers: (row.kickedUsers as IRoom['kickedUsers']) ?? undefined,
     settings: (row.settings as IRoom['settings']) ?? undefined,
+    musicQueue: (row.musicQueue as IRoom['musicQueue']) ?? undefined,
+    musicNowPlaying: (row.musicNowPlaying as IRoom['musicNowPlaying']) ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -84,6 +88,8 @@ export function toPrismaRoom(room: IRoom): {
   joinRequests: PrismaJson;
   kickedUsers: PrismaJson;
   settings: PrismaJson;
+  musicQueue: PrismaJson;
+  musicNowPlaying: PrismaJson;
   createdAt: Date;
   updatedAt: Date;
 } {
@@ -99,6 +105,8 @@ export function toPrismaRoom(room: IRoom): {
     joinRequests: asJson(room.joinRequests),
     kickedUsers: asJson(room.kickedUsers),
     settings: asJson(room.settings),
+    musicQueue: asJson(room.musicQueue),
+    musicNowPlaying: asJson(room.musicNowPlaying),
     createdAt: room.createdAt,
     updatedAt: room.updatedAt,
   };
@@ -146,6 +154,11 @@ export class PrismaRoomRepository implements RoomRepository {
       where: { roomId: normalize(roomId) },
     });
     return result.count > 0;
+  }
+
+  async findAll(): Promise<IRoom[]> {
+    const rows = await getPrismaClient().room.findMany();
+    return rows.map(fromPrismaRoom);
   }
 
   async findTimerCandidates(): Promise<IRoom[]> {

@@ -45,6 +45,8 @@ export const openapiSpec = {
     { name: 'Video', description: 'Subir, enlazar y reproducir video.' },
     { name: 'Demo', description: 'Disponibilidad de la demo gratuita.' },
     { name: 'Proxy', description: 'Proxy CORS para videos externos (HLS/Drive).' },
+    { name: 'Admin', description: 'Panel de administración (ADMIN_TOKEN). Solo lectura + moderación.' },
+    { name: 'Spotify', description: 'Música sincronizada: resolver enlaces y OAuth en servidor.' },
   ],
   paths: {
     '/api/health': {
@@ -247,7 +249,222 @@ export const openapiSpec = {
         responses: {
           '206': { description: 'Fragmento del archivo.' },
           '302': { description: 'Redirección al video externo.' },
+          '400': { description: 'Spotify se reproduce en el embed del cliente.' },
           '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/admin/rooms': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Listar salas activas (sin secretos)',
+        parameters: [{ $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Lista sanitizada de salas.' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '503': { description: 'Panel no configurado (falta ADMIN_TOKEN).' },
+        },
+      },
+    },
+    '/api/admin/rooms/{roomId}': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Detalle de sala (participantes, video, ajustes, solicitudes, expulsados)',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Detalle sanitizado.' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      delete: {
+        tags: ['Admin'],
+        summary: 'Cerrar sala (expulsa a todos y la elimina)',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Sala cerrada.' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/admin/rooms/{roomId}/settings': {
+      patch: {
+        tags: ['Admin'],
+        summary: 'Cambiar ajustes de sala (misma whitelist que el anfitrión)',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Ajustes actualizados.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/admin/rooms/{roomId}/kick': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Expulsar o banear ({targetUserName|targetUserId, ban?})',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Usuario expulsado.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/admin/rooms/{roomId}/unban': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Desbanear ({targetUserName|targetUserId})',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Usuario desbaneado.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/admin/rooms/{roomId}/role': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Cambiar rol ({targetUserName, role: coleader|member})',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Rol actualizado.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/admin/rooms/{roomId}/transfer-leader': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Traspasar liderazgo ({targetUserName|targetUserId})',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Liderazgo transferido.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/admin/rooms/{roomId}/rename': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Renombrar participante ({oldName|targetUserId, newName})',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Participante renombrado.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Nombre en uso.' },
+        },
+      },
+    },
+    '/api/admin/rooms/{roomId}/mute': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Silenciar ({kind: mic|camera, targetUserName?}: con objetivo o toda la sala)',
+        parameters: [{ $ref: '#/components/parameters/RoomId' }, { $ref: '#/components/parameters/AdminToken' }],
+        responses: {
+          '200': { description: 'Orden de silencio emitida.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/spotify/resolve': {
+      get: {
+        tags: ['Spotify'],
+        summary: 'Validar un enlace y obtener su embed (?url=)',
+        responses: {
+          '200': { description: '{kind, id, embedUrl}.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+        },
+      },
+    },
+    '/api/spotify/status': {
+      get: {
+        tags: ['Spotify'],
+        summary: 'Estado OAuth por sala (?roomId=): {configured, connected}',
+        responses: {
+          '200': { description: 'Estado.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+        },
+      },
+    },
+    '/api/spotify/auth-url': {
+      get: {
+        tags: ['Spotify'],
+        summary: 'URL de autorización OAuth (?roomId=)',
+        responses: {
+          '200': { description: '{authUrl}.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '503': { description: 'Spotify no configurado.' },
+        },
+      },
+    },
+    '/api/spotify/callback': {
+      get: {
+        tags: ['Spotify'],
+        summary: 'Callback OAuth (?code=&state=roomId): guarda el token y redirige',
+        responses: {
+          '302': { description: 'Redirección a la sala.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '502': { description: 'Spotify rechazó el código.' },
+        },
+      },
+    },
+    '/api/spotify/disconnect': {
+      post: {
+        tags: ['Spotify'],
+        summary: 'Olvidar el token de la sala ({roomId})',
+        responses: {
+          '200': { description: '{connected: false}.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+        },
+      },
+    },
+    '/api/spotify/search': {
+      get: {
+        tags: ['Spotify'],
+        summary: 'Buscar canciones (?q=&roomId=&limit=): client-credentials sin usuario',
+        parameters: [
+          {
+            name: 'q',
+            in: 'query',
+            required: true,
+            description: 'Texto a buscar (2-80 caracteres).',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'roomId',
+            in: 'query',
+            required: true,
+            description: 'Sala (aplica los gates musicEnabled/musicAllowSearch).',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            required: false,
+            description: 'Resultados (1-20, default 10).',
+            schema: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+          },
+        ],
+        responses: {
+          '200': { description: '{tracks: [{id, name, artists, albumArt, durationMs, uri, openUrl}]}.' },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '403': { $ref: '#/components/responses/Forbidden' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '502': { description: 'Spotify falló (upstream).' },
         },
       },
     },
@@ -303,8 +520,19 @@ export const openapiSpec = {
         description: 'Código de 6 letras (ej. KX7Q2P).',
         schema: { type: 'string' },
       },
+      AdminToken: {
+        name: 'x-admin-token',
+        in: 'header',
+        required: true,
+        description: 'Secreto del panel admin (o Authorization: Bearer).',
+        schema: { type: 'string' },
+      },
     },
     responses: {
+      Unauthorized: {
+        description: 'Token de administrador inválido o ausente.',
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+      },
       BadRequest: {
         description: 'Petición inválida.',
         content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
@@ -358,7 +586,7 @@ export const openapiSpec = {
           fileName: { type: 'string' },
           mimeType: { type: 'string' },
           sizeBytes: { type: 'number' },
-          sourceType: { type: 'string', enum: ['file', 'url', 'hls'] },
+          sourceType: { type: 'string', enum: ['file', 'url', 'hls', 'spotify'] },
           directUrl: { type: 'string' },
         },
       },

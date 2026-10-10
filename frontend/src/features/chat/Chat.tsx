@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, X } from 'lucide-react';
 import { ChatMessage } from '../../types/room';
 import { getAvatarColor, getInitials } from '../../shared/utils';
+import { SpotifyListenButton } from '../room/components/SpotifyListenButton';
 
 interface ChatProps {
   messages: ChatMessage[];
@@ -12,6 +13,14 @@ interface ChatProps {
   typingUsers?: string[];
   /** Se llama al teclear con texto no vacío (el hook lo throttlea a 1/2 s). */
   onTyping?: () => void;
+  /** Sala para el icono Spotify (opcional: sin esto no se muestra). */
+  roomId?: string;
+  /** Enlace público de lo que suena (null = sin fuente Spotify). */
+  spotifyOpenUrl?: string | null;
+  /** ¿Puede poner ambiente en la sala (anfitrión/co-anfitrión)? */
+  canPlayAmbient?: boolean;
+  /** Pone el ambiente en la sala (API + `video-changed` a todos). */
+  onPlayAmbient?: () => Promise<void>;
 }
 
 export const Chat: React.FC<ChatProps> = ({
@@ -21,6 +30,10 @@ export const Chat: React.FC<ChatProps> = ({
   onClose,
   typingUsers = [],
   onTyping,
+  roomId,
+  spotifyOpenUrl = null,
+  canPlayAmbient = false,
+  onPlayAmbient = async () => undefined,
 }) => {
   const [input, setInput] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -195,6 +208,14 @@ export const Chat: React.FC<ChatProps> = ({
 
       {/* Input bar always visible */}
       <form onSubmit={handleSubmit} className="drawer-chat__input-bar">
+        {roomId && (
+          <SpotifyListenButton
+            roomId={roomId}
+            openUrl={spotifyOpenUrl}
+            canPlayAmbient={canPlayAmbient}
+            onPlayAmbient={onPlayAmbient}
+          />
+        )}
         <input
           ref={inputRef}
           type="text"

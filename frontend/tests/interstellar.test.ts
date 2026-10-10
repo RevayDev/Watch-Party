@@ -4,7 +4,6 @@ import {
   hasInterstellarPair,
   isInterstellarEmoji,
   INTERSTELLAR_WINDOW_MS,
-  INTERSTELLAR_DURATION_MS,
   AMBIENT_QUOTES,
   pickAmbientQuotes,
   type InterstellarEvent,
@@ -101,7 +100,6 @@ describe('interstellar.ts', () => {
 
     it('exporta las constantes esperadas', () => {
       expect(INTERSTELLAR_WINDOW_MS).toBe(5000);
-      expect(INTERSTELLAR_DURATION_MS).toBe(4000);
     });
   });
 

@@ -22,6 +22,14 @@ const ALLOWED_KEYS = new Set<string>([
   'duckingEnabled',
   'duckingLevel',
   'hostOnlySync',
+  'musicEnabled',
+  'musicAllowSearch',
+  'musicCanAdd',
+  'musicQueueMode',
+  'musicCanRemove',
+  'musicAllowReorder',
+  'musicRequireApproval',
+  'musicMaxPerUser',
 ]);
 
 const BOOLEAN_KEYS = new Set<string>([
@@ -37,6 +45,10 @@ const BOOLEAN_KEYS = new Set<string>([
   'visualEffects',
   'duckingEnabled',
   'hostOnlySync',
+  'musicEnabled',
+  'musicAllowSearch',
+  'musicAllowReorder',
+  'musicRequireApproval',
 ]);
 
 /** Rango válido para `duckingLevel` (porcentaje 10–60, default 30 en cliente). */
@@ -151,6 +163,33 @@ export function sanitizeRoomSettings(input: unknown, opts: SanitizeOptions = {})
       );
     } else {
       (out as Record<string, unknown>)['duckingLevel'] = Math.round(value);
+    }
+  }
+
+  // Núcleo musical Spotify: enums estrictos de cadena.
+  const MUSIC_ENUMS = {
+    musicCanAdd: ['anyone', 'moderator'],
+    musicQueueMode: ['fifo', 'votes'],
+    musicCanRemove: ['proposer', 'moderator'],
+  } as const;
+  for (const key of Object.keys(MUSIC_ENUMS) as Array<keyof typeof MUSIC_ENUMS>) {
+    if (!(key in input)) continue;
+    const value = input[key];
+    const allowed = MUSIC_ENUMS[key] as readonly string[];
+    if (typeof value !== 'string' || !allowed.includes(value)) {
+      errors.push(`"${key}" debe ser uno de: ${allowed.join(', ')}.`);
+    } else {
+      (out as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  // Núcleo musical: tope por usuario (entero 1–20).
+  if ('musicMaxPerUser' in input) {
+    const value = input['musicMaxPerUser'];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 20) {
+      errors.push('"musicMaxPerUser" debe ser un entero entre 1 y 20.');
+    } else {
+      (out as Record<string, unknown>)['musicMaxPerUser'] = value;
     }
   }
 

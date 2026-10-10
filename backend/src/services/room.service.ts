@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   IRoom,
+  IMusicQueueEntry,
   IVideoMetadata,
   CreateRoomDTO,
   IParticipant,
@@ -229,6 +230,14 @@ export class RoomService {
    */
   public static async countLiveRooms(): Promise<number> {
     return roomRepository.count();
+  }
+
+  /**
+   * Todas las salas del store activo (panel admin: solo-lectura).
+   * El controlador sanitiza (jamás expone `leaderSecret` ni `socketId`).
+   */
+  public static async listRooms(): Promise<IRoom[]> {
+    return roomRepository.findAll();
   }
 
   /**
@@ -762,5 +771,259 @@ export class RoomService {
     room.updatedAt = new Date();
     await roomRepository.save(room);
     return room;
+  }
+
+  // ── Núcleo musical Spotify (cola + now playing) ──────────────────────────
+
+  private static musicQueueOf(room: IRoom): IMusicQueueEntry[] {
+    if (!Array.isArray(room.musicQueue)) room.musicQueue = [];
+    return room.musicQueue;
+  }
+
+  private static voterKeyOf(voter: { userId?: string; name: string }): string {
+    if (voter.userId) return voter.userId;
+    return voter.name.trim().toLowerCase();
+  }
+
+  private static proposerKeyOf(entry: IMusicQueueEntry): string {
+    if (entry.proposedByUserId) return entry.proposedByUserId;
+    return entry.proposedBy.trim().toLowerCase();
+  }
+
+  /**
+   * Añade un tema a la cola musical. Duplicados (mismo trackId en
+   * queued/pending) y exceso del tope por usuario se ignoran (no-op que
+   * devuelve la sala sin cambios). Entradas inválidas también son no-op.
+   */
+  public static async addMusicEntry(
+    roomId: string,
+    entry: Omit<IMusicQueueEntry, 'id' | 'status' | 'votes' | 'createdAt'> & {
+      status?: 'queued' | 'pending';
+    }
+  ): Promise<IRoom | null> {
+    const cleanId = cleanIdOf(roomId);
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room) return null;
+      const queue = this.musicQueueOf(room);
+      const trackId = (entry.trackId || '').trim();
+      const name = (entry.name || '').trim();
+      const artists = (entry.artists || '').trim();
+      const proposedBy = (entry.proposedBy || '').trim();
+      // Validación estricta: no-op si no cumple.
+      if (!/^[A-Za-z0-9]{8,}$/.test(trackId)) return room;
+      if (!name || !artists || !proposedBy) return room;
+      if (name.length > 200 || artists.length > 200) return room;
+      // Dupe: mismo trackId ya en cola (queued/pending).
+      if (queue.some((e) => e.trackId === trackId)) return room;
+      // Límite por usuario (default 5).
+      const max = room.settings?.musicMaxPerUser ?? 5;
+      const key = entry.proposedByUserId ? entry.proposedByUserId : proposedBy.toLowerCase();
+      // Nota: cuando el proponente trae userId se compara por userId; si no,
+      // por nombre en minúsculas (mismo criterio que voterKeyOf/proposerKeyOf).
+      const mineCount = entry.proposedByUserId
+        ? queue.filter((e) => e.proposedByUserId === entry.proposedByUserId).length
+        : queue.filter((e) => !e.proposedByUserId && e.proposedBy.trim().toLowerCase() === key).length;
+      if (mineCount >= max) return room;
+      const now = new Date();
+      const full: IMusicQueueEntry = {
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        trackId,
+        name,
+        artists,
+        albumArt: entry.albumArt,
+        durationMs: entry.durationMs,
+        uri: entry.uri,
+        openUrl: entry.openUrl,
+        kind: entry.kind ?? 'track',
+        proposedBy,
+        proposedByUserId: entry.proposedByUserId,
+        status: entry.status ?? 'queued',
+        votes: [],
+        createdAt: now,
+      };
+      queue.push(full);
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      return room;
+    });
+  }
+
+  /** Alterna el voto de un usuario sobre una entrada encolada. */
+  public static async toggleMusicVote(
+    roomId: string,
+    entryId: string,
+    voter: { userId?: string; name: string }
+  ): Promise<IRoom | null> {
+    const cleanId = cleanIdOf(roomId);
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room) return null;
+      const queue = this.musicQueueOf(room);
+      const entry = queue.find((e) => e.id === entryId);
+      if (!entry || entry.status !== 'queued') return room;
+      const key = this.voterKeyOf(voter);
+      const idx = entry.votes.findIndex((v) => v === key);
+      if (idx !== -1) entry.votes.splice(idx, 1);
+      else entry.votes.push(key);
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      return room;
+    });
+  }
+
+  /** Quita una entrada: moderador o proponente (según settings.musicCanRemove). */
+  public static async removeMusicEntry(
+    roomId: string,
+    entryId: string,
+    requester: { userId?: string; name: string; isModerator: boolean }
+  ): Promise<IRoom | null> {
+    const cleanId = cleanIdOf(roomId);
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room) return null;
+      const queue = this.musicQueueOf(room);
+      const entry = queue.find((e) => e.id === entryId);
+      if (!entry) return room;
+      const mode = room.settings?.musicCanRemove ?? 'proposer';
+      let allowed = requester.isModerator;
+      if (!allowed && mode !== 'moderator') {
+        if (entry.proposedByUserId && requester.userId) {
+          allowed = entry.proposedByUserId === requester.userId;
+        } else {
+          allowed = entry.proposedBy.trim().toLowerCase() === requester.name.trim().toLowerCase();
+        }
+      }
+      if (!allowed) return room;
+      room.musicQueue = queue.filter((e) => e.id !== entryId);
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      return room;
+    });
+  }
+
+  /** Reordena la cola (solo moderadores y con musicAllowReorder=true). */
+  public static async reorderMusicQueue(
+    roomId: string,
+    order: string[],
+    isModerator: boolean
+  ): Promise<IRoom | null> {
+    const cleanId = cleanIdOf(roomId);
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room) return null;
+      if (!isModerator) return room;
+      if (room.settings?.musicAllowReorder !== true) return room;
+      const queue = this.musicQueueOf(room);
+      if (!Array.isArray(order) || order.length === 0) return room;
+      if (order.length !== queue.length) return room;
+      const current = new Set(queue.map((e) => e.id));
+      if (order.some((id) => typeof id !== 'string' || !current.has(id))) return room;
+      if (new Set(order).size !== queue.length) return room;
+      const byId = new Map(queue.map((e) => [e.id, e]));
+      room.musicQueue = order.map((id) => byId.get(id) as IMusicQueueEntry);
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      return room;
+    });
+  }
+
+  /** Pasa una entrada pending → queued (solo moderadores). */
+  public static async approveMusicEntry(
+    roomId: string,
+    entryId: string,
+    isModerator: boolean
+  ): Promise<IRoom | null> {
+    const cleanId = cleanIdOf(roomId);
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room) return null;
+      if (!isModerator) return room;
+      const queue = this.musicQueueOf(room);
+      const entry = queue.find((e) => e.id === entryId);
+      if (!entry) return room;
+      if (entry.status !== 'pending') return room;
+      entry.status = 'queued';
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      return room;
+    });
+  }
+
+  /**
+   * Avanza la cola: saca el siguiente tema (fifo = más antiguo, votes = más
+   * votos con desempate por antigüedad), lo fija como nowPlaying y refleja el
+   * embed Spotify en `room.video`. Con cola vacía deja nowPlaying=null.
+   */
+  public static async advanceMusicQueue(roomId: string): Promise<IRoom | null> {
+    const cleanId = cleanIdOf(roomId);
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room) return null;
+      const queue = this.musicQueueOf(room);
+      const queued = queue.filter((e) => e.status === 'queued');
+      if (queued.length === 0) {
+        room.musicNowPlaying = null;
+        room.updatedAt = new Date();
+        await roomRepository.save(room);
+        return room;
+      }
+      const mode = room.settings?.musicQueueMode ?? 'fifo';
+      let next: IMusicQueueEntry = queued[0];
+      if (mode === 'votes') {
+        for (const e of queued) {
+          const ev = e.votes.length;
+          const nv = next.votes.length;
+          if (
+            ev > nv ||
+            (ev === nv && new Date(e.createdAt).getTime() < new Date(next.createdAt).getTime())
+          ) {
+            next = e;
+          }
+        }
+      } else {
+        for (const e of queued) {
+          if (new Date(e.createdAt).getTime() < new Date(next.createdAt).getTime()) next = e;
+        }
+      }
+      room.musicQueue = queue.filter((e) => e.id !== next.id);
+      room.musicNowPlaying = {
+        entryId: next.id,
+        trackId: next.trackId,
+        name: next.name,
+        artists: next.artists,
+        albumArt: next.albumArt,
+        uri: next.uri,
+        openUrl: next.openUrl,
+        startedAt: new Date(),
+        startedBy: 'sala',
+      };
+      room.video = {
+        originalName: `${next.name} — ${next.artists}`,
+        fileName: next.openUrl ?? `https://open.spotify.com/track/${next.trackId}`,
+        mimeType: 'audio/spotify',
+        sizeBytes: 0,
+        durationSeconds: 0,
+        sourceType: 'spotify',
+        directUrl: `https://open.spotify.com/embed/track/${next.trackId}`,
+      };
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      return room;
+    });
+  }
+
+  /** Detiene la música: limpia nowPlaying y el video solo si era de Spotify. */
+  public static async stopMusic(roomId: string): Promise<IRoom | null> {
+    const cleanId = cleanIdOf(roomId);
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room) return null;
+      room.musicNowPlaying = null;
+      if (room.video?.sourceType === 'spotify') room.video = undefined;
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      return room;
+    });
   }
 }

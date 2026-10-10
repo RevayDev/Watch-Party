@@ -4,6 +4,7 @@ import { BottomSheet } from "../shared/components/BottomSheet";
 import { isDemoMode } from "../shared/demo";
 import type { IRoomSettings } from "../types/room";
 import { DUCK_DEFAULT_PCT, DUCK_MAX_PCT, DUCK_MIN_PCT, clampDuckPct } from "../shared/perf";
+import { ApiService } from "../services/api";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -32,6 +33,21 @@ interface RoomSettingsModalProps {
   duckingLevelPct?: number;
   /** Rol B: parche parcial que se emite por socket (el servidor fusiona). */
   onUpdatePerf?: (patch: Partial<IRoomSettings>) => void;
+  /** Tu vista de la barra (personal, local: jamás se emite a la sala). */
+  barShowLabels?: boolean;
+  barLayout?: 'spread' | 'centered';
+  onBarPrefsChange?: (patch: { showLabels?: boolean; layout?: 'spread' | 'centered' }) => void;
+  /** Sala para el bloque de conexión Spotify (sin roomId se oculta). */
+  roomId?: string;
+  /** Música y Spotify (todo se emite por onUpdatePerf como Rendimiento). */
+  musicEnabled?: boolean;
+  musicAllowSearch?: boolean;
+  musicCanAdd?: 'anyone' | 'moderator';
+  musicQueueMode?: 'fifo' | 'votes';
+  musicCanRemove?: 'proposer' | 'moderator';
+  musicAllowReorder?: boolean;
+  musicRequireApproval?: boolean;
+  musicMaxPerUser?: number;
 }
 
 const TIMER_OPTIONS = [15, 30, 45, 60, 120, 180];
@@ -59,6 +75,18 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   duckingEnabled = true,
   duckingLevelPct = DUCK_DEFAULT_PCT,
   onUpdatePerf,
+  barShowLabels = true,
+  barLayout = 'spread',
+  onBarPrefsChange,
+  roomId,
+  musicEnabled = false,
+  musicAllowSearch = true,
+  musicCanAdd = 'anyone',
+  musicQueueMode = 'fifo',
+  musicCanRemove = 'proposer',
+  musicAllowReorder = true,
+  musicRequireApproval = false,
+  musicMaxPerUser = 3,
 }) => {
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
@@ -105,6 +133,56 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   // el servidor valida la whitelist y difunde `room-settings-updated`.
   const perfDisabled = !canEdit || !onUpdatePerf;
   const duckPct = clampDuckPct(duckingLevelPct);
+
+  // ── Música y Spotify: estado de conexión (solo con roomId) ─────────────
+  const [spotConnected, setSpotConnected] = useState<boolean | null>(null);
+  const [spotBusy, setSpotBusy] = useState(false);
+  useEffect(() => {
+    if (!isOpen || !roomId) return;
+    let alive = true;
+    setSpotConnected(null);
+    ApiService.spotifyStatus(roomId)
+      .then((s) => {
+        if (alive) setSpotConnected(s.connected === true);
+      })
+      .catch(() => {
+        if (alive) setSpotConnected(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isOpen, roomId]);
+
+  const handleSpotConnect = async () => {
+    if (!roomId || spotBusy) return;
+    setSpotBusy(true);
+    try {
+      const { authUrl } = await ApiService.spotifyAuthUrl(roomId);
+      window.open(authUrl, '_self');
+    } catch (err: unknown) {
+      notify('error', err instanceof Error ? err.message : 'No se pudo conectar Spotify', 'Spotify');
+    } finally {
+      setSpotBusy(false);
+    }
+  };
+
+  const handleSpotDisconnect = async () => {
+    if (!roomId || spotBusy) return;
+    setSpotBusy(true);
+    try {
+      await ApiService.spotifyDisconnect(roomId);
+      setSpotConnected(false);
+    } catch (err: unknown) {
+      notify('error', err instanceof Error ? err.message : 'No se pudo desconectar Spotify', 'Spotify');
+    } finally {
+      setSpotBusy(false);
+    }
+  };
+
+  const clampMaxPerUser = (v: number): number => {
+    if (!Number.isFinite(v)) return 3;
+    return Math.min(20, Math.max(1, Math.round(v)));
+  };
 
   return (
     <BottomSheet
@@ -408,6 +486,220 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 <span className="perf-slider-value">{duckPct}%</span>
               </div>
             </div>
+        </div>
+
+        {/* Tu vista de la barra: gusto personal, solo en este navegador.
+            No se emite a la sala (a diferencia de Rendimiento). */}
+        <div className="room-settings__box room-settings__box--full">
+            <div className="room-settings__box-head room-settings__box-head--title">
+              <span className="room-settings__box-title">Tu vista de la barra</span>
+            </div>
+            <p className="room-settings__box-desc">
+              Solo para ti, en este navegador. No afecta a los demás.
+            </p>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Textos bajo los iconos</span>
+              <label className="part-switch" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={barShowLabels}
+                  onChange={(e) => onBarPrefsChange?.({ showLabels: e.target.checked })}
+                  title="Muestra u oculta los textos bajo los iconos de la barra"
+                />
+                <span className="part-slider" />
+              </label>
+            </div>
+            <p className="room-settings__box-desc">
+              Nombres como Silenciar, Chat o Música.
+            </p>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Barra distribuida en PC</span>
+              <label className="part-switch" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={barLayout === 'spread'}
+                  onChange={(e) => onBarPrefsChange?.({ layout: e.target.checked ? 'spread' : 'centered' })}
+                  title="Reparte izquierda/centro/derecha en pantalla ancha (apagado: píldora centrada)"
+                />
+                <span className="part-slider" />
+              </label>
+            </div>
+            <p className="room-settings__box-desc">
+              Izquierda, centro y derecha separados en PC.
+            </p>
+        </div>
+
+        {/* Música y Spotify (antes de Actions, mismo estilo; todo por onUpdatePerf) */}
+        <div className="room-settings__box room-settings__box--full">
+            <div className="room-settings__box-head room-settings__box-head--title">
+              <span className="room-settings__box-title">Música y Spotify</span>
+            </div>
+            {!canEdit && (
+              <p className="room-settings__box-desc">
+                Solo el anfitrión puede cambiar estos ajustes.
+              </p>
+            )}
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Funciones musicales</span>
+              <label className="part-switch" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={musicEnabled}
+                  disabled={perfDisabled}
+                  onChange={(e) => onUpdatePerf?.({ musicEnabled: e.target.checked })}
+                  title="Activa la cola musical colaborativa de la sala"
+                />
+                <span className="part-slider" />
+              </label>
+            </div>
+            <p className="room-settings__box-desc">
+              Cola de canciones propuestas por la sala.
+            </p>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Búsqueda y propuestas</span>
+              <label className="part-switch" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={musicAllowSearch}
+                  disabled={perfDisabled}
+                  onChange={(e) => onUpdatePerf?.({ musicAllowSearch: e.target.checked })}
+                  title="Permite buscar canciones y proponerlas a la cola"
+                />
+                <span className="part-slider" />
+              </label>
+            </div>
+            <p className="room-settings__box-desc">
+              Buscador de Spotify dentro de la pestaña Música.
+            </p>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Reordenar (moderador)</span>
+              <label className="part-switch" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={musicAllowReorder}
+                  disabled={perfDisabled}
+                  onChange={(e) => onUpdatePerf?.({ musicAllowReorder: e.target.checked })}
+                  title="Los moderadores pueden reordenar la cola"
+                />
+                <span className="part-slider" />
+              </label>
+            </div>
+            <p className="room-settings__box-desc">
+              Flechas para subir o bajar canciones en la cola.
+            </p>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Aprobar propuestas</span>
+              <label className="part-switch" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={musicRequireApproval}
+                  disabled={perfDisabled}
+                  onChange={(e) => onUpdatePerf?.({ musicRequireApproval: e.target.checked })}
+                  title="Las propuestas esperan aprobación de un moderador"
+                />
+                <span className="part-slider" />
+              </label>
+            </div>
+            <p className="room-settings__box-desc">
+              Las canciones entran como pendientes hasta aprobarlas.
+            </p>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Quién puede proponer</span>
+              <select
+                className="room-settings__input"
+                aria-label="Quién puede proponer"
+                value={musicCanAdd}
+                disabled={perfDisabled}
+                onChange={(e) => onUpdatePerf?.({ musicCanAdd: e.target.value as 'anyone' | 'moderator' })}
+              >
+                <option value="anyone">Cualquiera</option>
+                <option value="moderator">Moderadores</option>
+              </select>
+            </div>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Orden de la cola</span>
+              <select
+                className="room-settings__input"
+                aria-label="Orden de la cola"
+                value={musicQueueMode}
+                disabled={perfDisabled}
+                onChange={(e) => onUpdatePerf?.({ musicQueueMode: e.target.value as 'fifo' | 'votes' })}
+              >
+                <option value="fifo">Orden de llegada</option>
+                <option value="votes">Por votación</option>
+              </select>
+            </div>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Quién puede quitar</span>
+              <select
+                className="room-settings__input"
+                aria-label="Quién puede quitar"
+                value={musicCanRemove}
+                disabled={perfDisabled}
+                onChange={(e) => onUpdatePerf?.({ musicCanRemove: e.target.value as 'proposer' | 'moderator' })}
+              >
+                <option value="proposer">Proponente</option>
+                <option value="moderator">Moderadores</option>
+              </select>
+            </div>
+
+            <div className="room-settings__box-head">
+              <span className="room-settings__box-title">Máximo por persona</span>
+              <input
+                type="number"
+                className="room-settings__input"
+                aria-label="Máximo por persona"
+                min={1}
+                max={20}
+                value={musicMaxPerUser}
+                disabled={perfDisabled}
+                onChange={(e) => onUpdatePerf?.({ musicMaxPerUser: clampMaxPerUser(Number(e.target.value)) })}
+              />
+            </div>
+            <p className="room-settings__box-desc">
+              Entre 1 y 20 propuestas por persona.
+            </p>
+
+            {roomId && (
+              <div className="room-settings__box-head">
+                <span className="room-settings__box-title">
+                  Spotify {spotConnected === null ? '' : spotConnected ? '● conectado' : '○ desconectado'}
+                </span>
+                {spotConnected ? (
+                  <button
+                    type="button"
+                    className="leader-exit-modal__cancel-btn"
+                    disabled={spotBusy}
+                    onClick={() => void handleSpotDisconnect()}
+                  >
+                    Desconectar
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    disabled={spotBusy}
+                    onClick={() => void handleSpotConnect()}
+                  >
+                    Conectar
+                  </button>
+                )}
+              </div>
+            )}
+
+            <p className="room-settings__box-desc">
+              Limitaciones: la reproducción completa requiere Spotify Premium; sin Premium se usa el
+              reproductor integrado (embed) y cada persona escucha en su cuenta.
+            </p>
         </div>
 
         {/* Actions */}
