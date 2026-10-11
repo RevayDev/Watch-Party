@@ -1,63 +1,57 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Chat } from '../src/features/chat/Chat';
 
 /**
- * Icono Spotify abajo del chat (barra de mensaje, lado derecho):
- * vincular cuenta + ambiente sin salir del drawer.
+ * Icono Spotify en la barra del chat: abre el panel musical o conecta,
+ * igual que el del footer (sin poner nada en la sala).
  */
-
-function mockStatus(statusBody: unknown) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => statusBody,
-    }))
-  );
-}
 
 const chatProps = (overrides: Partial<Record<string, any>> = {}) => ({
   messages: [],
   onSendMessage: vi.fn(),
   roomId: 'ABC123',
-  spotifyOpenUrl: null as string | null,
-  canPlayAmbient: true,
-  onPlayAmbient: vi.fn(async () => undefined),
+  spotifyState: 'connected',
+  musicOpen: false,
+  onOpenMusic: vi.fn(),
+  onSpotifyConnect: vi.fn(),
   ...overrides,
 });
 
 describe('Chat (icono Spotify en la barra de mensaje)', () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
   it('muestra el botón Spotify junto a Enviar', () => {
-    mockStatus({ configured: true, connected: true });
     render(<Chat {...chatProps()} />);
-    expect(screen.getByRole('button', { name: /spotify/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /música.*abrir panel/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /enviar mensaje/i })).toBeDefined();
   });
 
-  it('al presionarlo pone ambiente en la sala (anfitrión vinculado)', async () => {
-    mockStatus({ configured: true, connected: true });
-    const onPlayAmbient = vi.fn(async () => undefined);
-    render(<Chat {...chatProps({ onPlayAmbient })} />);
+  it('conectado abre el panel musical al pulsarlo', async () => {
+    const onOpenMusic = vi.fn();
+    render(<Chat {...chatProps({ onOpenMusic })} />);
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /spotify/i }));
+      fireEvent.click(screen.getByRole('button', { name: /música.*abrir panel/i }));
     });
-    await waitFor(() => {
-      expect(onPlayAmbient).toHaveBeenCalledTimes(1);
-    });
+    expect(onOpenMusic).toHaveBeenCalledTimes(1);
   });
 
-  it('sin props Spotify no muestra el botón (chats antiguos/tests)', () => {
-    mockStatus({ configured: true, connected: true });
-    render(<Chat messages={[]} onSendMessage={vi.fn()} />);
-    expect(screen.queryByRole('button', { name: /spotify/i })).toBeNull();
+  it('desconectado inicia la conexión al pulsarlo', async () => {
+    const onSpotifyConnect = vi.fn();
+    render(<Chat {...chatProps({ spotifyState: 'disconnected', onSpotifyConnect })} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /spotify: vincular cuenta/i }));
+    });
+    expect(onSpotifyConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin roomId no muestra el botón (chats antiguos/tests)', () => {
+    const { roomId: _drop, ...rest } = chatProps();
+    render(<Chat messages={[]} onSendMessage={vi.fn()} {...rest} roomId={undefined} />);
+    expect(screen.queryByRole('button', { name: /música/i })).toBeNull();
   });
 });

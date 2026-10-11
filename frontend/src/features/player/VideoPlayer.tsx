@@ -302,7 +302,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return;
     }
 
-    // Spotify se reproduce en su embed (iframe): sin <video>, sin HLS ni proxy.
+    // Fuente Spotify legada (o en transición): no hay <video> que cargar.
+    // La música vive en la cola musical; este caso solo limpia el loader.
     if (videoSourceType === 'spotify') {
       setPlaybackError(null);
       lastLoadKeyRef.current = null;
@@ -830,11 +831,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               HLS LIVE/STREAM
             </span>
           )}
-          {video.sourceType === 'spotify' && (
-            <span style={{ marginLeft: '0.5rem', background: '#1DB954', color: '#fff', fontSize: '0.68rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 700 }}>
-              SPOTIFY
-            </span>
-          )}
         </div>
 
         <div className="player-container__topbar">
@@ -988,19 +984,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Spotify: embed oficial en vez de <video>. Toda la sala carga la
-          misma fuente (sync de fuente vía `video-changed`); el transporte
-          (play/pausa/seek fino) lo controla cada embed — sin SDK Premium no
-          hay control remoto del audio, igual que el ducking por mic. */}
-      {video.sourceType === 'spotify' && videoDirectUrl ? (
-        <iframe
-          key={video.fileName || videoDirectUrl}
-          className="spotify-embed"
-          src={videoDirectUrl}
-          title={video.originalName}
-          loading="lazy"
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-        />
+      {/* Spotify legado: esta sala guardó música como video. La música vive
+          ahora en la cola (pestaña Música); el reproductor queda para películas. */}
+      {video.sourceType === 'spotify' ? (
+        <div className="player-container__placeholder">
+          <div className="dropzone-container" style={{ textAlign: 'center', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>🎵 {video.originalName}</h3>
+              <p style={{ fontSize: '0.84rem', color: 'var(--color-muted-light)', marginTop: '0.35rem' }}>
+                La música ahora vive en la cola: abre la pestaña Música para verla y escucharla en tu Spotify.
+              </p>
+            </div>
+          </div>
+        </div>
       ) : (
         <video
           ref={videoRef}

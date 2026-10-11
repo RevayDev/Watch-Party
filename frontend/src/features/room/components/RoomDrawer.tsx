@@ -29,16 +29,20 @@ interface RoomDrawerProps {
   toggleCamera: () => void;
   socket: Socket;
   roomId: string;
-  /** Spotify en el chat: enlace de lo que suena + ambiente. */
-  spotifyOpenUrl?: string | null;
-  canPlayAmbient?: boolean;
-  onPlayAmbient?: () => Promise<void>;
+  /** Spotify en el chat: estado + abrir panel o conectar. */
+  spotifyState?: import('./SpotifyListenButton').SpotifyConnState;
+  musicOpen?: boolean;
+  onOpenMusic?: () => void;
+  onSpotifyConnect?: () => void;
   /** Música/Spotify: cola colaborativa (opcionales: sin esto no se muestra el tab). */
   musicQueue?: IMusicQueueEntry[];
   musicNowPlaying?: IMusicNowPlaying | null;
   musicSettings?: IRoomSettings;
   musicIsModerator?: boolean;
   musicSpotifyConnected?: boolean;
+  musicAccountName?: string | null;
+  musicSpotifyError?: boolean;
+  musicSpotifyConfigured?: boolean;
   onMusicSearch?: (q: string) => Promise<IMusicTrack[] | null>;
   onMusicAdd?: (t: IMusicTrack) => void;
   onMusicVote?: (id: string) => void;
@@ -48,6 +52,14 @@ interface RoomDrawerProps {
   onMusicNext?: () => void;
   onMusicStop?: () => void;
   onMusicConnect?: () => void;
+  onMusicDisconnect?: () => void;
+  /** Cuenta propia (sin .env): vinculada en este navegador. */
+  musicSelfLinked?: boolean;
+  musicSelfAccount?: string | null;
+  musicOwnClientId?: string | null;
+  onSaveSelfClientId?: (clientId: string) => void;
+  onConnectSelf?: () => void;
+  onUnlinkSelf?: () => void;
 }
 
 export const RoomDrawer: React.FC<RoomDrawerProps> = ({
@@ -69,14 +81,18 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   toggleCamera,
   socket,
   roomId,
-  spotifyOpenUrl = null,
-  canPlayAmbient = false,
-  onPlayAmbient = async () => undefined,
+  spotifyState = 'loading',
+  musicOpen = false,
+  onOpenMusic = () => undefined,
+  onSpotifyConnect = () => undefined,
   musicQueue = [],
   musicNowPlaying = null,
   musicSettings,
   musicIsModerator = false,
   musicSpotifyConnected = false,
+  musicAccountName = null,
+  musicSpotifyError = false,
+  musicSpotifyConfigured = true,
   onMusicSearch = async () => null,
   onMusicAdd = () => undefined,
   onMusicVote = () => undefined,
@@ -86,6 +102,13 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   onMusicNext = () => undefined,
   onMusicStop = () => undefined,
   onMusicConnect = () => undefined,
+  onMusicDisconnect = () => undefined,
+  musicSelfLinked = false,
+  musicSelfAccount = null,
+  musicOwnClientId = null,
+  onSaveSelfClientId = () => undefined,
+  onConnectSelf = () => undefined,
+  onUnlinkSelf = () => undefined,
 }) => {
   // Helper local: evita repetir buildSocketAuth(roomId, myName) en cada emit.
   // Se evalúa en el momento del emit (lee localStorage entonces), igual que antes.
@@ -111,9 +134,10 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onTyping={onTyping}
             onClose={() => setActiveSideTab(null)}
             roomId={roomId}
-            spotifyOpenUrl={spotifyOpenUrl}
-            canPlayAmbient={canPlayAmbient}
-            onPlayAmbient={onPlayAmbient}
+            spotifyState={spotifyState}
+            musicOpen={musicOpen}
+            onOpenMusic={onOpenMusic}
+            onSpotifyConnect={onSpotifyConnect}
           />
         )}
         {sideTabView === 'participants' && (
@@ -204,6 +228,9 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             myName={myName}
             userId={userId}
             spotifyConnected={musicSpotifyConnected}
+            accountName={musicAccountName}
+            spotifyError={musicSpotifyError}
+            spotifyConfigured={musicSpotifyConfigured}
             onSearch={onMusicSearch}
             onAdd={onMusicAdd}
             onVote={onMusicVote}
@@ -213,6 +240,13 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onNext={onMusicNext}
             onStop={onMusicStop}
             onConnect={onMusicConnect}
+            onDisconnect={onMusicDisconnect}
+            selfLinked={musicSelfLinked}
+            selfAccount={musicSelfAccount}
+            ownClientId={musicOwnClientId}
+            onSaveSelfClientId={onSaveSelfClientId}
+            onConnectSelf={onConnectSelf}
+            onUnlinkSelf={onUnlinkSelf}
           />
         )}
       </div>

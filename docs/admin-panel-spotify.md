@@ -63,25 +63,41 @@ Histórico/baneos permanentes entre reinicios, estadísticas de uso, gestión de
 
 ---
 
-## 2. Spotify ("Potify") — música sincronizada en la sala
+## 2. Spotify ("Potify") — karaoke con cola sincronizada
+
+> Diseño vigente: la sala comparte cola y selección (metadatos), nunca el
+> audio. Detalle técnico en `docs/spotify-queue.md`.
 
 ### 2.1 Objetivo
 
-Poder poner **música de Spotify como fuente de la sala**, igual que hoy se pone
-un archivo o un enlace de video: todos escuchan lo mismo al mismo tiempo y el
-anfitrión (o quien tenga el control) la pausa, reanuda y cambia.
+Karaoke en grupo: la cola suena igual para todos en sus propios Spotify, la
+selección avanza sincronizada y cada uno canta con su micrófono.
 
-### 2.2 Alcance funcional (fase 1)
+### 2.2 Alcance funcional (fase 1, implementado)
 
-- En el selector de fuente ("Cambiar") aparece la pestaña **Spotify** junto a
-  Subir y Enlace.
-- Pegar un **enlace de canción/playlist de Spotify** lo carga como fuente de
-  la sala (`sourceType: 'spotify'`,Reuse del modelo `IVideoMetadata`).
-- La reproducción usa el **mismo sync** que el video: `sync-video`
-  (play/pause/seek), `playback-heartbeat` y consenso para recién llegados.
-- La cinemática del combo, las reacciones y el ducking por mic funcionan igual
-  (el player no distingue la fuente).
-- Sin enlace válido se muestra el mismo estado de error del player actual.
+- Icono musical del footer: sin vincular abre el OAuth en pestaña nueva;
+  vinculado abre/cierra el panel (toggle) con punto de estado.
+- Panel Música: conexión + cuenta, buscador con carátulas, cola con orden y
+  votos, canción actual, controles de moderación, desvincular y estado de
+  letra informativo (sin proveedor autorizado no hay letra).
+- La cola (`music-add/vote/remove/reorder/approve/next/stop`) solo mueve
+  metadatos (`musicQueue` + `musicNowPlaying`); jamás toca `room.video`.
+- Turno para cantar (`singerName` en ajustes) y aplausos con 👏.
+
+### 2.3 Permisos
+
+- Cola y moderación respetan `musicEnabled`, `musicCanAdd`, `musicQueueMode`,
+  `musicCanRemove`, `musicAllowReorder`, `musicRequireApproval` y los roles
+  leader/cohost/member (+ `adminToken` del panel).
+- El reproductor de películas y su `sync-video` son independientes.
+
+### 2.4 Requisitos técnicos (resumen)
+
+- OAuth con `state` de un solo uso, tokens AES-256-GCM en el servidor, nunca
+  en el frontend. Ver variables en `docs/spotify-queue.md` §2.
+- Web Playback SDK solo si la app y el uso cumplen las políticas de Spotify;
+  hoy no se implementa: cada dispositivo reproduce con su cuenta (Premium
+  para disco completo).
 
 ### 2.3 Permisos
 
@@ -102,45 +118,34 @@ anfitrión (o quien tenga el control) la pausa, reanuda y cambia.
 
 ### 2.5 Fuera de alcance (fase 1)
 
-Cola de canciones votada, letras sincronizadas, modo DJ por turnos y
-reproducción sin cuenta de Spotify.
+Puntuación por afinación, efectos de voz, dúos simultáneos, cola votada con
+más modos y reproducción sin cuenta de Spotify.
 
 ---
 
-## 3. Orden de implementación sugerido
+## 3. Orden de implementación (estado)
 
-1. Panel Admin solo-lectura (salas + usuarios) con `ADMIN_TOKEN`. ✅
-   (`GET /api/admin/rooms`, `GET /api/admin/rooms/:roomId`, `RoomService.listRooms()`)
-2. Acciones de sala (ajustes, cerrar) y de usuario (expulsar, rol, mute). ✅
-   (`PATCH/DELETE /api/admin/rooms/:roomId…`, `POST …/kick|unban|role|transfer-leader|rename|mute`;
-   emiten los mismos eventos socket que la moderación en sala)
-3. Spotify fase 1 (enlace + sync + OAuth básico). ✅ → endurecido en fase B:
-   OAuth con `state` anti-CSRF de un solo uso (10 min) + conexión persistente
-   cifrada (`persistent` en `/status`; ver `docs/spotify-queue.md`) + búsqueda
-   `GET /api/spotify/search` (client-credentials, gates `musicEnabled` /
-   `musicAllowSearch`).
-   (`sourceType: 'spotify'` con embed, `GET /api/spotify/resolve|status|auth-url|callback|search`,
-   `POST …/disconnect`; sin pestaña en "Cambiar": el acceso es el icono Spotify
-   del footer y de la barra del chat)
+1. Panel Admin con `ADMIN_TOKEN` (listas + cerrar + ajustes + expulsar/rol/mute
+   vía eventos socket existentes). ✅
+2. Spotify fase B: OAuth con `state` anti-CSRF (10 min) + conexión persistente
+   cifrada + búsqueda client-credentials con gates. ✅
+3. Integración completa: icono toggle con estados, OAuth en pestaña nueva con
+   retorno gestionado, cola solo-metadatos (sin tocar el video), cuenta en
+   estado, desvincular, letra informativa. ✅ Detalle en `docs/spotify-queue.md`.
 
 Notas de la implementación:
 
-- El transporte fino (play/pausa/seek remoto sobre el embed) y el ducking
-  por mic no aplican al iframe de Spotify sin SDK Premium: la sala comparte
-  la misma fuente (`video-changed`) y cada embed la reproduce. Cola votada,
-  letras y modo DJ siguen fuera de alcance.
-- Sin `ADMIN_TOKEN` en el servidor, `/api/admin/*` responde 503; sin
-  `SPOTIFY_CLIENT_ID/SECRET`, la pestaña muestra "no configurado".
-- Icono Spotify en el footer de la sala y en la barra del chat
-  (`SpotifyListenButton`, junto a Salir y junto a Enviar): música ambiente
-  mientras entra la gente + vincular cuenta estilo Instagram (pantalla oficial
-  de Autorizar de Spotify vía OAuth). Sin cuenta vinculada redirige a
-  vincularla (`window.open(authUrl, '_self')`, el callback vuelve a `?room=`);
-  vinculada + anfitrión + nada sonando pone el ambiente en toda la sala
-  (`video-changed`, playlist `DEFAULT_AMBIENT_SPOTIFY_URL`); sonando Spotify
-  abre lo que suena en pestaña nueva; miembro sin nada sonando lo abre en su
-  propio Spotify. Sin OAuth en el servidor el ambiente igual funciona (embed
-  público). El modal "Cambiar" vuelve a 2 pestañas (Subir/Enlace).
+- La música JAMÁS toca `room.video`: `music-next`/`music-stop` solo mueven
+  `musicQueue` + `musicNowPlaying`; `video-url` rechaza enlaces Spotify (400,
+  "usa la cola musical"); el player muestra un placeholder amable si una sala
+  vieja guardó música como video.
+- Cada persona escucha en su propio Spotify (sin retransmisión del anfitrión,
+  sin sync de audio, sin letras raspadas).
+- Icono Spotify en el footer y en la barra del chat: sin vincular abre el
+  OAuth en pestaña nueva (sin perder la sala); vinculado abre/cierra el panel
+  (toggle) con punto gris/verde/rojo. Cerrar el panel no desconecta ni vacía.
+- Sin `ADMIN_TOKEN`, `/api/admin/*` responde 503 (con token erróneo, 401); sin `SPOTIFY_CLIENT_ID/
+  SECRET`, el panel muestra "no configurado".
 
 ## 4. Barra inferior por zonas y gusto personal
 

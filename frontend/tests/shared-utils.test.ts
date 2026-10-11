@@ -4,6 +4,7 @@ import {
   getAvatarColor,
   getInitials,
   formatRemaining,
+  readSpotifyReturn,
 } from '../src/shared/utils';
 
 afterEach(() => {
@@ -85,5 +86,27 @@ describe('formatRemaining', () => {
     [-1_000, '0:00'],
   ])('%i ms -> "%s"', (ms, expected) => {
     expect(formatRemaining(ms)).toBe(expected);
+  });
+});
+
+describe('readSpotifyReturn', () => {
+  it('connected sin reason', () => {
+    expect(readSpotifyReturn('?room=ABC&spotify=connected')).toEqual({ kind: 'connected' });
+  });
+
+  it('error con reason', () => {
+    expect(readSpotifyReturn('?room=ABC&spotify=error&reason=cancelled')).toEqual({
+      kind: 'error',
+      reason: 'cancelled',
+    });
+  });
+
+  it('error sin reason usa unknown', () => {
+    expect(readSpotifyReturn('?spotify=error')).toEqual({ kind: 'error', reason: 'unknown' });
+  });
+
+  it('null sin parámetros', () => {
+    expect(readSpotifyReturn('?room=ABC')).toBeNull();
+    expect(readSpotifyReturn('')).toBeNull();
   });
 });

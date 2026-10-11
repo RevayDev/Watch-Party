@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, X } from 'lucide-react';
 import { ChatMessage } from '../../types/room';
 import { getAvatarColor, getInitials } from '../../shared/utils';
-import { SpotifyListenButton } from '../room/components/SpotifyListenButton';
+import { SpotifyListenButton, type SpotifyConnState } from '../room/components/SpotifyListenButton';
 
 interface ChatProps {
   messages: ChatMessage[];
@@ -15,12 +15,14 @@ interface ChatProps {
   onTyping?: () => void;
   /** Sala para el icono Spotify (opcional: sin esto no se muestra). */
   roomId?: string;
-  /** Enlace público de lo que suena (null = sin fuente Spotify). */
-  spotifyOpenUrl?: string | null;
-  /** ¿Puede poner ambiente en la sala (anfitrión/co-anfitrión)? */
-  canPlayAmbient?: boolean;
-  /** Pone el ambiente en la sala (API + `video-changed` a todos). */
-  onPlayAmbient?: () => Promise<void>;
+  /** Estado de la conexión Spotify (punto del botón). */
+  spotifyState?: SpotifyConnState;
+  /** ¿Está abierto el panel musical? */
+  musicOpen?: boolean;
+  /** Abre/cierra el panel musical. */
+  onOpenMusic?: () => void;
+  /** Inicia el OAuth en pestaña nueva. */
+  onSpotifyConnect?: () => void;
 }
 
 export const Chat: React.FC<ChatProps> = ({
@@ -31,9 +33,10 @@ export const Chat: React.FC<ChatProps> = ({
   typingUsers = [],
   onTyping,
   roomId,
-  spotifyOpenUrl = null,
-  canPlayAmbient = false,
-  onPlayAmbient = async () => undefined,
+  spotifyState = 'loading',
+  musicOpen = false,
+  onOpenMusic = () => undefined,
+  onSpotifyConnect = () => undefined,
 }) => {
   const [input, setInput] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -210,10 +213,10 @@ export const Chat: React.FC<ChatProps> = ({
       <form onSubmit={handleSubmit} className="drawer-chat__input-bar">
         {roomId && (
           <SpotifyListenButton
-            roomId={roomId}
-            openUrl={spotifyOpenUrl}
-            canPlayAmbient={canPlayAmbient}
-            onPlayAmbient={onPlayAmbient}
+            state={spotifyState}
+            panelOpen={musicOpen}
+            onTogglePanel={onOpenMusic}
+            onConnect={onSpotifyConnect}
           />
         )}
         <input

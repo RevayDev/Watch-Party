@@ -1,8 +1,9 @@
 # Spotify: cola y búsqueda (fase B)
 
-> Reproducción en el propio dispositivo + búsqueda sin usuario. Sin
-> sincronía de audio entre participantes: la sala comparte la misma fuente
-> y cada cliente la reproduce (embed o app).
+> La sala comparte la cola y la selección (metadatos), nunca el audio. Cada
+> persona escucha en su propio Spotify. La cola musical jamás modifica el
+> reproductor de películas (`room.video`): `music-next`/`music-stop` solo
+> actualizan `musicNowPlaying` + cola.
 
 ## 1. Configurar la app en el dashboard (paso a paso)
 
@@ -37,20 +38,36 @@ SPOTIFY_MARKET=ES
 
 ## 3. Flujo OAuth (endurecido)
 
+Hay dos vías complementarias (el footer y el panel usan la que corresponda):
+
+**A. OAuth del servidor** (requiere `.env`): pasos 1-7 de abajo.
+**B. Cuenta propia, sin `.env`** (cada usuario vincula la suya): el usuario
+crea su app en el dashboard (solo Client ID, sin secreto), registra como
+redirect URI el origen del frontend (p. ej. `http://localhost:5173/`) y pega
+el Client ID en el panel ("Tu cuenta de Spotify"). Flujo PKCE directo
+navegador↔Spotify; los tokens quedan solo en su `localStorage`. La sala sigue
+compartiendo solo cola y selección.
+
 1. `GET /api/spotify/auth-url?roomId=` → `{authUrl}` con `state` anti-CSRF
    de un solo uso (`base64url(roomId.nonce)`, expira en 10 min).
-2. El usuario autoriza en Spotify → `GET /api/spotify/callback?code=&state=`.
-3. El callback valida el `state` (formato, existencia, expiración y sala
-   ligada; un solo uso) y canjea el código. `state` inválido/expirado →
-   `400 {error:'Sesión de autorización inválida o expirada.'}`.
-4. Éxito → `302` a `CLIENT_URL?room=&spotify=connected`. Fallo de Spotify
-   → `502 {error}` (sin tokens en la respuesta).
-5. `GET /api/spotify/status?roomId=` → `{configured, connected, persistent,
-   roomId}`. `POST /api/spotify/disconnect {roomId}` borra memoria Y base.
+2. El frontend abre esa URL en **pestaña nueva** (directo desde el clic, con
+   fallback a la misma pestaña si el popup se bloquea). La sala sigue abierta.
+3. El usuario autoriza en Spotify → `GET /api/spotify/callback?code=&state=`.
+4. El callback valida el `state` (formato, existencia, expiración y sala
+   ligada; un solo uso) y canjea el código.
+5. Éxito → `302` a `CLIENT_URL?room=&spotify=connected`. Cualquier fallo
+   (cancelado, expirado, no configurado, rechazado) → `302` a
+   `CLIENT_URL?room=&spotify=error&reason=` (nunca una página JSON sin salida).
+6. El frontend lee `spotify=connected|error`, avisa, refresca el estado y
+   limpia la URL (conserva `room`).
+7. `GET /api/spotify/status?roomId=` → `{configured, connected, persistent,
+   roomId, accountName, error}` (`error: 'refresh_failed'` si hay conexión
+   guardada pero el token no se pudo renovar). `POST /api/spotify/disconnect
+   {roomId}` borra memoria Y base.
 
 Scopes mínimos: `user-read-playback-state user-modify-playback-state`
 (reproducir en el propio dispositivo). La búsqueda usa client-credentials
-sin usuario; el embed no necesita token.
+sin usuario.
 
 ## 4. Cola y búsqueda
 
@@ -65,9 +82,16 @@ sin usuario; el embed no necesita token.
 
 ## 5. Límites conocidos
 
-- **Premium**: solo cuentas Premium reproducen a disco completo en el
-  navegador; el resto oye previews de ~30 s vía embed.
-- **Sin sincronía de audio**: no hay reloj compartido de audio; pausas y
-  cambios llegan por el sync de la sala como con el video, pero cada
-  dispositivo decodifica por su cuenta.
+- **Premium**: solo cuentas Premium reproducen a disco completo en su
+  dispositivo; el resto oye previews de ~30 s en la app de Spotify.
+- **Sin sincronía de audio**: no hay reloj compartido ni retransmisión del
+  anfitrión a los invitados (técnica y legalmente inviable con contenido
+  protegido). `music-next`/`music-stop` y `video-url` con enlaces Spotify
+  NO tocan `room.video`: la película nunca se interrumpe por la música.
+- **Sin letras de Spotify**: no existe API oficial de letras; el panel muestra
+  un estado informativo hasta integrar un proveedor autorizado. No se inventan
+  letras ni se raspan.
+- **Karaoke**: la arquitectura lo separa (catálogo → cola → reproductor
+  autorizado → proveedor de letras). El turno (`singerName`) y la letra
+  sincronizada llegarán con proveedor autorizado; hoy solo el estado.
 - Los tokens nunca viajan al frontend ni salen en logs (solo booleans).

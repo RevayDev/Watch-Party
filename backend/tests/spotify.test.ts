@@ -5,6 +5,11 @@ import { createApp } from '../src/app.js';
 import { RoomService } from '../src/services/room.service.js';
 import { parseSpotifyUrl, toEmbedUrl } from '../src/domain/spotify.js';
 import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
+import {
+  clearSpotifyStates,
+  expireSpotifyStatesForTests,
+  issueSpotifyState,
+} from '../src/services/spotify-state.js';
 
 /**
  * Spotify ("Potify") fase 1 — docs/admin-panel-spotify.md §2.
@@ -137,9 +142,21 @@ describe('Spotify OAuth básico (token en servidor)', () => {
     expect(res.status).toBe(503);
   });
 
-  it('callback sin code → 400', async () => {
+  it('callback sin code redirige al cliente con error (no JSON)', async () => {
     const url = await startApp();
-    expect((await fetch(`${url}/api/spotify/callback?state=ABC123`)).status).toBe(400);
+    const res = await fetch(`${url}/api/spotify/callback?state=ABC123`, { redirect: 'manual' });
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    expect(location).toContain('spotify=error');
+  });
+
+  it('callback cancelado por el usuario redirige con reason=cancelled', async () => {
+    const url = await startApp();
+    const res = await fetch(`${url}/api/spotify/callback?error=access_denied`, { redirect: 'manual' });
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    expect(location).toContain('spotify=error');
+    expect(location).toContain('reason=cancelled');
   });
 
   it('disconnect siempre deja connected:false', async () => {
@@ -154,8 +171,8 @@ describe('Spotify OAuth básico (token en servidor)', () => {
   });
 });
 
-describe('video-url acepta Spotify (sin probe de red)', () => {
-  it('guarda sourceType spotify con embedUrl', async () => {
+describe('video-url rechaza Spotify (la música vive en la cola)', () => {
+  it('un track válido va a la cola, no al reproductor', async () => {
     const url = await startApp();
     const { room, leaderSecret } = await RoomService.createRoom({
       leaderName: 'DjLider',
@@ -173,40 +190,13 @@ describe('video-url acepta Spotify (sin probe de red)', () => {
         title: 'Mi canción',
       }),
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const body = (await res.json()) as any;
-    expect(body.video.sourceType).toBe('spotify');
-    expect(body.video.directUrl).toBe(
-      'https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQ'
-    );
-    expect(body.video.originalName).toBe('Mi canción');
+    expect(typeof body.error).toBe('string');
+    expect(body.error).toContain('cola');
   });
 
-  it('sin título usa un nombre por defecto legible', async () => {
-    const url = await startApp();
-    const { room, leaderSecret } = await RoomService.createRoom({
-      leaderName: 'DjLider2',
-      isTemporary: true,
-    });
-    const res = await fetch(`${url}/api/rooms/${room.roomId}/video-url`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-leader-secret': leaderSecret,
-        'x-user-name': 'DjLider2',
-      },
-      body: JSON.stringify({
-        url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
-      }),
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as any;
-    expect(body.video.sourceType).toBe('spotify');
-    expect(typeof body.video.originalName).toBe('string');
-    expect(body.video.originalName.length).toBeGreaterThan(0);
-  });
-
-  it('enlace Spotify con tipo no soportado → 400', async () => {
+  it('enlace Spotify con tipo no soportado también va a la cola', async () => {
     const url = await startApp();
     const { room, leaderSecret } = await RoomService.createRoom({
       leaderName: 'DjLider3',
@@ -222,5 +212,33 @@ describe('video-url acepta Spotify (sin probe de red)', () => {
       body: JSON.stringify({ url: 'https://open.spotify.com/user/alguien' }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('callback OAuth con redirección al cliente', () => {
+  it('state expirado redirige con reason=expired (no JSON)', async () => {
+    const url = await startApp();
+    clearSpotifyStates();
+    const state = issueSpotifyState('ABC123');
+    expireSpotifyStatesForTests();
+    const res = await fetch(`${url}/api/spotify/callback?code=x&state=${state}`, {
+      redirect: 'manual',
+    });
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    expect(location).toContain('spotify=error');
+    expect(location).toContain('reason=expired');
+    expect(location).toContain('room=ABC123');
+    clearSpotifyStates();
+  });
+
+  it('status sin configurar trae accountName y error nulos', async () => {
+    const url = await startApp();
+    const res = await fetch(`${url}/api/spotify/status?roomId=ABC123`);
+    const body = (await res.json()) as any;
+    expect(body.configured).toBe(false);
+    expect(body.connected).toBe(false);
+    expect(body.accountName).toBeNull();
+    expect(body.error).toBeNull();
   });
 });

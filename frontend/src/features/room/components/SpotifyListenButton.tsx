@@ -1,87 +1,68 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Music } from 'lucide-react';
-import { ApiService } from '../../../services/api';
 
-/**
- * Playlist ambiente por defecto (música de espera mientras entra la gente).
- * El anfitrión puede cambiarla desde la pestaña Spotify ("Cambiar").
- */
-export const DEFAULT_AMBIENT_SPOTIFY_URL =
-  'https://open.spotify.com/playlist/37i9dQZF1DX4WYpdgoIcn6';
+export type SpotifyConnState = 'loading' | 'disconnected' | 'connected' | 'error';
 
 interface SpotifyListenButtonProps {
-  roomId: string;
-  /** Enlace público de lo que suena (null = sin fuente Spotify). */
-  openUrl: string | null;
-  /** ¿Puede poner música en la sala (anfitrión/co-anfitrión)? */
-  canPlayAmbient: boolean;
-  /** Pone el ambiente en la sala (API + `video-changed` a todos). */
-  onPlayAmbient: () => Promise<void>;
+  /** Estado de la conexión (lo consulta el padre; el botón no hace fetch). */
+  state: SpotifyConnState;
+  /** Cuenta vinculada, si se conoce (tooltip). */
+  accountName?: string | null;
+  /** ¿Está abierto el panel musical? (anillo activo). */
+  panelOpen: boolean;
+  /** Conectado: abre/cierra el panel. Desconectado o error: conecta. */
+  onTogglePanel: () => void;
+  onConnect: () => void;
+}
+
+const DOT_CLASS: Record<SpotifyConnState, string> = {
+  loading: 'spotify-status-dot spotify-status-dot--loading',
+  disconnected: 'spotify-status-dot spotify-status-dot--disconnected',
+  connected: 'spotify-status-dot spotify-status-dot--connected',
+  error: 'spotify-status-dot spotify-status-dot--error',
+};
+
+function titleFor(state: SpotifyConnState, accountName?: string | null, panelOpen?: boolean): string {
+  switch (state) {
+    case 'connected':
+      return `Música${accountName ? ` (conectado como ${accountName})` : ''} — ${panelOpen ? 'cerrar panel' : 'abrir panel'}`;
+    case 'error':
+      return 'Spotify: error de conexión — pulsa para vincular de nuevo';
+    case 'loading':
+      return 'Spotify: comprobando conexión…';
+    default:
+      return 'Spotify: vincular cuenta para la música de la sala';
+  }
 }
 
 /**
- * Botón Spotify del footer (como los demás botones circulares).
- * Música ambiente mientras entra la gente + vincular cuenta estilo
- * Instagram (pantalla oficial de Autorizar de Spotify vía OAuth):
- * - Sin cuenta vinculada → redirige (misma pestaña) a vincularla.
- * - Vinculada + anfitrión + nada sonando → ambiente para toda la sala.
- * - Sonando Spotify → abre lo que suena para escucharlo.
- * - Miembro sin nada sonando → abre el ambiente en su propio Spotify.
+ * Botón musical del footer (y del chat): mismo círculo que los demás.
+ * - Desconectado o error → inicia el OAuth (pestaña nueva, sin perder la sala).
+ * - Conectado → abre/cierra el panel musical (toggle, como Chat).
+ * El punto indica el estado: gris = desconectado, verde = conectado,
+ * rojo = error. Cerrar el panel no desconecta ni vacía la cola.
  */
 export const SpotifyListenButton: React.FC<SpotifyListenButtonProps> = ({
-  roomId,
-  openUrl,
-  canPlayAmbient,
-  onPlayAmbient,
+  state,
+  accountName,
+  panelOpen,
+  onTogglePanel,
+  onConnect,
 }) => {
-  const [checking, setChecking] = useState(false);
-
-  const handleClick = async () => {
-    if (checking) return;
-    setChecking(true);
-    try {
-      const status = await ApiService.spotifyStatus(roomId);
-      if (status.configured && !status.connected) {
-        // Vincular cuenta (pantalla oficial de Spotify, como Instagram).
-        const { authUrl } = await ApiService.spotifyAuthUrl(roomId);
-        window.open(authUrl, '_self');
-        return;
-      }
-      if (openUrl) {
-        // Ya suena Spotify en la sala: escucharlo.
-        window.open(openUrl, '_blank');
-        return;
-      }
-      if (canPlayAmbient) {
-        // Sonidito de ambiente para toda la sala mientras entra la gente.
-        // Funciona sin OAuth: el embed es público (el backend no exige token
-        // para guardar enlaces Spotify).
-        try {
-          await onPlayAmbient();
-        } catch {
-          window.open(DEFAULT_AMBIENT_SPOTIFY_URL, '_blank');
-        }
-        return;
-      }
-      window.open(DEFAULT_AMBIENT_SPOTIFY_URL, '_blank');
-    } catch {
-      // Sin red o con error: igual se puede escuchar el enlace público.
-      window.open(openUrl ?? DEFAULT_AMBIENT_SPOTIFY_URL, '_blank');
-    } finally {
-      setChecking(false);
-    }
-  };
-
+  const loading = state === 'loading';
+  const linked = state === 'connected';
   return (
     <button
       type="button"
-      onClick={() => void handleClick()}
-      className="meet-circle-btn"
-      title="Spotify: vincular cuenta y música ambiente"
-      disabled={checking}
-      aria-busy={checking}
+      onClick={() => (linked ? onTogglePanel() : onConnect())}
+      className={`meet-circle-btn meet-circle-btn--music${linked && panelOpen ? ' meet-circle-btn--active' : ''}`}
+      title={titleFor(state, accountName, panelOpen)}
+      aria-label={titleFor(state, accountName, panelOpen)}
+      disabled={loading}
+      aria-busy={loading}
     >
       <Music size={18} />
+      <span className={DOT_CLASS[state]} aria-hidden="true" />
     </button>
   );
 };

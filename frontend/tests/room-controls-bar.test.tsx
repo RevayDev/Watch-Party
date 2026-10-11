@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { RoomControls } from '../src/features/room/components/RoomControls';
 
 /**
@@ -37,9 +37,11 @@ function barProps(overrides: Partial<Record<string, any>> = {}) {
     uiPinned: true,
     toggleBarsVisibility: noop,
     roomId: 'ABC123',
-    spotifyOpenUrl: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQ',
-    canPlayAmbient: true,
-    onPlayAmbient: vi.fn(async () => undefined),
+    spotifyState: 'disconnected',
+    spotifyAccount: null,
+    musicOpen: false,
+    onToggleMusic: vi.fn(),
+    onSpotifyConnect: vi.fn(),
     ...overrides,
   };
 }
@@ -104,6 +106,28 @@ describe('RoomControls (orden y etiquetas)', () => {
     render(<RoomControls {...barProps()} />);
     expect(screen.getByRole('button', { name: /spotify: vincular cuenta/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /salir de la reunión/i })).toBeDefined();
+  });
+
+  it('Spotify conectado abre/cierra el panel (toggle)', () => {
+    const onToggleMusic = vi.fn();
+    const onSpotifyConnect = vi.fn();
+    render(
+      <RoomControls
+        {...barProps({ spotifyState: 'connected', spotifyAccount: 'DjAna', onToggleMusic, onSpotifyConnect })}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /abrir panel/i }));
+    expect(onToggleMusic).toHaveBeenCalledTimes(1);
+    expect(onSpotifyConnect).not.toHaveBeenCalled();
+  });
+
+  it('Spotify desconectado inicia el OAuth al pulsar', () => {
+    const onToggleMusic = vi.fn();
+    const onSpotifyConnect = vi.fn();
+    render(<RoomControls {...barProps({ onToggleMusic, onSpotifyConnect })} />);
+    fireEvent.click(screen.getByRole('button', { name: /spotify: vincular cuenta/i }));
+    expect(onSpotifyConnect).toHaveBeenCalledTimes(1);
+    expect(onToggleMusic).not.toHaveBeenCalled();
   });
 
   it('etiquetas dinámicas según estado (mic off / cámaras ocultas)', () => {

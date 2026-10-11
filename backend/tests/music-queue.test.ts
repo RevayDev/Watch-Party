@@ -248,13 +248,13 @@ describe('RoomService.advanceMusicQueue', () => {
     return { roomId: room.roomId, firstId: first!.musicQueue![0].id };
   }
 
-  it('fifo avanza el más antiguo y fija video spotify', async () => {
+  it('fifo avanza el más antiguo sin tocar el video', async () => {
     const { roomId, firstId } = await roomWithTwo('fifo');
     const res = await RoomService.advanceMusicQueue(roomId);
     expect(res?.musicNowPlaying?.entryId).toBe(firstId);
     expect(res?.musicNowPlaying?.startedBy).toBe('sala');
-    expect(res?.video?.sourceType).toBe('spotify');
-    expect(res?.video?.directUrl).toBe('https://open.spotify.com/embed/track/aaaaaaaaAA');
+    // Solo metadatos: el reproductor de películas queda intacto.
+    expect(res?.video ?? null).toBeNull();
     expect(res?.musicQueue).toHaveLength(1);
   });
 
@@ -275,7 +275,7 @@ describe('RoomService.advanceMusicQueue', () => {
 });
 
 describe('RoomService.stopMusic', () => {
-  it('limpia nowPlaying y el video solo si era spotify', async () => {
+  it('limpia nowPlaying sin tocar el video', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await RoomService.addMusicEntry(room.roomId, entryOf());
     await RoomService.advanceMusicQueue(room.roomId);

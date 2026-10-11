@@ -210,7 +210,8 @@ export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  // Pasar al siguiente tema (solo moderadores): actualiza cola y video.
+  // Pasar al siguiente tema (solo moderadores): actualiza cola y nowPlaying.
+  // Solo metadatos: NO emite `video-changed` (la película sigue intacta).
   socket.on('music-next', async (data: { roomId: string } & PrivilegedPayload) => {
     if (!data || typeof data !== 'object') return;
     const cleanRoomId = cleanRoomIdOf(data.roomId);
@@ -227,10 +228,9 @@ export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
     const updated = await RoomService.advanceMusicQueue(cleanRoomId);
     if (!updated) return;
     emitQueue(io, cleanRoomId, updated);
-    io.to(cleanRoomId).emit('video-changed', { video: updated.video ?? null });
   });
 
-  // Detener la música (solo moderadores): limpia nowPlaying y el video Spotify.
+  // Detener la música (solo moderadores): limpia nowPlaying. No toca el video.
   socket.on('music-stop', async (data: { roomId: string } & PrivilegedPayload) => {
     if (!data || typeof data !== 'object') return;
     const cleanRoomId = cleanRoomIdOf(data.roomId);
@@ -247,6 +247,5 @@ export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
     const updated = await RoomService.stopMusic(cleanRoomId);
     if (!updated) return;
     emitQueue(io, cleanRoomId, updated);
-    io.to(cleanRoomId).emit('video-changed', { video: null });
   });
 }

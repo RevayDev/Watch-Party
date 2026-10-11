@@ -12,6 +12,23 @@ import {
 import { consumeSpotifyState } from '../services/spotify-state.js';
 
 /**
+ * Extrae el roomId del `state` SIN consumir el nonce (solo para saber a qué
+ * sala devolver al usuario cuando la autorización falla). null si ilegible.
+ */
+function peekRoomFromState(state: string | null): string | null {
+  if (!state) return null;
+  try {
+    const decoded = Buffer.from(state, 'base64url').toString('utf-8');
+    const sep = decoded.lastIndexOf('.');
+    if (sep <= 0) return null;
+    const room = decoded.slice(0, sep).toUpperCase().trim();
+    return room || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Spotify fase B — docs/admin-panel-spotify.md §3.
  * `resolve` es público (validar/pegar enlaces). El OAuth guarda el token
  * en el servidor (nunca en el frontend) con `state` anti-CSRF de un solo
@@ -78,29 +95,40 @@ export class SpotifyController {
         const s = Array.isArray(v) ? v[0] : v;
         return typeof s === 'string' && s.trim() ? s.trim() : null;
       };
+      const client = (process.env.CLIENT_URL || '').trim().replace(/\/$/, '') || '/';
+      const backToClient = (roomId: string | null, params: string): void => {
+        const base = roomId ? `${client}${client.includes('?') ? '&' : '?'}room=${encodeURIComponent(roomId)}` : client;
+        const sep = base.includes('?') ? '&' : '?';
+        res.redirect(302, `${base}${sep}${params}`);
+      };
+      // Spotify redirige con ?error= cuando el usuario cancela o deniega.
+      const spotifyError = pick(req.query.error);
+      if (spotifyError) {
+        res.redirect(302, `${client}${client.includes('?') ? '&' : '?'}spotify=error&reason=cancelled`);
+        return;
+      }
       const code = pick(req.query.code);
       const state = pick(req.query.state);
       if (!code || !state) {
-        res.status(400).json({ error: 'code y state (roomId) son requeridos' });
+        backToClient(peekRoomFromState(state), 'spotify=error&reason=invalid');
         return;
       }
       // State de un solo uso: formato, existencia, expiración y sala ligada.
       const roomId = consumeSpotifyState(state);
       if (!roomId) {
-        res.status(400).json({ error: 'Sesión de autorización inválida o expirada.' });
+        backToClient(peekRoomFromState(state), 'spotify=error&reason=expired');
         return;
       }
       if (!isSpotifyConfigured()) {
-        res.status(503).json({ error: 'Spotify no está configurado en este servidor.' });
+        backToClient(roomId, 'spotify=error&reason=not_configured');
         return;
       }
       try {
         await exchangeSpotifyCode(roomId, code);
       } catch {
-        res.status(502).json({ error: 'Spotify rechazó el código de autorización.' });
+        backToClient(roomId, 'spotify=error&reason=rejected');
         return;
       }
-      const client = (process.env.CLIENT_URL || '').trim().replace(/\/$/, '') || '/';
       const sep = client.includes('?') ? '&' : '?';
       res.redirect(302, `${client}${sep}room=${encodeURIComponent(roomId)}&spotify=connected`);
     } catch (error) {

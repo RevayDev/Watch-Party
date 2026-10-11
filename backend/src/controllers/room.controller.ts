@@ -7,7 +7,7 @@ import { DemoCapacityError, maxUsersForRoom } from '../services/room.service.js'
 import { IVideoMetadata } from '../types/room.types.js';
 import { findBannedEntry, isNameTaken } from '../domain/room.entity.js';
 import { AuthClaim, requireLeader, requireModerator } from '../domain/auth-policy.js';
-import { parseSpotifyUrl, toEmbedUrl, defaultSpotifyName } from '../domain/spotify.js';
+import { parseSpotifyUrl } from '../domain/spotify.js';
 import { clearCinematicTrigger } from '../sockets/socket-state.js';
 import { sanitizeRoomSettings } from '../domain/settings-policy.js';
 import {
@@ -405,34 +405,11 @@ export class RoomController {
 
       let cleanUrl = url.trim();
 
-      // Spotify ("Potify" fase 1): el enlace se guarda como fuente `spotify`
-      // con el reproductor embebido. Sin probe de red: el embed lo resuelve el
-      // navegador y el sync de transporte lo gestiona el cliente como con el video.
-      const spotifyRef = parseSpotifyUrl(cleanUrl);
-      if (spotifyRef) {
-        const videoMetadata: IVideoMetadata = {
-          originalName:
-            typeof title === 'string' && title.trim()
-              ? title.trim()
-              : defaultSpotifyName(spotifyRef),
-          fileName: cleanUrl,
-          mimeType: 'audio/spotify',
-          sizeBytes: 0,
-          durationSeconds: 0,
-          sourceType: 'spotify',
-          directUrl: toEmbedUrl(spotifyRef),
-        };
-        const updatedRoom = await RoomService.updateRoomVideo(roomId, videoMetadata);
-        console.log(`🎵 Música Spotify configurada en sala [${roomId}]: ${videoMetadata.originalName} (${spotifyRef.kind})`);
-        res.json({
-          message: 'Música de Spotify configurada correctamente',
-          video: updatedRoom?.video,
-          status: updatedRoom?.status,
-        });
-        return;
-      }
-      if (/open\.spotify\.com/i.test(cleanUrl)) {
-        res.status(400).json({ error: 'No es un enlace válido de Spotify (usa track, playlist, álbum o episodio).' });
+      // Spotify: el reproductor de la sala es solo para películas. La música
+      // vive en la cola musical (metadatos sincronizados; cada uno escucha en
+      // su propio Spotify) y ponerla como video interrumpiría la película.
+      if (parseSpotifyUrl(cleanUrl) || /open\.spotify\.com/i.test(cleanUrl)) {
+        res.status(400).json({ error: 'Los enlaces de Spotify van en la cola musical (pestaña Música), no como video de la sala.' });
         return;
       }
 

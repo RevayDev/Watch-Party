@@ -952,8 +952,10 @@ export class RoomService {
 
   /**
    * Avanza la cola: saca el siguiente tema (fifo = más antiguo, votes = más
-   * votos con desempate por antigüedad), lo fija como nowPlaying y refleja el
-   * embed Spotify en `room.video`. Con cola vacía deja nowPlaying=null.
+   * votos con desempate por antigüedad) y lo fija como nowPlaying.
+   * SOLO metadatos: jamás toca `room.video` (la película no se interrumpe;
+   * cada uno escucha en su propio Spotify).
+   * Con cola vacía deja nowPlaying=null.
    */
   public static async advanceMusicQueue(roomId: string): Promise<IRoom | null> {
     const cleanId = cleanIdOf(roomId);
@@ -998,29 +1000,19 @@ export class RoomService {
         startedAt: new Date(),
         startedBy: 'sala',
       };
-      room.video = {
-        originalName: `${next.name} — ${next.artists}`,
-        fileName: next.openUrl ?? `https://open.spotify.com/track/${next.trackId}`,
-        mimeType: 'audio/spotify',
-        sizeBytes: 0,
-        durationSeconds: 0,
-        sourceType: 'spotify',
-        directUrl: `https://open.spotify.com/embed/track/${next.trackId}`,
-      };
       room.updatedAt = new Date();
       await roomRepository.save(room);
       return room;
     });
   }
 
-  /** Detiene la música: limpia nowPlaying y el video solo si era de Spotify. */
+  /** Detiene la música: limpia nowPlaying. Nunca toca `room.video`. */
   public static async stopMusic(roomId: string): Promise<IRoom | null> {
     const cleanId = cleanIdOf(roomId);
     return withRoomLock(cleanId, async () => {
       const room = await roomRepository.findById(cleanId);
       if (!room) return null;
       room.musicNowPlaying = null;
-      if (room.video?.sourceType === 'spotify') room.video = undefined;
       room.updatedAt = new Date();
       await roomRepository.save(room);
       return room;

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { IMusicNowPlaying, IMusicQueueEntry, IMusicTrack, IRoomSettings } from '../../../types/room';
+import { SelfSpotifyLink } from './SelfSpotifyLink';
 
 export interface MusicPanelProps {
   roomId: string;
@@ -10,6 +11,12 @@ export interface MusicPanelProps {
   myName: string;
   userId?: string;
   spotifyConnected: boolean;
+  /** Cuenta vinculada, si se conoce. */
+  accountName?: string | null;
+  /** La conexión guardada falló al renovarse: hay que vincular de nuevo. */
+  spotifyError?: boolean;
+  /** Servidor sin OAuth configurado. */
+  spotifyConfigured?: boolean;
   onSearch: (q: string) => Promise<IMusicTrack[] | null>;
   onAdd: (t: IMusicTrack) => void;
   onVote: (id: string) => void;
@@ -19,6 +26,14 @@ export interface MusicPanelProps {
   onNext: () => void;
   onStop: () => void;
   onConnect: () => void;
+  onDisconnect: () => void;
+  /** Cuenta vinculada por el propio usuario (sin .env del servidor). */
+  selfLinked?: boolean;
+  selfAccount?: string | null;
+  ownClientId?: string | null;
+  onSaveSelfClientId?: (clientId: string) => void;
+  onConnectSelf?: () => void;
+  onUnlinkSelf?: () => void;
 }
 
 function formatDuration(ms?: number): string {
@@ -52,6 +67,9 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   myName,
   userId,
   spotifyConnected,
+  accountName = null,
+  spotifyError = false,
+  spotifyConfigured = true,
   onSearch,
   onAdd,
   onVote,
@@ -61,6 +79,13 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   onNext,
   onStop,
   onConnect,
+  onDisconnect,
+  selfLinked = false,
+  selfAccount = null,
+  ownClientId = null,
+  onSaveSelfClientId = () => undefined,
+  onConnectSelf = () => undefined,
+  onUnlinkSelf = () => undefined,
 }) => {
   void roomId;
   const [query, setQuery] = useState('');
@@ -137,21 +162,61 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
     <div className="drawer-chat__messages" aria-label="Música">
       <div className="drawer-chat__system-row">
         <span className="drawer-chat__system-pill">
-          {spotifyConnected ? 'Spotify conectado' : 'Spotify desconectado'}
+          {spotifyError
+            ? 'Spotify: error de conexión'
+            : spotifyConnected
+              ? `Spotify conectado${accountName ? ` como ${accountName}` : ''}`
+              : 'Spotify desconectado'}
         </span>
+        {spotifyConnected && (
+          <button
+            type="button"
+            className="leader-exit-modal__cancel-btn"
+            style={{ marginLeft: '0.5rem' }}
+            onClick={onDisconnect}
+          >
+            Desvincular
+          </button>
+        )}
       </div>
 
-      {!spotifyConnected && (
+      {spotifyError && (
+        <div className="room-settings__box">
+          <p className="room-settings__box-desc">
+            No se pudo renovar la conexión. Vincula de nuevo para seguir usando la cola.
+          </p>
+          <button type="button" className="btn btn--primary" onClick={onConnect}>
+            Vincular de nuevo
+          </button>
+        </div>
+      )}
+
+      {!spotifyConnected && !spotifyError && (
         <div className="room-settings__box">
           <div className="room-settings__box-head">
             <span className="room-settings__box-title">Conecta Spotify para proponer</span>
           </div>
-          <p className="room-settings__box-desc">Vincula tu cuenta para buscar y añadir canciones a la cola.</p>
-          <button type="button" className="btn btn--primary" onClick={onConnect}>
-            Conectar
-          </button>
+          <p className="room-settings__box-desc">
+            {spotifyConfigured
+              ? 'Vincula tu cuenta para buscar y añadir canciones a la cola.'
+              : 'Spotify no está configurado en este servidor.'}
+          </p>
+          {spotifyConfigured && (
+            <button type="button" className="btn btn--primary" onClick={onConnect}>
+              Conectar
+            </button>
+          )}
         </div>
       )}
+
+      <SelfSpotifyLink
+        linked={selfLinked}
+        accountName={selfAccount}
+        ownClientId={ownClientId}
+        onSaveClientId={onSaveSelfClientId}
+        onConnect={onConnectSelf}
+        onUnlink={onUnlinkSelf}
+      />
 
       {nowPlaying && (
         <div className="room-settings__box" aria-label="Sonando ahora">
@@ -319,7 +384,12 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       </div>
 
       <p className="room-settings__box-desc">
-        Nota: la reproducción completa requiere Spotify Premium; sin Premium se usa el reproductor integrado (embed).
+        Cada persona escucha en su propio Spotify (la sala comparte la cola y
+        la selección, no el audio). La reproducción completa requiere Premium.
+      </p>
+      <p className="room-settings__box-desc">
+        Letra: sin proveedor de letras autorizado configurado. Cuando lo haya,
+        aparecerá aquí sincronizada con la canción.
       </p>
     </div>
   );

@@ -6,10 +6,9 @@ import { VideoPlayer } from '../src/features/player/VideoPlayer';
 import { ApiService } from '../src/services/api';
 
 /**
- * Spotify ("Potify") fase 1 — docs/admin-panel-spotify.md §2.
- * Sin pestaña en el picker (va en footer + chat): el player muestra el
- * embed de Spotify en vez de <video>, y ApiService expone status/auth-url/
- * disconnect/resolve + setVideoUrl con enlace.
+ * Spotify en el reproductor: la música vive en la cola (metadatos), nunca
+ * como video. Una sala legada con `sourceType: 'spotify'` muestra un
+ * placeholder amable en vez de un reproductor roto.
  */
 
 vi.mock('../src/shared/components/BottomSheet', () => ({ BottomSheet: () => null }));
@@ -24,7 +23,7 @@ describe('VideoPlayer (fuente Spotify)', () => {
     directUrl: 'https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQ',
   };
 
-  it('muestra el embed en vez del <video>', () => {
+  it('no monta iframe ni <video>: placeholder hacia la cola', () => {
     const { container } = render(
       <VideoPlayer
         roomId="ABC123"
@@ -37,13 +36,12 @@ describe('VideoPlayer (fuente Spotify)', () => {
         reactions={[]}
       />
     );
-    const frame = container.querySelector('iframe.spotify-embed') as HTMLIFrameElement | null;
-    expect(frame).not.toBeNull();
-    expect(frame?.getAttribute('src')).toBe('https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQ');
+    expect(container.querySelector('iframe.spotify-embed')).toBeNull();
     expect(container.querySelector('video')).toBeNull();
+    expect(container.textContent).toMatch(/vive en la cola/i);
   });
 
-  it('rotula la fuente como Spotify', () => {
+  it('rotula la canción legada', () => {
     const { container } = render(
       <VideoPlayer
         roomId="ABC123"
@@ -56,7 +54,7 @@ describe('VideoPlayer (fuente Spotify)', () => {
         reactions={[]}
       />
     );
-    expect(container.textContent).toMatch(/spotify/i);
+    expect(container.textContent).toMatch(/Mi canción/);
   });
 });
 

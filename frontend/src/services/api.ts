@@ -282,7 +282,14 @@ export class ApiService {
   }
 
   // ── Spotify ("Potify" fase 1) ──────────────────────────────────────────
-  static async spotifyStatus(roomId: string): Promise<{ configured: boolean; connected: boolean; roomId: string }> {
+  static async spotifyStatus(roomId: string): Promise<{
+    configured: boolean;
+    connected: boolean;
+    persistent: boolean;
+    roomId: string;
+    accountName: string | null;
+    error: 'refresh_failed' | null;
+  }> {
     const response = await fetch(`${API_BASE_URL}/spotify/status?roomId=${encodeURIComponent(roomId)}`);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

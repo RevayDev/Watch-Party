@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff } from 'lucide-react';
 import { Reactions } from '../../../components/Reactions';
-import { SpotifyListenButton } from './SpotifyListenButton';
+import { SpotifyListenButton, type SpotifyConnState } from './SpotifyListenButton';
 
 /**
  * Barra inferior de la sala (extraída verbatim de pages/Room.tsx, solo composición).
@@ -30,14 +30,18 @@ interface RoomControlsProps {
   isBarVisible: boolean;
   uiPinned?: boolean;
   toggleBarsVisibility: () => void;
-  /** Sala para el botón Spotify (vincular + ambiente + escuchar). */
+  /** Sala (informativa; el estado Spotify lo da el padre). */
   roomId?: string;
-  /** Enlace público de lo que suena (null = sin fuente Spotify). */
-  spotifyOpenUrl?: string | null;
-  /** ¿Puede poner ambiente en la sala (anfitrión/co-anfitrión)? */
-  canPlayAmbient?: boolean;
-  /** Pone el ambiente en la sala (API + `video-changed` a todos). */
-  onPlayAmbient?: () => Promise<void>;
+  /** Estado de la conexión Spotify (punto del botón). */
+  spotifyState?: SpotifyConnState;
+  /** Cuenta vinculada, si se conoce (tooltip). */
+  spotifyAccount?: string | null;
+  /** ¿Está abierto el panel musical? (anillo activo + toggle). */
+  musicOpen?: boolean;
+  /** Conectado: abre/cierra el panel musical. */
+  onToggleMusic?: () => void;
+  /** Desconectado o error: inicia el OAuth en pestaña nueva. */
+  onSpotifyConnect?: () => void;
   /** Distribución en PC: repartida o píldora centrada (gusto personal). */
   layout?: 'spread' | 'centered';
   /** Etiquetas bajo los iconos (gusto personal). */
@@ -85,10 +89,11 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   isBarVisible,
   uiPinned = true,
   toggleBarsVisibility,
-  roomId = '',
-  spotifyOpenUrl = null,
-  canPlayAmbient = false,
-  onPlayAmbient = async () => undefined,
+  spotifyState = 'loading',
+  spotifyAccount = null,
+  musicOpen = false,
+  onToggleMusic = () => undefined,
+  onSpotifyConnect = () => undefined,
   layout = 'spread',
   showLabels = true,
 }) => {
@@ -270,12 +275,13 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       {/* ── Derecha: música ── */}
       <div className="meet-bar-group meet-bar-group--right">
       <BarItem label="Música">
-        {/* Spotify: vincular cuenta + ambiente de espera + escuchar lo que suena */}
+        {/* Spotify: sin vincular abre el OAuth; vinculado abre/cierra el panel */}
         <SpotifyListenButton
-          roomId={roomId}
-          openUrl={spotifyOpenUrl}
-          canPlayAmbient={canPlayAmbient}
-          onPlayAmbient={onPlayAmbient}
+          state={spotifyState}
+          accountName={spotifyAccount}
+          panelOpen={musicOpen}
+          onTogglePanel={onToggleMusic}
+          onConnect={onSpotifyConnect}
         />
       </BarItem>
       </div>

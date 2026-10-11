@@ -1,10 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { notify } from "../services/notifications";
 import { BottomSheet } from "../shared/components/BottomSheet";
 import { isDemoMode } from "../shared/demo";
 import type { IRoomSettings } from "../types/room";
 import { DUCK_DEFAULT_PCT, DUCK_MAX_PCT, DUCK_MIN_PCT, clampDuckPct } from "../shared/perf";
 import { ApiService } from "../services/api";
+import {
+  clearOwnSpotify,
+  getOwnClientId,
+  getSelfStatus,
+  openOAuthTab,
+  setOwnClientId,
+  startSelfOAuth,
+} from "../features/room/components/spotifyUser";
+import { SelfSpotifyLink } from "../features/room/components/SelfSpotifyLink";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -91,6 +100,9 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
   const [choice, setChoice] = useState<number | null>(timerMinutes);
+  // Organización por pestañas: General (sala+timer), Música, Barra (local),
+  // Rendimiento. Mismo contenido y handlers, solo agrupado.
+  const [tab, setTab] = useState<'general' | 'musica' | 'barra' | 'rendimiento'>('general');
 
   // Demo: la persistencia y el cierre automático configurable quedan
   // deshabilitados solo visualmente (el timer lo pone el servidor).
@@ -134,33 +146,80 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   const perfDisabled = !canEdit || !onUpdatePerf;
   const duckPct = clampDuckPct(duckingLevelPct);
 
+  const refreshSpotStatus = useCallback(async () => {
+    if (!roomId) return;
+    try {
+      const s = await ApiService.spotifyStatus(roomId);
+      setSpotConnected(s.connected === true);
+      setSpotConfigured(s.configured !== false);
+    } catch {
+      setSpotConnected(null);
+    }
+  }, [roomId]);
+
   // ── Música y Spotify: estado de conexión (solo con roomId) ─────────────
   const [spotConnected, setSpotConnected] = useState<boolean | null>(null);
+  const [spotConfigured, setSpotConfigured] = useState(true);
   const [spotBusy, setSpotBusy] = useState(false);
+  // Cuenta propia (sin .env): se ofrece cuando el servidor no la da.
+  const [selfLinked, setSelfLinked] = useState(false);
+  const [selfAccount, setSelfAccount] = useState<string | null>(null);
+  const refreshSelfStatus = useCallback(async () => {
+    try {
+      const s = await getSelfStatus();
+      setSelfLinked(s.connected);
+      setSelfAccount(s.accountName);
+    } catch {
+      setSelfLinked(false);
+      setSelfAccount(null);
+    }
+  }, []);
   useEffect(() => {
     if (!isOpen || !roomId) return;
     let alive = true;
     setSpotConnected(null);
     ApiService.spotifyStatus(roomId)
       .then((s) => {
-        if (alive) setSpotConnected(s.connected === true);
+        if (!alive) return;
+        setSpotConnected(s.connected === true);
+        setSpotConfigured(s.configured !== false);
       })
       .catch(() => {
         if (alive) setSpotConnected(null);
       });
+    void refreshSelfStatus();
+    // Al volver de la pestaña de Spotify, re-consulta el estado.
+    const onFocus = () => {
+      void refreshSpotStatus();
+      void refreshSelfStatus();
+    };
+    window.addEventListener('focus', onFocus);
     return () => {
       alive = false;
+      window.removeEventListener('focus', onFocus);
     };
-  }, [isOpen, roomId]);
+  }, [isOpen, roomId, refreshSpotStatus, refreshSelfStatus]);
 
   const handleSpotConnect = async () => {
     if (!roomId || spotBusy) return;
     setSpotBusy(true);
     try {
-      const { authUrl } = await ApiService.spotifyAuthUrl(roomId);
-      window.open(authUrl, '_self');
+      const ok = await openOAuthTab(async () => (await ApiService.spotifyAuthUrl(roomId)).authUrl);
+      if (!ok) notify('error', 'Spotify no está configurado en este servidor.', 'Spotify');
     } catch (err: unknown) {
       notify('error', err instanceof Error ? err.message : 'No se pudo conectar Spotify', 'Spotify');
+    } finally {
+      setSpotBusy(false);
+    }
+  };
+
+  const handleSelfConnect = async () => {
+    const clientId = getOwnClientId();
+    if (!clientId) return;
+    setSpotBusy(true);
+    try {
+      const ok = await openOAuthTab(async () => (await startSelfOAuth(clientId, roomId ?? '')).authUrl);
+      if (!ok) notify('error', 'No se pudo iniciar la vinculación.', 'Spotify');
     } finally {
       setSpotBusy(false);
     }
@@ -195,6 +254,29 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
           <h3 className="leader-exit-modal__title">Configuración de la sala</h3>
         </div>
 
+        <div className="room-settings__tabs" role="tablist" aria-label="Secciones de configuración">
+          {(
+            [
+              ['general', 'General'],
+              ['musica', 'Música'],
+              ['barra', 'Barra'],
+              ['rendimiento', 'Rendimiento'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              className={`room-settings__tab${tab === key ? ' room-settings__tab--active' : ''}`}
+              onClick={() => setTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'general' && (
         <div className="room-settings__columns">
           {/* COLUMNA 1 — Información */}
           <div className="room-settings__column">
@@ -366,8 +448,11 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               </p>
             </div>
           </div>
+        </div>
+        )}
 
-          {/* Rendimiento (rol B): ancho completo en PC */}
+        {/* Rendimiento (rol B): ancho completo en PC */}
+        {tab === 'rendimiento' && (
           <div className="room-settings__box room-settings__box--perf room-settings__box--full">
               <div className="room-settings__box-head room-settings__box-head--title">
                 <span className="room-settings__box-title">Rendimiento</span>
@@ -486,10 +571,12 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 <span className="perf-slider-value">{duckPct}%</span>
               </div>
             </div>
-        </div>
+        )}
+
 
         {/* Tu vista de la barra: gusto personal, solo en este navegador.
             No se emite a la sala (a diferencia de Rendimiento). */}
+        {tab === 'barra' && (
         <div className="room-settings__box room-settings__box--full">
             <div className="room-settings__box-head room-settings__box-head--title">
               <span className="room-settings__box-title">Tu vista de la barra</span>
@@ -530,8 +617,10 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               Izquierda, centro y derecha separados en PC.
             </p>
         </div>
+        )}
 
-        {/* Música y Spotify (antes de Actions, mismo estilo; todo por onUpdatePerf) */}
+        {/* Música y Spotify: sub-secciones Cola / Permisos / Límites / Conexión */}
+        {tab === 'musica' && (
         <div className="room-settings__box room-settings__box--full">
             <div className="room-settings__box-head room-settings__box-head--title">
               <span className="room-settings__box-title">Música y Spotify</span>
@@ -541,6 +630,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 Solo el anfitrión puede cambiar estos ajustes.
               </p>
             )}
+
+            <h4 className="room-settings__subhead">Cola de canciones</h4>
 
             <div className="room-settings__box-head">
               <span className="room-settings__box-title">Funciones musicales</span>
@@ -610,11 +701,15 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               Las canciones entran como pendientes hasta aprobarlas.
             </p>
 
-            <div className="room-settings__box-head">
-              <span className="room-settings__box-title">Quién puede proponer</span>
+            <h4 className="room-settings__subhead">Permisos</h4>
+
+            <div className="room-settings__group">
+              <label className="room-settings__label" htmlFor="music-can-add">
+                Quién puede proponer
+              </label>
               <select
+                id="music-can-add"
                 className="room-settings__input"
-                aria-label="Quién puede proponer"
                 value={musicCanAdd}
                 disabled={perfDisabled}
                 onChange={(e) => onUpdatePerf?.({ musicCanAdd: e.target.value as 'anyone' | 'moderator' })}
@@ -624,11 +719,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               </select>
             </div>
 
-            <div className="room-settings__box-head">
-              <span className="room-settings__box-title">Orden de la cola</span>
+            <div className="room-settings__group">
+              <label className="room-settings__label" htmlFor="music-order">
+                Orden de la cola
+              </label>
               <select
+                id="music-order"
                 className="room-settings__input"
-                aria-label="Orden de la cola"
                 value={musicQueueMode}
                 disabled={perfDisabled}
                 onChange={(e) => onUpdatePerf?.({ musicQueueMode: e.target.value as 'fifo' | 'votes' })}
@@ -638,11 +735,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               </select>
             </div>
 
-            <div className="room-settings__box-head">
-              <span className="room-settings__box-title">Quién puede quitar</span>
+            <div className="room-settings__group">
+              <label className="room-settings__label" htmlFor="music-can-remove">
+                Quién puede quitar
+              </label>
               <select
+                id="music-can-remove"
                 className="room-settings__input"
-                aria-label="Quién puede quitar"
                 value={musicCanRemove}
                 disabled={perfDisabled}
                 onChange={(e) => onUpdatePerf?.({ musicCanRemove: e.target.value as 'proposer' | 'moderator' })}
@@ -652,55 +751,79 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               </select>
             </div>
 
-            <div className="room-settings__box-head">
-              <span className="room-settings__box-title">Máximo por persona</span>
+            <h4 className="room-settings__subhead">Límites</h4>
+
+            <div className="room-settings__group">
+              <label className="room-settings__label" htmlFor="music-max-user">
+                Máximo por persona
+              </label>
               <input
+                id="music-max-user"
                 type="number"
                 className="room-settings__input"
-                aria-label="Máximo por persona"
                 min={1}
                 max={20}
                 value={musicMaxPerUser}
                 disabled={perfDisabled}
                 onChange={(e) => onUpdatePerf?.({ musicMaxPerUser: clampMaxPerUser(Number(e.target.value)) })}
               />
+              <p className="room-settings__box-desc">
+                Entre 1 y 20 propuestas por persona.
+              </p>
             </div>
-            <p className="room-settings__box-desc">
-              Entre 1 y 20 propuestas por persona.
-            </p>
 
             {roomId && (
-              <div className="room-settings__box-head">
-                <span className="room-settings__box-title">
-                  Spotify {spotConnected === null ? '' : spotConnected ? '● conectado' : '○ desconectado'}
-                </span>
-                {spotConnected ? (
-                  <button
-                    type="button"
-                    className="leader-exit-modal__cancel-btn"
-                    disabled={spotBusy}
-                    onClick={() => void handleSpotDisconnect()}
-                  >
-                    Desconectar
-                  </button>
+              <>
+                <h4 className="room-settings__subhead">Conexión</h4>
+                {spotConfigured ? (
+                <div className="room-settings__box-head">
+                  <span className="room-settings__box-title">
+                    Spotify {spotConnected === null ? '' : spotConnected ? '● conectado' : '○ desconectado'}
+                  </span>
+                  {spotConnected ? (
+                    <button
+                      type="button"
+                      className="leader-exit-modal__cancel-btn"
+                      disabled={spotBusy}
+                      onClick={() => void handleSpotDisconnect()}
+                    >
+                      Desconectar
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      disabled={spotBusy}
+                      onClick={() => void handleSpotConnect()}
+                    >
+                      Conectar
+                    </button>
+                  )}
+                </div>
                 ) : (
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    disabled={spotBusy}
-                    onClick={() => void handleSpotConnect()}
-                  >
-                    Conectar
-                  </button>
+                <SelfSpotifyLink
+                  linked={selfLinked}
+                  accountName={selfAccount}
+                  ownClientId={getOwnClientId()}
+                  busy={spotBusy}
+                  onSaveClientId={(id) => setOwnClientId(id)}
+                  onConnect={() => void handleSelfConnect()}
+                  onUnlink={() => {
+                    clearOwnSpotify();
+                    void refreshSelfStatus();
+                  }}
+                />
                 )}
-              </div>
+              </>
             )}
 
             <p className="room-settings__box-desc">
-              Limitaciones: la reproducción completa requiere Spotify Premium; sin Premium se usa el
-              reproductor integrado (embed) y cada persona escucha en su cuenta.
+              Limitaciones: la reproducción completa requiere Spotify Premium y
+              cada persona escucha en su propia cuenta; la sala solo comparte
+              la cola y la selección, nunca el audio.
             </p>
         </div>
+        )}
 
         {/* Actions */}
         <div className="room-settings__actions">

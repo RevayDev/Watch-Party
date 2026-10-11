@@ -2944,6 +2944,63 @@ a.home-faq-hl--frontend {
   color: #fbbf24;
 }
 
+/* Pestañas de secciones (General / Música / Barra / Rendimiento) */
+.room-settings__tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+}
+
+.room-settings__tab {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-muted-light);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 9999px;
+  padding: 0.45rem 1.05rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--trans-fast),
+    background var(--trans-fast),
+    border-color var(--trans-fast);
+}
+
+.room-settings__tab:hover {
+  color: #fff;
+}
+
+.room-settings__tab--active {
+  color: #fff;
+  background: rgba(99, 102, 241, 0.22);
+  border-color: var(--color-primary);
+}
+
+/* Sub-secciones dentro de una tarjeta (Música: Cola / Permisos / …) */
+.room-settings__subhead {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-primary-light);
+  margin: 1rem 0 0.55rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--color-border);
+}
+.room-settings__subhead:first-of-type {
+  margin-top: 0.35rem;
+  padding-top: 0;
+  border-top: none;
+}
+/* Grupos apilados (etiqueta arriba, control abajo) con aire entre sí */
+.room-settings__box--full .room-settings__group {
+  margin-bottom: 0.75rem;
+}
+
 .room-settings__timer-remove {
   display: inline-flex;
   align-items: center;
@@ -3333,6 +3390,28 @@ a.home-faq-hl--frontend {
   background: var(--color-primary);
   border: 2px solid rgba(8, 12, 20, 0.95);
   pointer-events: none;
+}
+
+/* ── Spotify: punto de estado en el botón de música ── */
+.spotify-status-dot {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid rgba(8, 12, 20, 0.95);
+  pointer-events: none;
+}
+.spotify-status-dot--disconnected,
+.spotify-status-dot--loading {
+  background: #64748b;
+}
+.spotify-status-dot--connected {
+  background: #1db954;
+}
+.spotify-status-dot--error {
+  background: #ef4444;
 }
 
 /* ── Emoji Popup ── */

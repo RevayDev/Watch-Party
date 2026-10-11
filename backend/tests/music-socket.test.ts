@@ -162,7 +162,7 @@ describe('music-queue.handler', () => {
     expect(payload?.queue.length).toBeLessThanOrEqual(12);
   });
 
-  it('music-next emite music-queue-updated y video-changed', async () => {
+  it('music-next emite music-queue-updated y NO toca el video', async () => {
     await RoomService.updateSettings(roomId, { musicEnabled: true });
     await RoomService.addMusicEntry(roomId, {
       trackId: TRACK.id,
@@ -198,7 +198,7 @@ describe('music-queue.handler', () => {
     const update = emitted.find((e) => e.event === 'music-queue-updated');
     const video = emitted.find((e) => e.event === 'video-changed');
     expect(update).toBeDefined();
-    expect(video).toBeDefined();
-    expect((video!.payload as { video: { sourceType: string } }).video.sourceType).toBe('spotify');
+    // La cola es solo metadatos: la película sigue intacta.
+    expect(video).toBeUndefined();
   });
 });

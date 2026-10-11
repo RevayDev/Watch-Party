@@ -153,6 +153,39 @@ export function buildRestAuthHeaders(roomId: string, requesterName?: string): Re
 }
 
 /**
+ * Lee el resultado del retorno OAuth de Spotify en la URL (`?spotify=...`).
+ * El backend redirige aquí tras autorizar, cancelar o fallar. Devuelve null
+ * si no hay retorno pendiente. No toca la URL (eso lo hace el llamador).
+ */
+export function readSpotifyReturn(
+  search: string
+): { kind: 'connected' } | { kind: 'error'; reason: string } | null {
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(search);
+  } catch {
+    return null;
+  }
+  const flag = params.get('spotify');
+  if (flag === 'connected') return { kind: 'connected' };
+  if (flag === 'error') return { kind: 'error', reason: params.get('reason') || 'unknown' };
+  return null;
+}
+
+/** Quita los parámetros del retorno OAuth (`spotify`, `reason`) de la URL. */
+export function stripSpotifyReturnParams(): void {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('spotify')) return;
+    url.searchParams.delete('spotify');
+    url.searchParams.delete('reason');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    /* noop */
+  }
+}
+
+/**
  * Guarda la sesión de leader. Si no se provee leaderSecret, se preserva el ya
  * guardado para esa sala (para no borrarlo en re-entradas sin secreto).
  */

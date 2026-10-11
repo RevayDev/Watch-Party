@@ -226,10 +226,16 @@ export async function getSpotifyStatus(roomId: string): Promise<{
   connected: boolean;
   persistent: boolean;
   roomId: string;
+  /** Nombre de la cuenta vinculada (null si no se pudo obtener). */
+  accountName: string | null;
+  /** 'refresh_failed' si hay conexión guardada pero el token no se pudo renovar. */
+  error: 'refresh_failed' | null;
 }> {
   const key = normRoom(roomId);
   const configured = isSpotifyConfigured();
-  if (!configured) return { configured, connected: false, persistent: false, roomId: key };
+  if (!configured) {
+    return { configured, connected: false, persistent: false, roomId: key, accountName: null, error: null };
+  }
   const token = await getValidSpotifyToken(roomId);
   let persistent = false;
   if (hasSpotifyTokenKey()) {
@@ -239,7 +245,31 @@ export async function getSpotifyStatus(roomId: string): Promise<{
       persistent = false;
     }
   }
-  return { configured, connected: token !== null, persistent, roomId: key };
+  let accountName: string | null = null;
+  if (token) {
+    try {
+      const res = await fetch('https://api.spotify.com/v1/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const me = (await res.json()) as { display_name?: unknown; email?: unknown };
+        const name = typeof me.display_name === 'string' && me.display_name.trim()
+          ? me.display_name.trim()
+          : typeof me.email === 'string' && me.email.trim() ? me.email.trim() : '';
+        accountName = name || null;
+      }
+    } catch {
+      accountName = null;
+    }
+  }
+  return {
+    configured,
+    connected: token !== null,
+    persistent,
+    roomId: key,
+    accountName,
+    error: token === null && persistent ? 'refresh_failed' : null,
+  };
 }
 
 /** Borra la conexión en memoria Y en el repositorio persistente. */
