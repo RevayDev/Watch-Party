@@ -14,6 +14,8 @@ export const INTERSTELLAR_DURATION_MS = 4000;
  * socket: toda la sala ve exactamente las mismas, como con el video.
  */
 export const AMBIENT_QUOTES = [
+  'STAY',
+  'I NEED TO STAY',
   'No entres dócil en esa buena noche.',
   'El amor es lo único que trasciende el tiempo y el espacio.',
   'La humanidad nació en la Tierra; no estaba destinada a morir aquí.',
