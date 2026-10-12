@@ -810,9 +810,9 @@ export class RoomService {
       const name = (entry.name || '').trim();
       const artists = (entry.artists || '').trim();
       const proposedBy = (entry.proposedBy || '').trim();
-      // Validación estricta: no-op si no cumple.
-      if (!/^[A-Za-z0-9]{8,}$/.test(trackId)) return room;
+      if (!/^[A-Za-z0-9_-]{8,}$/.test(trackId)) return room;
       if (!name || !artists || !proposedBy) return room;
+
       if (name.length > 200 || artists.length > 200) return room;
       // Dupe: mismo trackId ya en cola (queued/pending).
       if (queue.some((e) => e.trackId === trackId)) return room;

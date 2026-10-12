@@ -96,11 +96,11 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
       ) : (
         <form onSubmit={onUrlSubmit} className="dropzone-url-card">
           <div className="dropzone-input-group">
-            <label>Enlace del video o transmisión:</label>
+            <label>Enlace del video, karaoke o transmisión:</label>
             <input
               type="url"
               required
-              placeholder="https://... playlist.m3u8 o Google Drive"
+              placeholder="https://... YouTube, Google Drive o playlist.m3u8"
               className="dropzone-input"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
@@ -110,7 +110,7 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
             <label>Título del archivo (opcional):</label>
             <input
               type="text"
-              placeholder="Ej: Nuestro viaje de verano"
+              placeholder="Ej: Bohemian Rhapsody (Karaoke Version)"
               className="dropzone-input"
               value={titleInput}
               onChange={(e) => setTitleInput(e.target.value)}
@@ -118,9 +118,9 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
           </div>
 
           <div className="dropzone-supported-hints">
-            <span>✓ Compatible con transmisiones HLS (.m3u8, Yandex, etc.)</span>
+            <span>✓ Compatible con YouTube (ideal para Karaoke con letras y música sincronizada)</span>
             <span>✓ Compatible con enlaces públicos de Google Drive</span>
-            <span>✓ Compatible con URLs directas (.mp4, .webm)</span>
+            <span>✓ Compatible con transmisiones HLS (.m3u8) y URLs directas (.mp4)</span>
           </div>
 
           <button

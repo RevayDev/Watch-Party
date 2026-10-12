@@ -405,42 +405,53 @@ export class RoomController {
 
       let cleanUrl = url.trim();
 
-      // Spotify: el reproductor de la sala es solo para películas. La música
-      // vive en la cola musical (metadatos sincronizados; cada uno escucha en
-      // su propio Spotify) y ponerla como video interrumpiría la película.
+      // Spotify: el reproductor de la sala es solo para películas / karaoke en YouTube.
       if (parseSpotifyUrl(cleanUrl) || /open\.spotify\.com/i.test(cleanUrl)) {
-        res.status(400).json({ error: 'Los enlaces de Spotify van en la cola musical (pestaña Música), no como video de la sala.' });
+        res.status(400).json({ error: 'Los enlaces de Spotify van en la cola musical (no reproducen audio sincronizado en grupo). Usa enlaces de YouTube para karaoke y música en sala.' });
         return;
       }
 
+      // YouTube link conversion / detection
+      const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+      const isYouTube = Boolean(ytMatch && ytMatch[1]);
+      let ytVideoId: string | undefined;
+
+      if (isYouTube && ytMatch) {
+        ytVideoId = ytMatch[1];
+        cleanUrl = `https://www.youtube.com/watch?v=${ytVideoId}`;
+      }
+
       // Google Drive link conversion helper (e.g. drive.google.com/file/d/ID/view -> direct stream)
-      const driveMatch = cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
-        || cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+      const driveMatch = !isYouTube ? (cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
+        || cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]{20,})/)) : null;
       const driveFileId = driveMatch?.[1];
       if (driveFileId) {
         // drive.usercontent.google.com + confirm=t streams large files directly (bypasses the virus-scan HTML page)
         cleanUrl = `https://drive.usercontent.google.com/download?id=${driveFileId}&export=download&confirm=t`;
       }
 
-      const isHls = cleanUrl.includes('.m3u8') || cleanUrl.includes('/hls/');
+      const isHls = !isYouTube && (cleanUrl.includes('.m3u8') || cleanUrl.includes('/hls/'));
 
-      const probeError = await probeExternalUrl(cleanUrl);
-      if (probeError) {
-        res.status(400).json({ error: probeError });
-        return;
+      // YouTube no se sondea con probeExternalUrl (Google bloquea o devuelve HTML)
+      if (!isYouTube) {
+        const probeError = await probeExternalUrl(cleanUrl);
+        if (probeError) {
+          res.status(400).json({ error: probeError });
+          return;
+        }
       }
 
       const originalName =
-        title?.trim() || (await resolveFallbackVideoName(cleanUrl, isHls, driveFileId));
+        title?.trim() || (isYouTube ? `YouTube Karaoke (${ytVideoId})` : await resolveFallbackVideoName(cleanUrl, isHls, driveFileId));
 
       const videoMetadata: IVideoMetadata = {
         originalName,
         fileName: cleanUrl,
-        mimeType: isHls ? 'application/x-mpegURL' : 'video/mp4',
+        mimeType: isYouTube ? 'video/youtube' : isHls ? 'application/x-mpegURL' : 'video/mp4',
         sizeBytes: 0,
         durationSeconds: 0,
-        sourceType: isHls ? 'hls' : 'url',
-        directUrl: cleanUrl,
+        sourceType: isYouTube ? 'youtube' : isHls ? 'hls' : 'url',
+        directUrl: isYouTube ? `https://www.youtube-nocookie.com/embed/${ytVideoId}?enablejsapi=1` : cleanUrl,
       };
 
       const updatedRoom = await RoomService.updateRoomVideo(roomId, videoMetadata);

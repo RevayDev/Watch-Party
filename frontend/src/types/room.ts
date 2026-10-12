@@ -52,7 +52,7 @@ export interface IRoomSettings {
   duckingEnabled?: boolean;
   /** Nivel de atenuación en % (10–60, default 30). */
   duckingLevel?: number;
-  /** Música/Spotify (whitelist del servidor). */
+  /** Música/YouTube (whitelist del servidor). */
   musicEnabled?: boolean;
   musicAllowSearch?: boolean;
   musicCanAdd?: 'anyone' | 'moderator';
@@ -70,7 +70,7 @@ export interface IVideoMetadata {
   mimeType: string;
   sizeBytes: number;
   durationSeconds?: number;
-  sourceType?: 'file' | 'url' | 'hls' | 'spotify';
+  sourceType?: 'file' | 'url' | 'hls' | 'spotify' | 'youtube';
   directUrl?: string;
 }
 
@@ -88,12 +88,12 @@ export interface IRoomData {
   kickedUsers?: IKickedParticipant[];
   settings?: IRoomSettings;
   createdAt: string;
-  /** Cola musical colaborativa (Spotify). */
+  /** Cola musical colaborativa (YouTube). */
   musicQueue?: IMusicQueueEntry[];
   musicNowPlaying?: IMusicNowPlaying | null;
 }
 
-/** Pista de Spotify (búsqueda / propuestas). */
+/** Pista musical (YouTube). */
 export interface IMusicTrack {
   id: string;
   name: string;
@@ -104,7 +104,7 @@ export interface IMusicTrack {
   openUrl?: string;
 }
 
-/** Entrada de la cola musical. */
+/** Entrada de la cola musical (YouTube). */
 export interface IMusicQueueEntry {
   id: string;
   trackId: string;
@@ -112,23 +112,28 @@ export interface IMusicQueueEntry {
   artists: string;
   albumArt?: string;
   durationMs?: number;
+  uri?: string;
+  openUrl?: string;
+  kind?: 'track';
   proposedBy: string;
-  votes: string[];
+  proposedByUserId?: string;
   status: 'queued' | 'pending';
+  votes: string[];
+  createdAt: string;
 }
 
-/** Lo que suena ahora (cola musical). */
+/** Tema sonando ahora en la sala (YouTube). */
 export interface IMusicNowPlaying {
-  id: string;
+  entryId: string;
   trackId: string;
   name: string;
   artists: string;
   albumArt?: string;
-  durationMs?: number;
-  proposedBy: string;
-  votes: string[];
-  status: 'queued' | 'pending';
+  uri?: string;
+  openUrl?: string;
+  proposedBy?: string;
   startedAt: string;
+  startedBy: string;
 }
 
 export interface ChatMessage {

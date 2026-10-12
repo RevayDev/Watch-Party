@@ -41,6 +41,8 @@ flowchart TB
         H_MOD["handlers/moderation (221 lín)"]
         H_SET["handlers/settings"]
         H_CHAT["handlers/chat-reactions"]
+        H_MUS["handlers/music-queue"]
+        H_VR["handlers/video-ready"]
         H_RTC["handlers/webrtc-relay"]
         SAUTH["sockets/socket-auth.ts"]
         SSTATE["sockets/socket-state.ts\n(activeUsers, activeMediaStates)"]
@@ -56,8 +58,8 @@ flowchart TB
     API --> SHU
     HOME & PART & CHAT --> TYPESFE & SHU & SHC
     SERVER --> APPE & SKT
-    SKT --> H_JOIN & H_SYNC & H_MOD & H_SET & H_CHAT & H_RTC
-    H_JOIN & H_SYNC & H_MOD & H_SET --> APPL & SVC & DOMA & SAUTH & SSTATE
+    SKT --> H_JOIN & H_SYNC & H_MOD & H_SET & H_CHAT & H_MUS & H_VR & H_RTC
+    H_JOIN & H_SYNC & H_MOD & H_SET & H_MUS --> APPL & SVC & DOMA & SAUTH & SSTATE
     H_CHAT --> SSTATE
     H_RTC --> SSTATE
     H_JOIN --> GRACE
@@ -124,6 +126,8 @@ flowchart TB
 | `sync-playback` | SyncPlayback, RecordHeartbeat | RoomService | playback-policy | socket-state; `PrivilegedPayload` (type, sin uso de auth) |
 | `moderation` | Kick/Unban/SetRole/Rename | RoomService | auth-policy | socket-state, socket-auth |
 | `settings` | — | RoomService | settings-policy, auth-policy | socket-auth |
+| `music-queue` | — | RoomService | auth-policy | socket-state, socket-auth, socket-limits |
+| `video-ready` | — | — | — | socket-state |
 | `chat-reactions` | — | — | — | **ninguno (ni state ni auth)** |
 | `webrtc-relay` | — | — | — | socket-state (solo lectura) |
 

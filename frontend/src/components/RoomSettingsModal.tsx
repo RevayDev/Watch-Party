@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { Youtube } from "lucide-react";
 import { notify } from "../services/notifications";
 import { BottomSheet } from "../shared/components/BottomSheet";
 import { isDemoMode } from "../shared/demo";
@@ -48,7 +49,7 @@ interface RoomSettingsModalProps {
   onBarPrefsChange?: (patch: { showLabels?: boolean; layout?: 'spread' | 'centered' }) => void;
   /** Sala para el bloque de conexión Spotify (sin roomId se oculta). */
   roomId?: string;
-  /** Música y Spotify (todo se emite por onUpdatePerf como Rendimiento). */
+  /** Música y Karaoke (YouTube) (todo se emite por onUpdatePerf como Rendimiento). */
   musicEnabled?: boolean;
   musicAllowSearch?: boolean;
   musicCanAdd?: 'anyone' | 'moderator';
@@ -619,209 +620,233 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
         </div>
         )}
 
-        {/* Música y Spotify: sub-secciones Cola / Permisos / Límites / Conexión */}
+        {/* Música & YouTube: sub-secciones Cola / Permisos / Límites / Conexión */}
         {tab === 'musica' && (
-        <div className="room-settings__box room-settings__box--full">
+        <div className="room-settings__box room-settings__box--full room-settings__music-container" style={{ padding: '1.25rem' }}>
             <div className="room-settings__box-head room-settings__box-head--title">
-              <span className="room-settings__box-title">Música y Spotify</span>
+              <span className="room-settings__box-title">Música y Karaoke (YouTube)</span>
             </div>
+
+            {/* Hero Banner: YouTube Music & Karaoke */}
+            <div className="room-settings__hero-banner">
+              <div className="room-settings__hero-icon">
+                <Youtube size={24} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 className="room-settings__hero-title">
+                  <span>Música & Karaoke con YouTube</span>
+                  <span className="room-settings__hero-badge">Recomendado</span>
+                </h3>
+                <p className="room-settings__hero-desc">
+                  ¡Audio 100% compartido para toda la sala sin suscripciones de pago! Disfruta de canciones con letras sincronizadas y karaoke pegando cualquier enlace de <strong>YouTube</strong> directamente con el botón <em>"Cambiar"</em> del reproductor.
+                </p>
+              </div>
+            </div>
+
             {!canEdit && (
-              <p className="room-settings__box-desc">
-                Solo el anfitrión puede cambiar estos ajustes.
+              <p className="room-settings__box-desc" style={{ marginTop: 0 }}>
+                Solo el anfitrión puede cambiar estos ajustes de la cola.
               </p>
             )}
 
+            {/* Subsección: Opciones de la Cola */}
             <h4 className="room-settings__subhead">Cola de canciones</h4>
 
-            <div className="room-settings__box-head">
-              <span className="room-settings__box-title">Funciones musicales</span>
-              <label className="part-switch" style={{ margin: 0 }}>
-                <input
-                  type="checkbox"
-                  checked={musicEnabled}
-                  disabled={perfDisabled}
-                  onChange={(e) => onUpdatePerf?.({ musicEnabled: e.target.checked })}
-                  title="Activa la cola musical colaborativa de la sala"
-                />
-                <span className="part-slider" />
-              </label>
-            </div>
-            <p className="room-settings__box-desc">
-              Cola de canciones propuestas por la sala.
-            </p>
+            <div className="room-settings__grid-cards">
+              <div className="room-settings__card-row">
+                <div className="room-settings__card-info">
+                  <span className="room-settings__card-title">Funciones musicales</span>
+                  <p className="room-settings__card-desc">Habilita o desactiva la cola colaborativa de la sala.</p>
+                </div>
+                <label className="part-switch" style={{ margin: 0, flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={musicEnabled}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ musicEnabled: e.target.checked })}
+                    title="Activa la cola musical colaborativa de la sala"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
 
-            <div className="room-settings__box-head">
-              <span className="room-settings__box-title">Búsqueda y propuestas</span>
-              <label className="part-switch" style={{ margin: 0 }}>
-                <input
-                  type="checkbox"
-                  checked={musicAllowSearch}
-                  disabled={perfDisabled}
-                  onChange={(e) => onUpdatePerf?.({ musicAllowSearch: e.target.checked })}
-                  title="Permite buscar canciones y proponerlas a la cola"
-                />
-                <span className="part-slider" />
-              </label>
-            </div>
-            <p className="room-settings__box-desc">
-              Buscador de Spotify dentro de la pestaña Música.
-            </p>
+              <div className="room-settings__card-row">
+                <div className="room-settings__card-info">
+                  <span className="room-settings__card-title">Búsqueda y propuestas</span>
+                  <p className="room-settings__card-desc">Permite a los miembros buscar temas y agregarlos a la cola.</p>
+                </div>
+                <label className="part-switch" style={{ margin: 0, flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={musicAllowSearch}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ musicAllowSearch: e.target.checked })}
+                    title="Permite proponer canciones a la cola"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
 
-            <div className="room-settings__box-head">
-              <span className="room-settings__box-title">Reordenar (moderador)</span>
-              <label className="part-switch" style={{ margin: 0 }}>
-                <input
-                  type="checkbox"
-                  checked={musicAllowReorder}
-                  disabled={perfDisabled}
-                  onChange={(e) => onUpdatePerf?.({ musicAllowReorder: e.target.checked })}
-                  title="Los moderadores pueden reordenar la cola"
-                />
-                <span className="part-slider" />
-              </label>
-            </div>
-            <p className="room-settings__box-desc">
-              Flechas para subir o bajar canciones en la cola.
-            </p>
+              <div className="room-settings__card-row">
+                <div className="room-settings__card-info">
+                  <span className="room-settings__card-title">Reordenar (moderador)</span>
+                  <p className="room-settings__card-desc">Los moderadores pueden mover y priorizar temas.</p>
+                </div>
+                <label className="part-switch" style={{ margin: 0, flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={musicAllowReorder}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ musicAllowReorder: e.target.checked })}
+                    title="Los moderadores pueden reordenar la cola"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
 
-            <div className="room-settings__box-head">
-              <span className="room-settings__box-title">Aprobar propuestas</span>
-              <label className="part-switch" style={{ margin: 0 }}>
-                <input
-                  type="checkbox"
-                  checked={musicRequireApproval}
-                  disabled={perfDisabled}
-                  onChange={(e) => onUpdatePerf?.({ musicRequireApproval: e.target.checked })}
-                  title="Las propuestas esperan aprobación de un moderador"
-                />
-                <span className="part-slider" />
-              </label>
+              <div className="room-settings__card-row">
+                <div className="room-settings__card-info">
+                  <span className="room-settings__card-title">Aprobar propuestas</span>
+                  <p className="room-settings__card-desc">Las canciones requieren visto bueno antes de sonar.</p>
+                </div>
+                <label className="part-switch" style={{ margin: 0, flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={musicRequireApproval}
+                    disabled={perfDisabled}
+                    onChange={(e) => onUpdatePerf?.({ musicRequireApproval: e.target.checked })}
+                    title="Las propuestas esperan aprobación de un moderador"
+                  />
+                  <span className="part-slider" />
+                </label>
+              </div>
             </div>
-            <p className="room-settings__box-desc">
-              Las canciones entran como pendientes hasta aprobarlas.
-            </p>
 
+            {/* Subsección: Permisos y Reglas */}
             <h4 className="room-settings__subhead">Permisos</h4>
 
-            <div className="room-settings__group">
-              <label className="room-settings__label" htmlFor="music-can-add">
-                Quién puede proponer
-              </label>
-              <select
-                id="music-can-add"
-                className="room-settings__input"
-                value={musicCanAdd}
-                disabled={perfDisabled}
-                onChange={(e) => onUpdatePerf?.({ musicCanAdd: e.target.value as 'anyone' | 'moderator' })}
-              >
-                <option value="anyone">Cualquiera</option>
-                <option value="moderator">Moderadores</option>
-              </select>
-            </div>
+            <div className="room-settings__form-grid">
+              <div className="room-settings__field-card">
+                <label className="room-settings__field-label" htmlFor="music-can-add">
+                  Quién puede proponer
+                </label>
+                <select
+                  id="music-can-add"
+                  className="room-settings__input"
+                  value={musicCanAdd}
+                  disabled={perfDisabled}
+                  onChange={(e) => onUpdatePerf?.({ musicCanAdd: e.target.value as 'anyone' | 'moderator' })}
+                >
+                  <option value="anyone">Todos los miembros</option>
+                  <option value="moderator">Solo moderadores</option>
+                </select>
+              </div>
 
-            <div className="room-settings__group">
-              <label className="room-settings__label" htmlFor="music-order">
-                Orden de la cola
-              </label>
-              <select
-                id="music-order"
-                className="room-settings__input"
-                value={musicQueueMode}
-                disabled={perfDisabled}
-                onChange={(e) => onUpdatePerf?.({ musicQueueMode: e.target.value as 'fifo' | 'votes' })}
-              >
-                <option value="fifo">Orden de llegada</option>
-                <option value="votes">Por votación</option>
-              </select>
-            </div>
+              <div className="room-settings__field-card">
+                <label className="room-settings__field-label" htmlFor="music-order">
+                  Orden de la cola
+                </label>
+                <select
+                  id="music-order"
+                  className="room-settings__input"
+                  value={musicQueueMode}
+                  disabled={perfDisabled}
+                  onChange={(e) => onUpdatePerf?.({ musicQueueMode: e.target.value as 'fifo' | 'votes' })}
+                >
+                  <option value="fifo">Orden de llegada</option>
+                  <option value="votes">Por votación</option>
+                </select>
+              </div>
 
-            <div className="room-settings__group">
-              <label className="room-settings__label" htmlFor="music-can-remove">
-                Quién puede quitar
-              </label>
-              <select
-                id="music-can-remove"
-                className="room-settings__input"
-                value={musicCanRemove}
-                disabled={perfDisabled}
-                onChange={(e) => onUpdatePerf?.({ musicCanRemove: e.target.value as 'proposer' | 'moderator' })}
-              >
-                <option value="proposer">Proponente</option>
-                <option value="moderator">Moderadores</option>
-              </select>
+              <div className="room-settings__field-card">
+                <label className="room-settings__field-label" htmlFor="music-can-remove">
+                  Quién puede quitar
+                </label>
+                <select
+                  id="music-can-remove"
+                  className="room-settings__input"
+                  value={musicCanRemove}
+                  disabled={perfDisabled}
+                  onChange={(e) => onUpdatePerf?.({ musicCanRemove: e.target.value as 'proposer' | 'moderator' })}
+                >
+                  <option value="proposer">Proponente</option>
+                  <option value="moderator">Moderadores</option>
+                </select>
+              </div>
             </div>
 
             <h4 className="room-settings__subhead">Límites</h4>
 
-            <div className="room-settings__group">
-              <label className="room-settings__label" htmlFor="music-max-user">
-                Máximo por persona
-              </label>
-              <input
-                id="music-max-user"
-                type="number"
-                className="room-settings__input"
-                min={1}
-                max={20}
-                value={musicMaxPerUser}
-                disabled={perfDisabled}
-                onChange={(e) => onUpdatePerf?.({ musicMaxPerUser: clampMaxPerUser(Number(e.target.value)) })}
-              />
-              <p className="room-settings__box-desc">
-                Entre 1 y 20 propuestas por persona.
-              </p>
+            <div className="room-settings__form-grid">
+              <div className="room-settings__field-card">
+                <label className="room-settings__field-label" htmlFor="music-max-user">
+                  Máximo por persona
+                </label>
+                <input
+                  id="music-max-user"
+                  type="number"
+                  className="room-settings__input"
+                  min={1}
+                  max={20}
+                  value={musicMaxPerUser}
+                  disabled={perfDisabled}
+                  onChange={(e) => onUpdatePerf?.({ musicMaxPerUser: clampMaxPerUser(Number(e.target.value)) })}
+                />
+              </div>
             </div>
 
+            {/* Subsección: Conexión */}
             {roomId && (
               <>
                 <h4 className="room-settings__subhead">Conexión</h4>
                 {spotConfigured ? (
-                <div className="room-settings__box-head">
-                  <span className="room-settings__box-title">
-                    Spotify {spotConnected === null ? '' : spotConnected ? '● conectado' : '○ desconectado'}
-                  </span>
-                  {spotConnected ? (
-                    <button
-                      type="button"
-                      className="leader-exit-modal__cancel-btn"
-                      disabled={spotBusy}
-                      onClick={() => void handleSpotDisconnect()}
-                    >
-                      Desconectar
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn--primary"
-                      disabled={spotBusy}
-                      onClick={() => void handleSpotConnect()}
-                    >
-                      Conectar
-                    </button>
-                  )}
-                </div>
+                  <div className="room-settings__card-row">
+                    <div className="room-settings__card-info">
+                      <span className="room-settings__card-title">
+                        Spotify {spotConnected === null ? '' : spotConnected ? '● conectado' : '○ desconectado'}
+                      </span>
+                      <p className="room-settings__card-desc">
+                        {spotConnected 
+                          ? 'Cuenta conectada para buscar canciones en Spotify.' 
+                          : 'Opcional si deseas importar búsquedas desde tu cuenta.'}
+                      </p>
+                    </div>
+                    {spotConnected ? (
+                      <button
+                        type="button"
+                        className="leader-exit-modal__cancel-btn"
+                        disabled={spotBusy}
+                        onClick={() => void handleSpotDisconnect()}
+                      >
+                        Desconectar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn--primary"
+                        disabled={spotBusy}
+                        onClick={() => void handleSpotConnect()}
+                      >
+                        Conectar
+                      </button>
+                    )}
+                  </div>
                 ) : (
-                <SelfSpotifyLink
-                  linked={selfLinked}
-                  accountName={selfAccount}
-                  ownClientId={getOwnClientId()}
-                  busy={spotBusy}
-                  onSaveClientId={(id) => setOwnClientId(id)}
-                  onConnect={() => void handleSelfConnect()}
-                  onUnlink={() => {
-                    clearOwnSpotify();
-                    void refreshSelfStatus();
-                  }}
-                />
+                  <SelfSpotifyLink
+                    linked={selfLinked}
+                    accountName={selfAccount}
+                    ownClientId={getOwnClientId()}
+                    busy={spotBusy}
+                    onSaveClientId={(id) => setOwnClientId(id)}
+                    onConnect={() => void handleSelfConnect()}
+                    onUnlink={() => {
+                      clearOwnSpotify();
+                      void refreshSelfStatus();
+                    }}
+                  />
                 )}
               </>
             )}
-
-            <p className="room-settings__box-desc">
-              Limitaciones: la reproducción completa requiere Spotify Premium y
-              cada persona escucha en su propia cuenta; la sala solo comparte
-              la cola y la selección, nunca el audio.
-            </p>
         </div>
         )}
 

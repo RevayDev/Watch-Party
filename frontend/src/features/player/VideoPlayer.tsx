@@ -20,6 +20,8 @@ import { BottomSheet } from '../../shared/components/BottomSheet';
 import { AmbientIntro } from '../room/components/AmbientIntro';
 import { isDemoMode } from '../../shared/demo';
 import { VideoUploadPicker } from './VideoUploadPicker';
+import { YouTubePlayerView } from './YouTubePlayerView';
+import { parseYouTubeUrl } from '../../shared/youtube';
 import { useToasts } from '../../services/notifications';
 import {
   anchorFromRemoteAction,
@@ -95,6 +97,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsInstanceRef = useRef<Hls | null>(null);
   const lastLoadKeyRef = useRef<string | null>(null);
+  const ytPlayerRef = useRef<any>(null);
 
   // Demo: la subida de archivos está deshabilitada → el picker arranca en el
   // tab de enlace. Con VITE_DEMO_MODE=false arranca como hoy (subida).
@@ -254,6 +257,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     if (!video || playbackError || !onPlaybackHeartbeat) return;
     const report = () => {
+      if (videoSourceType === 'youtube' && ytPlayerRef.current) {
+        try {
+          const yt = ytPlayerRef.current;
+          const cur = typeof yt.getCurrentTime === 'function' ? yt.getCurrentTime() : 0;
+          const state = typeof yt.getPlayerState === 'function' ? yt.getPlayerState() : -1;
+          const isPlaying = state === 1;
+          if (Number.isFinite(cur)) onPlaybackHeartbeat(cur, isPlaying);
+        } catch {}
+        return;
+      }
       const vid = videoRef.current;
       if (!vid || !Number.isFinite(vid.currentTime)) return;
       onPlaybackHeartbeat(vid.currentTime, !vid.paused && !vid.ended);
@@ -304,7 +317,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // Fuente Spotify legada (o en transición): no hay <video> que cargar.
     // La música vive en la cola musical; este caso solo limpia el loader.
-    if (videoSourceType === 'spotify') {
+    if (videoSourceType === 'spotify' || videoSourceType === 'youtube') {
       setPlaybackError(null);
       lastLoadKeyRef.current = null;
       if (hlsInstanceRef.current) {
@@ -432,6 +445,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // supresión extendida para el play asíncrono del auto-play grupal).
   useEffect(() => {
     if (!remoteAction || !videoRef.current) return;
+
+    if (videoSourceType === 'youtube' && ytPlayerRef.current) {
+      const yt = ytPlayerRef.current;
+      try {
+        const latencyOffset = remoteAction.sentAt
+          ? Math.max(0, (Date.now() - remoteAction.sentAt) / 1000)
+          : 0;
+        const targetTime =
+          remoteAction.action === 'play'
+            ? remoteAction.currentTime + latencyOffset
+            : remoteAction.currentTime;
+        const cur = typeof yt.getCurrentTime === 'function' ? yt.getCurrentTime() : 0;
+        const diffYt = Math.abs(cur - targetTime);
+
+        isApplyingRemote.current = true;
+        if (remoteAction.action === 'seek' || diffYt > 2.5) {
+          if (typeof yt.seekTo === 'function') yt.seekTo(targetTime, true);
+        }
+        if (remoteAction.action === 'play') {
+          if (typeof yt.playVideo === 'function') yt.playVideo();
+        } else if (remoteAction.action === 'pause') {
+          if (typeof yt.pauseVideo === 'function') yt.pauseVideo();
+        }
+        window.setTimeout(() => {
+          isApplyingRemote.current = false;
+        }, 300);
+      } catch (err) {
+        console.warn('Sync YouTube player error:', err);
+      }
+      return;
+    }
 
     const vid = videoRef.current;
     isApplyingRemote.current = true;
@@ -590,6 +634,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const describeVideoSource = (): string => {
     if (!video) return 'origen desconocido';
     const direct = video.directUrl || '';
+    if (video.sourceType === 'youtube') return 'video de YouTube';
     if (video.sourceType === 'file') return 'archivo subido';
     if (direct.includes('drive.google.com') || direct.includes('drive.usercontent.google.com')) {
       return 'enlace de Google Drive';
@@ -997,6 +1042,47 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
           </div>
         </div>
+      ) : video.sourceType === 'youtube' ? (
+        (() => {
+          const ytRef = parseYouTubeUrl(video.directUrl || video.originalName);
+          const ytVideoId = ytRef?.videoId ?? '';
+          return ytVideoId ? (
+            <YouTubePlayerView
+              key={ytVideoId}
+              videoId={ytVideoId}
+              className="player-container__video"
+              onReady={(player) => {
+                ytPlayerRef.current = player;
+                if (onVideoReady && video.fileName && videoReadySentForRef.current !== video.fileName) {
+                  videoReadySentForRef.current = video.fileName;
+                  onVideoReady(video.fileName);
+                }
+              }}
+              onStateChange={(event) => {
+                if (isLocalEchoSuppressed()) return;
+                const yt = ytPlayerRef.current;
+                if (!yt || typeof yt.getCurrentTime !== 'function') return;
+                const currentTime = yt.getCurrentTime();
+                if (event.data === 1) {
+                  onSyncAction('play', currentTime);
+                } else if (event.data === 2) {
+                  onSyncAction('pause', currentTime);
+                }
+              }}
+            />
+          ) : (
+            <div className="player-container__placeholder">
+              <div className="dropzone-container" style={{ textAlign: 'center', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>⚠️ Enlace de YouTube inválido</h3>
+                  <p style={{ fontSize: '0.84rem', color: 'var(--color-muted-light)', marginTop: '0.35rem' }}>
+                    No se pudo extraer el ID del video. Pega un enlace válido de YouTube.
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()
       ) : (
         <video
           ref={videoRef}

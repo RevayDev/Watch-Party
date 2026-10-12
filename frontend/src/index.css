@@ -2946,38 +2946,46 @@ a.home-faq-hl--frontend {
 
 /* Pestañas de secciones (General / Música / Barra / Rendimiento) */
 .room-settings__tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin: -0.25rem 0 1.15rem 0;
+  padding: 0.5rem 0 0.65rem 0;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   overflow-x: auto;
-  padding-bottom: 0.15rem;
+  flex-shrink: 0;
 }
 
 .room-settings__tab {
   font-family: inherit;
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--color-muted-light);
-  background: transparent;
-  border: 1px solid var(--color-border);
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 9999px;
-  padding: 0.45rem 1.05rem;
+  padding: 0.45rem 1.15rem;
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    color var(--trans-fast),
-    background var(--trans-fast),
-    border-color var(--trans-fast);
+  transition: all 0.2s ease;
 }
 
 .room-settings__tab:hover {
   color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .room-settings__tab--active {
   color: #fff;
-  background: rgba(99, 102, 241, 0.22);
-  border-color: var(--color-primary);
+  background: rgba(99, 102, 241, 0.28);
+  border-color: #6366f1;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
 }
 
 /* Sub-secciones dentro de una tarjeta (Música: Cola / Permisos / …) */
@@ -7018,11 +7026,18 @@ a.home-faq-hl--frontend {
   width: min(1080px, calc(100vw - 32px));
   max-width: min(1080px, calc(100vw - 32px));
   max-height: 92vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-card--settings .sheet__body {
   overflow-y: auto;
   overflow-wrap: anywhere;
   /* Scroll sutil: track transparente, thumb fino redondeado */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  padding-right: 0.25rem;
 }
 .modal-card--settings::-webkit-scrollbar {
   width: 8px;
@@ -7504,4 +7519,239 @@ a.home-faq-hl--frontend {
   .floating-reaction__emoji {
     animation: none;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Diseño Premium para Configuración: Música & YouTube
+   ───────────────────────────────────────────────────────────── */
+.room-settings__music-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.room-settings__hero-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.04) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  box-shadow: 0 4px 20px -2px rgba(239, 68, 68, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+.room-settings__hero-banner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 140px;
+  height: 100%;
+  background: radial-gradient(circle at top right, rgba(239, 68, 68, 0.2), transparent 70%);
+  pointer-events: none;
+}
+
+.room-settings__hero-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  flex-shrink: 0;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.room-settings__hero-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.room-settings__hero-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.18rem 0.55rem;
+  border-radius: 9999px;
+  background: #ef4444;
+  color: #fff;
+  letter-spacing: 0.05em;
+}
+
+.room-settings__hero-desc {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.room-settings__grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 0.75rem;
+}
+
+.room-settings__card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.room-settings__card-row:hover {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+
+.room-settings__card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.room-settings__card-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.room-settings__card-desc {
+  font-size: 0.76rem;
+  color: #94a3b8;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.room-settings__form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.room-settings__field-card {
+  padding: 0.9rem 1.1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.room-settings__field-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.room-settings__section-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+
+.room-settings__section-divider span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #818cf8;
+  white-space: nowrap;
+}
+
+.room-settings__section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Tabs fijas unificadas en el Drawer (Chat / Participantes / Musica) */
+.meet-drawer__tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(13, 19, 33, 0.98);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  z-index: 5;
+}
+
+.meet-drawer__tab-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.meet-drawer__tab-group::-webkit-scrollbar {
+  display: none;
+}
+
+.meet-drawer__tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.meet-drawer__tab-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.meet-drawer__tab-btn--active {
+  color: #fff;
+  background: rgba(99, 102, 241, 0.25);
+  border-color: #6366f1;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+.meet-drawer__tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  border-radius: 9999px;
+  background: #ef4444;
+  color: #fff;
+  line-height: 1;
 }

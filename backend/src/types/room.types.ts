@@ -76,7 +76,7 @@ export interface IVideoMetadata {
   mimeType: string;
   sizeBytes: number;
   durationSeconds?: number;
-  sourceType?: 'file' | 'url' | 'hls' | 'spotify';
+  sourceType?: 'file' | 'url' | 'hls' | 'spotify' | 'youtube';
   directUrl?: string;
 }
 

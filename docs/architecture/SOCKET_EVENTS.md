@@ -40,10 +40,17 @@ Auth común privilegiada: payload puede traer `hostSecret?`, `requesterUserId?`,
 | 22 | `webrtc-answer { targetSocketId, answer }` | `useWebRTC` | ❌ | ❌ | `webrtc-answer{senderSocketId,answer}` al target |
 | 23 | `webrtc-ice-candidate { targetSocketId, candidate }` | `useWebRTC` | ❌ | ❌ | `webrtc-ice-candidate{senderSocketId,candidate}` al target |
 | 24 | `peer-media-state { roomId, userName?, isCameraOn, isMicOn }` | `useWebRTC` | `roomId` | ❌ (identidad = `activeUsers` o `userName` del payload) | guarda en `activeMediaStates` (por socket.id **y** por nombre) + reenvío a otros |
-| 25 | `disconnect` (implícito) | cierre navegador / `disconnectSocket()` | pendiente→borra join-request; con `userId`→gracia 20 s; sin `userId`→eliminación inmediata | — | `join-requests-updated` / (`host-changed` + `user-left`) diferidos o inmediatos; limpia playback si la sala queda vacía |
+| 25 | `music-add { roomId, track, ...auth }` | `useRoomSocket` (`musicAdd`) | `roomId && track.id/name/artists`; rate 12/min | ✅ `memberOf` + `musicEnabled` + `musicCanAdd` (moderador o cualquiera); deduplica 2 s | `music-queue-updated{queue, nowPlaying}` a toda la sala |
+| 26 | `music-vote { roomId, entryId, ...auth }` | `useRoomSocket` (`musicVote`) | `roomId && entryId`; rate 30/min | ✅ `memberOf` + `musicEnabled` | `music-queue-updated{queue, nowPlaying}` a toda la sala |
+| 27 | `music-remove { roomId, entryId, ...auth }` | `useRoomSocket` (`musicRemove`) | `roomId && entryId`; rate 20/min | ✅ `memberOf` + `musicCanRemove` (propositor o moderador) | `music-queue-updated{queue, nowPlaying}` a toda la sala |
+| 28 | `music-reorder { roomId, order, ...auth }` | `useRoomSocket` (`musicReorder`) | `roomId && order`; rate 20/min | ✅ `requireModerator` + `musicAllowReorder` | `music-queue-updated{queue, nowPlaying}` a toda la sala |
+| 29 | `music-approve { roomId, entryId, ...auth }` | `useRoomSocket` (`musicApprove`) | `roomId && entryId`; rate 20/min | ✅ `requireModerator` | `music-queue-updated{queue, nowPlaying}` a toda la sala |
+| 30 | `music-next { roomId, ...auth }` | `useRoomSocket` (`musicNext`) | `roomId`; rate 20/min | ✅ `requireModerator` (solo cola y nowPlaying, nunca toca video) | `music-queue-updated{queue, nowPlaying}` a toda la sala |
+| 31 | `music-stop { roomId, ...auth }` | `useRoomSocket` (`musicStop`) | `roomId`; rate 20/min | ✅ `requireModerator` (limpia nowPlaying, nunca toca video) | `music-queue-updated{queue, nowPlaying}` a toda la sala |
+| 32 | `disconnect` (implícito) | cierre navegador / `disconnectSocket()` | pendiente→borra join-request; con `userId`→gracia 20 s; sin `userId`→eliminación inmediata | — | `join-requests-updated` / (`host-changed` + `user-left`) diferidos o inmediatos; limpia playback si la sala queda vacía |
 | — | `timer-sweep` (servidor, cada 15 s) | — | `settings.timerEndsAt <= now` | — | `room-closed{message, reason:'timer'}` + `socketsLeave` + `deleteRoom(force=false)` |
 
-## 2. Servidor → Cliente (30; todos verificados en ambos extremos salvo nota)
+## 2. Servidor → Cliente (31; todos verificados en ambos extremos salvo nota)
 
 `room-state` · `join-pending` · `join-approved{roomId}` · `join-rejected{reason,message}`
 · `join-requests-updated{joinRequests}` · `user-joined{socketId,userName,isHost?,participants}`
@@ -58,7 +65,8 @@ Auth común privilegiada: payload puede traer `hostSecret?`, `requesterUserId?`,
 · `settings-error{message}` · `action-denied{event,message}` ·
 `webrtc-offer{senderSocketId,offer,callerName,callerIsHost}` · `webrtc-answer{senderSocketId,answer}`
 · `webrtc-ice-candidate{senderSocketId,candidate}` ·
-`peer-media-state{socketId,userName,isCameraOn,isMicOn}`.
+`peer-media-state{socketId,userName,isCameraOn,isMicOn}` ·
+`music-queue-updated{queue,nowPlaying}`.
 
 Listeners FE: 25 en `useRoomSocket` + 8 en `useWebRTC`
 (`room-state,user-joined,webrtc-offer/answer/ice-candidate,peer-media-state,user-left,participant-renamed`).

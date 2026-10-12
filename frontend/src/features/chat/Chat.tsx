@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X } from 'lucide-react';
+import { Send, X, Music } from 'lucide-react';
 import { ChatMessage } from '../../types/room';
 import { getAvatarColor, getInitials } from '../../shared/utils';
-import { SpotifyListenButton, type SpotifyConnState } from '../room/components/SpotifyListenButton';
 
 interface ChatProps {
   messages: ChatMessage[];
@@ -13,16 +12,12 @@ interface ChatProps {
   typingUsers?: string[];
   /** Se llama al teclear con texto no vacío (el hook lo throttlea a 1/2 s). */
   onTyping?: () => void;
-  /** Sala para el icono Spotify (opcional: sin esto no se muestra). */
+  /** Sala para el icono de música (opcional: sin esto no se muestra). */
   roomId?: string;
-  /** Estado de la conexión Spotify (punto del botón). */
-  spotifyState?: SpotifyConnState;
   /** ¿Está abierto el panel musical? */
   musicOpen?: boolean;
   /** Abre/cierra el panel musical. */
   onOpenMusic?: () => void;
-  /** Inicia el OAuth en pestaña nueva. */
-  onSpotifyConnect?: () => void;
 }
 
 export const Chat: React.FC<ChatProps> = ({
@@ -33,10 +28,8 @@ export const Chat: React.FC<ChatProps> = ({
   typingUsers = [],
   onTyping,
   roomId,
-  spotifyState = 'loading',
   musicOpen = false,
   onOpenMusic = () => undefined,
-  onSpotifyConnect = () => undefined,
 }) => {
   const [input, setInput] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -212,12 +205,15 @@ export const Chat: React.FC<ChatProps> = ({
       {/* Input bar always visible */}
       <form onSubmit={handleSubmit} className="drawer-chat__input-bar">
         {roomId && (
-          <SpotifyListenButton
-            state={spotifyState}
-            panelOpen={musicOpen}
-            onTogglePanel={onOpenMusic}
-            onConnect={onSpotifyConnect}
-          />
+          <button
+            type="button"
+            onClick={onOpenMusic}
+            className={`meet-circle-btn meet-circle-btn--music${musicOpen ? ' meet-circle-btn--active' : ''}`}
+            title={musicOpen ? 'Cerrar panel de música' : 'Abrir música (YouTube)'}
+            aria-label={musicOpen ? 'Cerrar panel de música' : 'Abrir música (YouTube)'}
+          >
+            <Music size={18} />
+          </button>
         )}
         <input
           ref={inputRef}

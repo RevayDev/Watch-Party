@@ -1,4 +1,5 @@
 import React from 'react';
+import { MessageSquare, Users, Music, X } from 'lucide-react';
 import { BottomSheet } from '../../../shared/components/BottomSheet';
 import { Chat } from '../../chat/Chat';
 import { Participants } from '../../participants/Participants';
@@ -8,7 +9,7 @@ import type { Socket } from 'socket.io-client';
 import { buildSocketAuth } from '../../../shared/utils';
 
 /**
- * Drawer lateral chat/participantes/música (extraído verbatim de pages/Room.tsx).
+ * Drawer lateral chat/participantes/música (con barra de pestañas siempre visible).
  */
 interface RoomDrawerProps {
   activeSideTab: 'chat' | 'participants' | 'music' | null;
@@ -29,21 +30,13 @@ interface RoomDrawerProps {
   toggleCamera: () => void;
   socket: Socket;
   roomId: string;
-  /** Spotify en el chat: estado + abrir panel o conectar. */
-  spotifyState?: import('./SpotifyListenButton').SpotifyConnState;
   musicOpen?: boolean;
   onOpenMusic?: () => void;
-  onSpotifyConnect?: () => void;
-  /** Música/Spotify: cola colaborativa (opcionales: sin esto no se muestra el tab). */
   musicQueue?: IMusicQueueEntry[];
   musicNowPlaying?: IMusicNowPlaying | null;
   musicSettings?: IRoomSettings;
   musicIsModerator?: boolean;
-  musicSpotifyConnected?: boolean;
-  musicAccountName?: string | null;
-  musicSpotifyError?: boolean;
-  musicSpotifyConfigured?: boolean;
-  onMusicSearch?: (q: string) => Promise<IMusicTrack[] | null>;
+  onAddMusicUrl?: (url: string) => Promise<boolean>;
   onMusicAdd?: (t: IMusicTrack) => void;
   onMusicVote?: (id: string) => void;
   onMusicRemove?: (id: string) => void;
@@ -51,15 +44,6 @@ interface RoomDrawerProps {
   onMusicApprove?: (id: string) => void;
   onMusicNext?: () => void;
   onMusicStop?: () => void;
-  onMusicConnect?: () => void;
-  onMusicDisconnect?: () => void;
-  /** Cuenta propia (sin .env): vinculada en este navegador. */
-  musicSelfLinked?: boolean;
-  musicSelfAccount?: string | null;
-  musicOwnClientId?: string | null;
-  onSaveSelfClientId?: (clientId: string) => void;
-  onConnectSelf?: () => void;
-  onUnlinkSelf?: () => void;
 }
 
 export const RoomDrawer: React.FC<RoomDrawerProps> = ({
@@ -81,19 +65,13 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   toggleCamera,
   socket,
   roomId,
-  spotifyState = 'loading',
   musicOpen = false,
   onOpenMusic = () => undefined,
-  onSpotifyConnect = () => undefined,
   musicQueue = [],
   musicNowPlaying = null,
   musicSettings,
   musicIsModerator = false,
-  musicSpotifyConnected = false,
-  musicAccountName = null,
-  musicSpotifyError = false,
-  musicSpotifyConfigured = true,
-  onMusicSearch = async () => null,
+  onAddMusicUrl,
   onMusicAdd = () => undefined,
   onMusicVote = () => undefined,
   onMusicRemove = () => undefined,
@@ -101,31 +79,69 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   onMusicApprove = () => undefined,
   onMusicNext = () => undefined,
   onMusicStop = () => undefined,
-  onMusicConnect = () => undefined,
-  onMusicDisconnect = () => undefined,
-  musicSelfLinked = false,
-  musicSelfAccount = null,
-  musicOwnClientId = null,
-  onSaveSelfClientId = () => undefined,
-  onConnectSelf = () => undefined,
-  onUnlinkSelf = () => undefined,
 }) => {
-  // Helper local: evita repetir buildSocketAuth(roomId, myName) en cada emit.
-  // Se evalúa en el momento del emit (lee localStorage entonces), igual que antes.
   const auth = () => buildSocketAuth(roomId, myName);
-  const drawerLabel = sideTabView === 'participants' ? 'Participantes' : sideTabView === 'music' ? 'Música' : 'Chat';
+  const currentTab = activeSideTab ?? sideTabView;
 
   return (
     <BottomSheet
       open={!!activeSideTab}
       onClose={() => setActiveSideTab(null)}
       variant="inline"
-      desktopClassName={`meet-drawer ${sideTabView === 'participants' ? 'meet-drawer--wide' : ''}`}
+      desktopClassName={`meet-drawer ${currentTab === 'participants' ? 'meet-drawer--wide' : ''}`}
       height={85}
-      label={drawerLabel}
+      label={currentTab === 'participants' ? 'Participantes' : currentTab === 'music' ? 'Música' : 'Chat'}
     >
       <div className="meet-drawer__body">
-        {sideTabView === 'chat' && (
+        {/* Header con pestañas integradas SIEMPRE visible en el drawer */}
+        <div className="meet-drawer__tab-header">
+          <div className="meet-drawer__tab-group" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentTab === 'chat'}
+              className={`meet-drawer__tab-btn ${currentTab === 'chat' ? 'meet-drawer__tab-btn--active' : ''}`}
+              onClick={() => setActiveSideTab('chat')}
+            >
+              <MessageSquare size={16} />
+              <span>Chat</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentTab === 'participants'}
+              className={`meet-drawer__tab-btn ${currentTab === 'participants' ? 'meet-drawer__tab-btn--active' : ''}`}
+              onClick={() => setActiveSideTab('participants')}
+            >
+              <Users size={16} />
+              <span>Participantes ({roomData.participants.length})</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentTab === 'music'}
+              className={`meet-drawer__tab-btn ${currentTab === 'music' ? 'meet-drawer__tab-btn--active' : ''}`}
+              onClick={() => setActiveSideTab('music')}
+            >
+              <Music size={16} />
+              <span>Música</span>
+              {musicQueue.length > 0 && (
+                <span className="meet-drawer__tab-badge">{musicQueue.length}</span>
+              )}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="drawer-close-btn"
+            onClick={() => setActiveSideTab(null)}
+            title="Cerrar panel"
+            aria-label="Cerrar panel"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {currentTab === 'chat' && (
           <Chat
             messages={messages}
             onSendMessage={handleSendMessage}
@@ -134,13 +150,11 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onTyping={onTyping}
             onClose={() => setActiveSideTab(null)}
             roomId={roomId}
-            spotifyState={spotifyState}
             musicOpen={musicOpen}
             onOpenMusic={onOpenMusic}
-            onSpotifyConnect={onSpotifyConnect}
           />
         )}
-        {sideTabView === 'participants' && (
+        {currentTab === 'participants' && (
           <Participants
             onClose={() => setActiveSideTab(null)}
             participants={roomData.participants}
@@ -218,7 +232,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             }}
           />
         )}
-        {sideTabView === 'music' && (
+        {currentTab === 'music' && (
           <MusicPanel
             roomId={roomId}
             queue={musicQueue}
@@ -227,11 +241,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             isModerator={musicIsModerator}
             myName={myName}
             userId={userId}
-            spotifyConnected={musicSpotifyConnected}
-            accountName={musicAccountName}
-            spotifyError={musicSpotifyError}
-            spotifyConfigured={musicSpotifyConfigured}
-            onSearch={onMusicSearch}
+            onAddUrl={onAddMusicUrl}
             onAdd={onMusicAdd}
             onVote={onMusicVote}
             onRemove={onMusicRemove}
@@ -239,17 +249,11 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onApprove={onMusicApprove}
             onNext={onMusicNext}
             onStop={onMusicStop}
-            onConnect={onMusicConnect}
-            onDisconnect={onMusicDisconnect}
-            selfLinked={musicSelfLinked}
-            selfAccount={musicSelfAccount}
-            ownClientId={musicOwnClientId}
-            onSaveSelfClientId={onSaveSelfClientId}
-            onConnectSelf={onConnectSelf}
-            onUnlinkSelf={onUnlinkSelf}
           />
         )}
       </div>
     </BottomSheet>
   );
 };
+
+export default RoomDrawer;

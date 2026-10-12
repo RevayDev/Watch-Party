@@ -8,23 +8,11 @@ import { MemberExitModal } from '../../components/MemberExitModal';
 import { RoomSettingsModal } from '../../components/RoomSettingsModal';
 import { WaitingApproval } from '../waiting/WaitingApproval';
 import { useRoomSocket } from './hooks/useRoomSocket';
-import { buildSocketAuth, readSpotifyReturn, stripSpotifyReturnParams } from '../../shared/utils';
-import { ApiService } from '../../services/api';
+import { buildSocketAuth } from '../../shared/utils';
+import { parseYouTubeUrl } from '../../shared/youtube';
 import { notify } from '../../services/notifications';
 import { RoomControls } from './components/RoomControls';
 import { RoomDrawer } from './components/RoomDrawer';
-import type { SpotifyConnState } from './components/SpotifyListenButton';
-import {
-  clearOwnSpotify,
-  finishSelfOAuth,
-  getOwnClientId,
-  getSelfStatus,
-  openOAuthTab,
-  readSelfReturn,
-  searchSelfTracks,
-  setOwnClientId,
-  startSelfOAuth,
-} from './components/spotifyUser';
 import { useBarPrefs } from './hooks/useBarPrefs';
 
 export interface RoomProps {
@@ -40,147 +28,26 @@ export interface RoomProps {
  */
 export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialIsLeader, onLeave }) => {
   const r = useRoomSocket({ roomId, userName, initialIsLeader, onLeave });
-  // Spotify: estado de la conexión (lo consulta la sala; el botón solo lo
-  // muestra). Cada uno escucha en su propio Spotify: la sala comparte la
-  // cola y la selección, nunca el audio.
-  const [spotify, setSpotify] = useState<{
-    state: SpotifyConnState;
-    accountName: string | null;
-    configured: boolean;
-  }>({ state: 'loading', accountName: null, configured: true });
-  // Cuenta vinculada por el propio usuario (sin .env): Client ID suyo (PKCE)
-  // y tokens solo en su navegador. Complementa al OAuth del servidor.
-  const [selfSpotify, setSelfSpotify] = useState<{ connected: boolean; accountName: string | null }>({
-    connected: false,
-    accountName: null,
-  });
-  const refreshSelfStatus = async () => {
-    try {
-      setSelfSpotify(await getSelfStatus());
-    } catch {
-      setSelfSpotify({ connected: false, accountName: null });
-    }
-  };
-  const refreshSpotifyStatus = async () => {
-    try {
-      const s = await ApiService.spotifyStatus(roomId);
-      if (!s.configured) {
-        setSpotify({ state: 'disconnected', accountName: null, configured: false });
-        return;
-      }
-      if (s.error === 'refresh_failed') {
-        setSpotify({ state: 'error', accountName: null, configured: true });
-        return;
-      }
-      setSpotify({
-        state: s.connected ? 'connected' : 'disconnected',
-        accountName: s.accountName,
-        configured: true,
-      });
-    } catch {
-      setSpotify((prev) => ({ ...prev, state: 'error' }));
-    }
-  };
-  useEffect(() => {
-    void refreshSpotifyStatus();
-    void refreshSelfStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId]);
-  // Retorno del OAuth (pestaña nueva): el backend redirige a
-  // `?room=&spotify=connected|error`. Se avisa, se refresca y se limpia la
-  // URL para no reprocesarlo. La sala nunca se pierde (sigue abierta).
-  useEffect(() => {
-    // Retorno propio (PKCE): ?spotify=self&code=&state=. Se canjea con los
-    // datos guardados al iniciar (misma sala) y luego se limpia la URL.
-    if (readSelfReturn(window.location.search)) {
-      const search = window.location.search;
-      stripSpotifyReturnParams();
-      void finishSelfOAuth(search)
-        .then((ok) => {
-          if (ok) notify('success', 'Tu cuenta de Spotify quedó vinculada.', 'Música');
-          else notify('error', 'No se pudo vincular tu cuenta. Revisa el Client ID e inténtalo de nuevo.', 'Música');
-          return refreshSelfStatus();
-        })
-        .catch(() => undefined);
-      return;
-    }
-    const ret = readSpotifyReturn(window.location.search);
-    if (!ret) return;
-    stripSpotifyReturnParams();
-    if (ret.kind === 'connected') {
-      notify('success', 'Spotify vinculado. Ya puedes usar la cola musical.', 'Música');
-    } else {
-      const reason = ret.reason === 'cancelled'
-        ? 'Autorización cancelada. Puedes intentarlo de nuevo.'
-        : ret.reason === 'expired'
-          ? 'La autorización expiró. Pide un enlace nuevo e inténtalo otra vez.'
-          : 'No se pudo vincular Spotify. Inténtalo de nuevo.';
-      notify('error', reason, 'Música');
-    }
-    void refreshSpotifyStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId]);
-  // OAuth en pestaña NUEVA, abierta directo desde el clic (anti-bloqueos).
-  // Si falla, la pestaña se cierra (o muestra el motivo) en vez de quedar en blanco.
-  const handleSpotifyConnect = async () => {
-    const ok = await openOAuthTab(async () => (await ApiService.spotifyAuthUrl(roomId)).authUrl);
-    if (!ok) notify('error', 'Spotify no está configurado en este servidor.', 'Música');
-  };
-  const handleSpotifyDisconnect = async () => {
-    try {
-      await ApiService.spotifyDisconnect(roomId);
-      notify('info', 'Spotify desvinculado de esta sala.', 'Música');
-    } catch {
-      notify('error', 'No se pudo desvincular Spotify.', 'Música');
-    }
-    await refreshSpotifyStatus();
-  };
-  // Estado efectivo para el footer: vale la del servidor y, si no, la propia.
-  const effState: SpotifyConnState =
-    spotify.state === 'connected' || selfSpotify.connected
-      ? 'connected'
-      : spotify.state;
-  const effAccount = spotify.state === 'connected' ? spotify.accountName : selfSpotify.accountName;
+
+  // Toggle del panel de música (YouTube)
   const toggleMusicPanel = () => {
     r.setActiveSideTab((v) => (v === 'music' ? null : 'music'));
   };
-  // Vincular uno mismo: guarda el Client ID y abre el OAuth propio.
-  const handleSelfConnect = async () => {
-    const clientId = getOwnClientId();
-    if (!clientId) {
-      notify('info', 'Pega tu Client ID de Spotify primero.', 'Música');
-      return;
-    }
-    const ok = await openOAuthTab(async () => (await startSelfOAuth(clientId, roomId)).authUrl);
-    if (!ok) notify('error', 'No se pudo iniciar la vinculación.', 'Música');
-  };
-  const handleSaveSelfClientId = (clientId: string) => {
-    setOwnClientId(clientId);
-    notify('success', 'Client ID guardado en este navegador.', 'Música');
-  };
-  const handleUnlinkSelf = () => {
-    clearOwnSpotify();
-    void refreshSelfStatus();
-    notify('info', 'Tu cuenta quedó desvinculada de este navegador.', 'Música');
-  };
-  // Clic del icono sin vincular: OAuth directo si el servidor lo ofrece;
-  // si no, se abre el panel (ahí está "vincular mi cuenta").
-  const handleFooterConnect = () => {
-    if (spotify.configured) void handleSpotifyConnect();
-    else toggleMusicPanel();
-  };
-  // Búsqueda: primero el servidor; si falla y hay cuenta propia, directa.
-  const handleMusicSearch = async (q: string) => {
-    const res = await r.searchMusic(q);
-    if (res !== null) return res;
-    if (selfSpotify.connected || getOwnClientId()) {
-      try {
-        return await searchSelfTracks(q);
-      } catch {
-        return null;
-      }
-    }
-    return null;
+  // Agregar música de YouTube a la cola
+  const handleAddMusicUrl = async (rawUrl: string): Promise<boolean> => {
+    const yt = parseYouTubeUrl(rawUrl);
+    if (!yt) return false;
+    const track = {
+      id: yt.videoId,
+      name: `YouTube (${yt.videoId})`,
+      artists: 'YouTube Music',
+      albumArt: `https://img.youtube.com/vi/${yt.videoId}/hqdefault.jpg`,
+      uri: yt.cleanUrl,
+      openUrl: yt.cleanUrl,
+    };
+    r.musicAdd(track);
+    notify('success', 'Canción de YouTube agregada a la cola musical.', 'Música');
+    return true;
   };
   const isModerator = r.isLeader || r.isCohost;
   // Estilo personal de la barra (local, por usuario: nunca se emite a la sala).
@@ -362,22 +229,13 @@ onVideoReady={r.handleVideoReady}
           toggleCamera={r.toggleCamera}
           socket={r.socket}
           roomId={roomId}
-          spotifyState={effState}
           musicOpen={r.activeSideTab === 'music'}
           onOpenMusic={toggleMusicPanel}
-          onSpotifyConnect={handleFooterConnect}
           musicQueue={r.musicQueue}
           musicNowPlaying={r.musicNowPlaying}
           musicSettings={r.roomData.settings}
           musicIsModerator={isModerator}
-          musicSpotifyConnected={spotify.state === 'connected' || selfSpotify.connected}
-          musicAccountName={effAccount}
-          musicSpotifyError={spotify.state === 'error'}
-          musicSpotifyConfigured={spotify.configured}
-          musicSelfLinked={selfSpotify.connected}
-          musicSelfAccount={selfSpotify.accountName}
-          musicOwnClientId={getOwnClientId()}
-          onMusicSearch={handleMusicSearch}
+          onAddMusicUrl={handleAddMusicUrl}
           onMusicAdd={r.musicAdd}
           onMusicVote={r.musicVote}
           onMusicRemove={r.musicRemove}
@@ -385,22 +243,14 @@ onVideoReady={r.handleVideoReady}
           onMusicApprove={r.musicApprove}
           onMusicNext={r.musicNext}
           onMusicStop={r.musicStop}
-          onMusicConnect={() => void handleSpotifyConnect()}
-          onMusicDisconnect={() => void handleSpotifyDisconnect()}
-          onSaveSelfClientId={handleSaveSelfClientId}
-          onConnectSelf={() => void handleSelfConnect()}
-          onUnlinkSelf={handleUnlinkSelf}
         />
       </main>
 
       {/* ── Bottom Bar (text buttons) ── */}
       <RoomControls
         roomId={roomId}
-        spotifyState={effState}
-        spotifyAccount={effAccount}
         musicOpen={r.activeSideTab === 'music'}
         onToggleMusic={toggleMusicPanel}
-        onSpotifyConnect={handleFooterConnect}
         layout={barPrefs.layout}
         showLabels={barPrefs.showLabels}
         isMicOn={r.isMicOn}
