@@ -1,8 +1,9 @@
-# 🎬 Watch Party
+# Watch Party
 
-Mira videos **sincronizados** con amigos en tiempo real: todos ven lo mismo al mismo tiempo, con chat, reacciones, voz y cámaras. Sin compartir pantalla: cada navegador reproduce su propia copia del video y el servidor los mantiene sincronizados.
+Watch Party lets participants watch synchronized video, chat, react, and talk by microphone or camera. The React and Vite frontend plays media in each browser. The Express and Socket.IO backend manages rooms, permissions, playback state, and signaling.
 
-> **Si eres junior y es tu primera vez aquí:** lee en orden: §1 (qué es) → §2 (pruébalo en 2 min) → §3 (cómo funciona, con dibujo) → §4 (dónde está cada cosa) → §5 (arquitectura hexagonal explicada simple). Con eso puedes escalar el proyecto.
+- [Architecture](docs/ARCHITECTURE.md) describes the system and its contracts.
+- [Development](docs/DEVELOPMENT.md) covers setup, implementation, testing, and deployment.
 
 ---
 
@@ -10,7 +11,7 @@ Mira videos **sincronizados** con amigos en tiempo real: todos ven lo mismo al m
 
 - **Salas con código de 6 letras** (ej. `KX7Q2P`). El anfitrión crea, comparte el código o el link `?room=KX7Q2P`, los demás se unen con su nombre.
 - **Video sincronizado:** play, pausa y saltos los ve todo el mundo igual (tolerancia de 2 s + compensación de latencia).
-- **Tiempo real:** chat, reacciones flotantes ✨, "está escribiendo…", voz y video por WebRTC (P2P, sin pasar por el servidor).
+- **Real time.** Chat, floating reactions, typing indicators, and WebRTC voice and video with optional TURN relay.
 - **Anfitrión manda:** aprueba entradas, silencia/apaga cámaras, expulsa, pone nombre y temporizador a la sala.
 - **Demo gratuita:** 5 salas vivas, 5 personas por sala, videos por enlace (Drive/HLS). Sin registros ni pagos.
 
@@ -18,7 +19,7 @@ Mira videos **sincronizados** con amigos en tiempo real: todos ven lo mismo al m
 
 ## 2. Pruébalo en 2 minutos (local)
 
-Requisitos: **Node.js 18+**. MongoDB es opcional (sin él, las salas viven en memoria).
+Use **Node.js 22.12+** on the Node 22 release line or **Node.js 24 LTS**. MongoDB is optional for local development.
 
 ```bash
 # Instalar (una vez): raíz + backend + frontend
@@ -41,12 +42,14 @@ Variables útiles (ver `backend/.env.example` y `frontend/.env.example`):
 
 | Variable | Dónde | Para qué |
 |---|---|---|
-| `MONGODB_URI` | backend | Si no se pone, usa memoria (se pierde al reiniciar) |
+| `MONGODB_URI` | backend | MongoDB connection URI. The default targets local MongoDB. If unavailable, storage falls back to memory with a local room-file snapshot. |
 | `CLIENT_URL` | backend | URL del frontend (CORS) |
 | `VITE_API_URL` | frontend | URL del backend (en local se deja vacía) |
-| `VITE_DEMO_MODE` | frontend | `false` restaura subida de archivos y quita límites demo |
+| `VITE_DEMO_MODE` | frontend | Enables the demo UI. Set backend `DEMO_MODE` to match when enabling demo limits. |
 | `ROOM_STORE` | backend | `auto` (Mongoose/memoria) o `prisma` (Prisma ORM, misma Mongo; antes corre `npm run db:push` una vez para crear el índice único) |
 | `DATABASE_URL` | backend | Solo para Prisma; si no está, usa `MONGODB_URI` |
+| `YOUTUBE_API_KEY` | backend | Enables search by title in the room music panel. Pasted YouTube links work independently. |
+| `TURN_URLS`, `TURN_SHARED_SECRET` | backend | Optional TURN relay for networks where direct WebRTC connections fail. |
 
 ---
 
@@ -161,7 +164,7 @@ Antes de refactorizar, lee `docs/architecture/IMPACT_MAP.md` (qué se rompe si t
 ```bash
 # En backend/ y en frontend/:
 npx tsc --noEmit   # tipos (0 errores)
-npm run test       # vitest (328 backend + 207 frontend = 535 tests OK)
+npm run test       # Run the Vitest suite for the current checkout
 npm run build      # build de producción
 ```
 
