@@ -1,17 +1,20 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { createRateLimiter } from '../middleware/rate-limit.middleware.js';
 
 const router = Router();
 const searchLimiter = createRateLimiter({ windowMs: 60_000, max: 8 });
 
-interface SearchItem {
-  id?: { videoId?: string };
-  snippet?: { title?: string; channelTitle?: string };
-}
+const searchQuery = z.string().trim().min(2).max(100);
+const searchResponse = z.object({ items: z.array(z.unknown()).default([]) });
+const videoResult = z.object({
+  id: z.object({ videoId: z.string().regex(/^[\w-]{11}$/) }),
+  snippet: z.object({ title: z.string().min(1), channelTitle: z.string().optional() }),
+});
 
 router.get('/search', searchLimiter, async (req, res) => {
-  const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-  if (query.length < 2 || query.length > 100) {
+  const query = searchQuery.safeParse(req.query.q);
+  if (!query.success) {
     res.status(400).json({ error: 'Escribe entre 2 y 100 caracteres para buscar.' });
     return;
   }
@@ -28,7 +31,7 @@ router.get('/search', searchLimiter, async (req, res) => {
     videoEmbeddable: 'true',
     videoSyndicated: 'true',
     maxResults: '12',
-    q: query,
+    q: query.data,
   });
 
   try {
@@ -40,10 +43,11 @@ router.get('/search', searchLimiter, async (req, res) => {
       res.status(502).json({ error: 'YouTube no pudo completar la búsqueda. Puedes pegar un enlace.' });
       return;
     }
-    const { items = [] } = (await response.json()) as { items?: SearchItem[] };
-    const tracks = items.flatMap(({ id, snippet }) => {
-      const videoId = id?.videoId;
-      if (!videoId || !/^[\w-]{11}$/.test(videoId) || !snippet?.title) return [];
+    const { items } = searchResponse.parse(await response.json());
+    const tracks = items.flatMap((item) => {
+      const video = videoResult.safeParse(item);
+      if (!video.success) return [];
+      const { id: { videoId }, snippet } = video.data;
       const url = `https://www.youtube.com/watch?v=${videoId}`;
       return [{
         id: videoId,

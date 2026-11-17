@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { RoomService } from '../src/services/room.service.js';
 import { setDemoModeOverride, resetDemoModeCache } from '../src/config/demo-mode.js';
-import type { IMusicQueueEntry } from '../src/types/room.types.js';
 import { backupRoomsFile, restoreRoomsFile } from './helpers.js';
 
 /**

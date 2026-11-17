@@ -32,6 +32,15 @@ it('devuelve 503 si falta la clave y conserva la opción de pegar un enlace', as
   expect((await response.json()).error).toMatch(/pegar un enlace/i);
 });
 
+it('rejects repeated query parameters before calling the provider', async () => {
+  vi.stubEnv('YOUTUBE_API_KEY', 'test-key');
+  const upstream = vi.fn();
+  vi.stubGlobal('fetch', upstream);
+  const response = await localFetch(`${endpoint}?q=queen&q=karaoke`);
+  expect(response.status).toBe(400);
+  expect(upstream).not.toHaveBeenCalled();
+});
+
 it('pide videos insertables y devuelve pistas listas para la cola', async () => {
   vi.stubEnv('YOUTUBE_API_KEY', 'test-key');
   const upstream = vi.fn().mockResolvedValue(Response.json({

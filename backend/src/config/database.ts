@@ -11,9 +11,9 @@ mongoose.connection.on('disconnected', () => {
   mongoConnected = false;
 });
 
-mongoose.connection.on('error', (err) => {
+mongoose.connection.on('error', () => {
   mongoConnected = false;
-  console.warn(`⚠️ Error en conexión MongoDB: ${err.message}`);
+  console.warn('MongoDB connection error.');
 });
 
 export function getIsMongoConnected(): boolean {
@@ -41,9 +41,9 @@ export async function connectPrisma(): Promise<void> {
     await getPrismaClient().$connect();
     prismaConnected = true;
     console.log('✅ Prisma conectado (ROOM_STORE=prisma). Mongoose queda inactivo.');
-  } catch (error: any) {
+  } catch {
     prismaConnected = false;
-    console.warn(`⚠️ No se pudo conectar Prisma (${error.message}).`);
+    console.warn('Could not connect using Prisma.');
     console.log('⚡ Fallback: usando almacén en memoria.');
   }
 }
@@ -54,10 +54,10 @@ export async function connectDatabase(uri: string): Promise<void> {
       serverSelectionTimeoutMS: 2000,
     });
     mongoConnected = true;
-    console.log(`✅ MongoDB conectado exitosamente en: ${uri}`);
-  } catch (error: any) {
+    console.log('MongoDB connected.');
+  } catch {
     mongoConnected = false;
-    console.warn(`⚠️ No se pudo conectar a MongoDB (${error.message}).`);
+    console.warn('Could not connect to MongoDB.');
     console.log('⚡ Modo Desarrollo / Fallback: Usando almacén en memoria (In-Memory Store). Todo funcionará al 100% en local.');
   }
 }

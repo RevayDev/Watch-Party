@@ -1,23 +1,26 @@
 import { Server, Socket } from 'socket.io';
+import { z } from 'zod';
 import { activeMediaStates, activeUsers } from '../socket-state.js';
 
-/** Handler de relay WebRTC y estado de medios. Nombres de eventos y payloads idénticos al original. */
+const relayTarget = z.object({ targetSocketId: z.string().min(1) }).passthrough();
+
+/** Relays WebRTC signaling only between admitted members of the same room. */
 export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
-  // 4. WebRTC Signaling (Offers, Answers, ICE candidates)
+  function getRelayRequest(data: unknown) {
+    const parsed = relayTarget.safeParse(data);
+    if (!parsed.success) return null;
+    const sender = activeUsers.get(socket.id);
+    const target = activeUsers.get(parsed.data.targetSocketId);
+    return sender && !sender.pending && target && !target.pending && sender.roomId === target.roomId
+      ? parsed.data
+      : null;
+  }
+
   socket.on(
     'webrtc-offer',
-    (data: {
-      targetSocketId: string;
-      offer: unknown;
-      callerName: string;
-      callerIsLeader: boolean;
-    } | undefined) => {
-      if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
-      // Solo sockets conocidos de la misma sala pueden señalizar (anti-reflector).
-      const sender = activeUsers.get(socket.id);
-      const target = activeUsers.get(data.targetSocketId);
-      if (!sender || sender.pending || !target || target.pending) return;
-      if (sender.roomId !== target.roomId) return;
+    (input: unknown) => {
+      const data = getRelayRequest(input);
+      if (!data) return;
       io.to(data.targetSocketId).emit('webrtc-offer', {
         senderSocketId: socket.id,
         offer: data.offer,
@@ -27,24 +30,18 @@ export function registerWebrtcRelayHandlers(io: Server, socket: Socket): void {
     }
   );
 
-  socket.on('webrtc-answer', (data: { targetSocketId: string; answer: unknown } | undefined) => {
-    if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
-    const sender = activeUsers.get(socket.id);
-    const target = activeUsers.get(data.targetSocketId);
-    if (!sender || sender.pending || !target || target.pending) return;
-    if (sender.roomId !== target.roomId) return;
+  socket.on('webrtc-answer', (input: unknown) => {
+    const data = getRelayRequest(input);
+    if (!data) return;
     io.to(data.targetSocketId).emit('webrtc-answer', {
       senderSocketId: socket.id,
       answer: data.answer,
     });
   });
 
-  socket.on('webrtc-ice-candidate', (data: { targetSocketId: string; candidate: unknown } | undefined) => {
-    if (!data || typeof data.targetSocketId !== 'string' || !data.targetSocketId) return;
-    const sender = activeUsers.get(socket.id);
-    const target = activeUsers.get(data.targetSocketId);
-    if (!sender || sender.pending || !target || target.pending) return;
-    if (sender.roomId !== target.roomId) return;
+  socket.on('webrtc-ice-candidate', (input: unknown) => {
+    const data = getRelayRequest(input);
+    if (!data) return;
     io.to(data.targetSocketId).emit('webrtc-ice-candidate', {
       senderSocketId: socket.id,
       candidate: data.candidate,

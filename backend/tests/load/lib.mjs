@@ -40,7 +40,7 @@ export async function waitForHealth(baseUrl, { timeoutMs = 30000, intervalMs = 5
  * heapUsed/wsPeak de los reportes salen como `n/a`. Se conserva la función
  * para no romper los imports de `ramp.mjs` / `rooms-scenarios.mjs`.
  */
-export async function adminMetrics(_baseUrl) {
+export async function adminMetrics() {
   return null;
 }
 

@@ -8,6 +8,7 @@ import { IVideoMetadata } from '../types/room.types.js';
 import { findBannedEntry, isNameTaken } from '../domain/room.entity.js';
 import { AuthClaim, requireLeader, requireModerator } from '../domain/auth-policy.js';
 import { parseSpotifyUrl } from '../domain/spotify.js';
+import { parseYouTubeUrl } from '../domain/youtube.js';
 import { clearCinematicTrigger, clearRoomMessageAuthors } from '../sockets/socket-state.js';
 import { sanitizeRoomSettings } from '../domain/settings-policy.js';
 import {
@@ -411,15 +412,9 @@ export class RoomController {
         return;
       }
 
-      // YouTube link conversion / detection
-      const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtube-nocookie\.com\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
-      const isYouTube = Boolean(ytMatch && ytMatch[1]);
-      let ytVideoId: string | undefined;
-
-      if (isYouTube && ytMatch) {
-        ytVideoId = ytMatch[1];
-        cleanUrl = `https://www.youtube.com/watch?v=${ytVideoId}`;
-      }
+      const youtube = parseYouTubeUrl(cleanUrl);
+      const isYouTube = youtube !== null;
+      if (youtube) cleanUrl = youtube.cleanUrl;
 
       // Google Drive link conversion helper (e.g. drive.google.com/file/d/ID/view -> direct stream)
       const driveMatch = !isYouTube ? (cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
@@ -442,7 +437,7 @@ export class RoomController {
       }
 
       const originalName =
-        title?.trim() || (isYouTube ? `YouTube Karaoke (${ytVideoId})` : await resolveFallbackVideoName(cleanUrl, isHls, driveFileId));
+        title?.trim() || (youtube ? `YouTube Karaoke (${youtube.videoId})` : await resolveFallbackVideoName(cleanUrl, isHls, driveFileId));
 
       const videoMetadata: IVideoMetadata = {
         originalName,
@@ -451,7 +446,7 @@ export class RoomController {
         sizeBytes: 0,
         durationSeconds: 0,
         sourceType: isYouTube ? 'youtube' : isHls ? 'hls' : 'url',
-        directUrl: isYouTube ? `https://www.youtube-nocookie.com/embed/${ytVideoId}?enablejsapi=1` : cleanUrl,
+        directUrl: youtube?.embedUrl ?? cleanUrl,
       };
 
       const updatedRoom = await RoomService.updateRoomVideo(roomId, videoMetadata);

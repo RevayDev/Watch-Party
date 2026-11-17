@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Server as IOServer, Socket } from 'socket.io';
 import { registerMusicQueueHandlers } from '../src/sockets/handlers/music-queue.handler.js';
 import { RoomService } from '../src/services/room.service.js';
@@ -187,17 +187,7 @@ describe('music-queue.handler', () => {
     const { io, emitted } = makeIo();
     registerMusicQueueHandlers(io, socket);
     admit('s1', roomId, 'L', 'leader-1');
-    // El creador es leader en el store: requireModerator pasa.
-    const room = await RoomService.getRoomById(roomId);
-    const leader = room?.participants[0];
-    if (leader) leader.userId = 'leader-1';
-    await RoomService.save ? undefined : undefined;
-    const saved = await (RoomService as unknown as { 
-      // save no es público: usar updateSettings para persistir el userId
-    }).constructor;
-    void saved;
-    // Persistir el userId del leader vía rename (simplemente reclamamos con secret).
-    // Más simple: usar leaderSecret como claim.
+    // Authenticate with the room secret, as the host client does.
     const secret = (await RoomService.getRoomById(roomId))!.leaderSecret;
     await registered.get('music-next')?.({
       roomId,

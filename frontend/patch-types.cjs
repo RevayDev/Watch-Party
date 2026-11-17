@@ -1,4 +1,5 @@
-const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- This maintenance script runs as CommonJS.
+const fs = require('node:fs');
 let file = fs.readFileSync('src/types/room.ts', 'utf8');
 
 const replacement = [

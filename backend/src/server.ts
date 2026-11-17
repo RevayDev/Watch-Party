@@ -4,19 +4,18 @@ import { Server as SocketIOServer } from 'socket.io';
 import { createApp } from './app.js';
 import { connectDatabase, connectPrisma, isPrismaStore } from './config/database.js';
 import { isOriginAllowed } from './config/cors.js';
+import { readStartupEnv } from './config/env.js';
 import { setupSocketHandlers } from './sockets/room.socket.js';
 
 dotenv.config();
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/watch_party';
-
 async function startServer() {
+  const { port, mongoUri } = readStartupEnv(process.env);
   // 1. Connect database (Prisma si ROOM_STORE=prisma, si no Mongoose/memoria)
   if (isPrismaStore()) {
     await connectPrisma();
   } else {
-    await connectDatabase(MONGODB_URI);
+    await connectDatabase(mongoUri);
   }
 
   // 2. Initialize express app
@@ -46,11 +45,12 @@ async function startServer() {
   setupSocketHandlers(io);
 
   // 4. Start HTTP Server on all interfaces (0.0.0.0)
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Watch Party server running at http://localhost:${PORT}`);
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Watch Party server running at http://localhost:${port}`);
   });
 }
 
 startServer().catch((err) => {
   console.error('Fatal startup error:', err);
+  process.exitCode = 1;
 });
