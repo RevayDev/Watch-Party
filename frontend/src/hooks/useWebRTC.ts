@@ -43,12 +43,13 @@ const ICE_SERVERS: RTCConfiguration = {
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
   ],
-  iceCandidatePoolSize: 10,
 };
 
 export function useWebRTC(socket: Socket | null, roomId: string, userName: string, isLeader: boolean) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
+  const [failedPeers, setFailedPeers] = useState<ReadonlySet<string>>(() => new Set());
+  const iceConfiguration = useRef<RTCConfiguration>(ICE_SERVERS);
   const [peerMediaStates, setPeerMediaStates] = useState<Record<string, PeerMediaState>>({});
   const [isMicOn, setIsMicOn] = useState<boolean>(false);
   const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
@@ -77,7 +78,6 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   // Master local media tracks (live hardware)
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const localAudioTrackRef = useRef<MediaStreamTrack | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
 
   const isMicOnRef = useRef(false);
   const isCameraOnRef = useRef(false);
@@ -165,44 +165,22 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
   };
 
   // ── Attach Current Local Tracks to a PeerConnection ─────────────────────────
-  const attachLocalTracksToPC = useCallback((pc: RTCPeerConnection) => {
-    // 1. Audio Track / Transceiver
-    const audioSender = pc.getSenders().find((s) => s.track?.kind === 'audio');
-    if (localAudioTrackRef.current) {
-      if (audioSender) {
-        audioSender.replaceTrack(localAudioTrackRef.current).catch(() => {});
-      } else {
-        try { pc.addTrack(localAudioTrackRef.current, localStreamRef.current || new MediaStream()); } catch {}
-      }
-    } else {
-      if (audioSender) {
-        audioSender.replaceTrack(null).catch(() => {});
-      } else {
-        const audioTxr = pc.getTransceivers().find((t) => t.receiver.track?.kind === 'audio');
-        if (!audioTxr) {
-          pc.addTransceiver('audio', { direction: 'sendrecv' });
+  const attachLocalTracksToPC = useCallback(async (pc: RTCPeerConnection, createMissing = false) => {
+    const tracks = { audio: localAudioTrackRef.current, video: localVideoTrackRef.current };
+    const transceivers = pc.getTransceivers();
+    await Promise.all((['audio', 'video'] as const).map(async (kind) => {
+      const compatible = transceivers.filter((item) => item.receiver.track.kind === kind && item.direction !== 'stopped');
+      const transceiver = compatible.find((item) => item.mid !== null) ?? compatible[0];
+      if (transceiver) {
+        // Una pista apagada deja el sender vacío, pero mantiene la misma línea SDP.
+        transceiver.direction = 'sendrecv';
+        if (transceiver.sender.track !== tracks[kind]) {
+          await transceiver.sender.replaceTrack(tracks[kind]);
         }
+      } else if (createMissing) {
+        pc.addTransceiver(tracks[kind] ?? kind, { direction: 'sendrecv' });
       }
-    }
-
-    // 2. Video Track / Transceiver
-    const videoSender = pc.getSenders().find((s) => s.track?.kind === 'video');
-    if (localVideoTrackRef.current) {
-      if (videoSender) {
-        videoSender.replaceTrack(localVideoTrackRef.current).catch(() => {});
-      } else {
-        try { pc.addTrack(localVideoTrackRef.current, localStreamRef.current || new MediaStream()); } catch {}
-      }
-    } else {
-      if (videoSender) {
-        videoSender.replaceTrack(null).catch(() => {});
-      } else {
-        const videoTxr = pc.getTransceivers().find((t) => t.receiver.track?.kind === 'video');
-        if (!videoTxr) {
-          pc.addTransceiver('video', { direction: 'sendrecv' });
-        }
-      }
-    }
+    }));
   }, []);
 
   // ── Libera un peer por completo (usado al fallar tras reintentos o al salir) ──
@@ -220,6 +198,12 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     makingOfferRef.current.delete(targetSocketId);
     restartAttempts.current.delete(targetSocketId);
     lastFramesRef.current.delete(targetSocketId);
+    setFailedPeers((previous) => {
+      if (!previous.has(targetSocketId)) return previous;
+      const next = new Set(previous);
+      next.delete(targetSocketId);
+      return next;
+    });
     const timer = disconnectTimers.current.get(targetSocketId);
     if (timer) {
       clearTimeout(timer);
@@ -236,6 +220,17 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
 
   // Se asigna tras definir sendOffer (referencia estable para el monitor de ICE).
   const restartPeerRef = useRef<(targetSocketId: string) => void>(() => {});
+  const schedulePeerCheck = useCallback((targetId: string, pc: RTCPeerConnection, delay = 8_000) => {
+    if (disconnectTimers.current.has(targetId)) return;
+    const timer = setTimeout(() => {
+      disconnectTimers.current.delete(targetId);
+      if (peerConnections.current.get(targetId) !== pc || !socket?.connected) return;
+      if (pc.connectionState !== 'connected' && pc.connectionState !== 'closed') {
+        restartPeerRef.current(targetId);
+      }
+    }, delay);
+    disconnectTimers.current.set(targetId, timer);
+  }, [socket]);
 
   // ── Create or retrieve RTCPeerConnection ──────────────────────────────────
   const getOrCreatePeerConnection = useCallback(
@@ -245,7 +240,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       }
 
       const existing = peerConnections.current.get(targetSocketId);
-      if (existing && existing.connectionState !== 'closed' && existing.connectionState !== 'failed') {
+      if (existing && existing.connectionState !== 'closed') {
         return existing;
       }
       if (existing) {
@@ -255,7 +250,15 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       }
 
       console.log(`[WebRTC] Initializing connection with ${targetName} (${targetSocketId})`);
-      const pc = new RTCPeerConnection(ICE_SERVERS);
+      let pc: RTCPeerConnection;
+      try {
+        pc = new RTCPeerConnection(iceConfiguration.current);
+      } catch (error) {
+        if (iceConfiguration.current === ICE_SERVERS) throw error;
+        console.warn('[WebRTC] Configuración de TURN inválida; se usará STUN.');
+        iceConfiguration.current = ICE_SERVERS;
+        pc = new RTCPeerConnection(ICE_SERVERS);
+      }
       peerConnections.current.set(targetSocketId, pc);
 
       // Create DataChannel for instant P2P state
@@ -267,8 +270,6 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       pc.ondatachannel = (ev) => {
         setupDataChannel(ev.channel, targetSocketId);
       };
-
-      attachLocalTracksToPC(pc);
 
       // ICE candidate handler
       pc.onicecandidate = (ev) => {
@@ -311,10 +312,17 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       // 8 s y se reintenta ICE; 'failed' reintenta con backoff (tope 3).
       // La película principal no se ve afectada en ningún caso.
       pc.onconnectionstatechange = () => {
+        if (peerConnections.current.get(targetSocketId) !== pc) return;
         const state = pc.connectionState;
         console.log(`[WebRTC] Peer ${targetSocketId} state: ${state}`);
         if (state === 'connected') {
           restartAttempts.current.delete(targetSocketId);
+          setFailedPeers((previous) => {
+            if (!previous.has(targetSocketId)) return previous;
+            const next = new Set(previous);
+            next.delete(targetSocketId);
+            return next;
+          });
           const timer = disconnectTimers.current.get(targetSocketId);
           if (timer) {
             clearTimeout(timer);
@@ -323,52 +331,37 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
           syncRemotePeersState();
           return;
         }
-        if (state === 'disconnected') {
-          // Puede recuperarse solo (handoff WiFi/datos): esperar antes de actuar.
-          if (!disconnectTimers.current.has(targetSocketId)) {
-            const timer = setTimeout(() => {
-              disconnectTimers.current.delete(targetSocketId);
-              const current = peerConnections.current.get(targetSocketId);
-              if (current && current.connectionState === 'disconnected') {
-                console.log(`[WebRTC] Peer ${targetSocketId} sigue desconectado: reintentando ICE`);
-                restartPeerRef.current(targetSocketId);
-              }
-            }, 8000);
-            disconnectTimers.current.set(targetSocketId, timer);
-          }
-          return;
-        }
-        if (state === 'failed') {
-          const timer = disconnectTimers.current.get(targetSocketId);
-          if (timer) {
-            clearTimeout(timer);
-            disconnectTimers.current.delete(targetSocketId);
-          }
-          restartPeerRef.current(targetSocketId);
-          return;
-        }
         if (state === 'closed') {
           cleanupPeer(targetSocketId);
+        } else {
+          schedulePeerCheck(targetSocketId, pc);
         }
       };
 
+      // Una oferta perdida puede dejar el peer en "new" sin emitir un cambio de estado.
+      schedulePeerCheck(targetSocketId, pc);
       return pc;
     },
-    [socket, attachLocalTracksToPC, setupDataChannel, syncRemotePeersState, cleanupPeer]
+    [socket, setupDataChannel, syncRemotePeersState, cleanupPeer, schedulePeerCheck]
   );
 
   // ── Send Offer (Initial or Renegotiation) ──────────────────────────────────
   const sendOffer = useCallback(
-    async (targetId: string, name: string, leader: boolean) => {
+    async (targetId: string, name: string, leader: boolean, restart = false) => {
       const pc = getOrCreatePeerConnection(targetId, name, leader);
+      if (makingOfferRef.current.get(targetId)) return;
       try {
         makingOfferRef.current.set(targetId, true);
-        const offer = await pc.createOffer({
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: true,
-        });
+        if (restart && pc.signalingState === 'have-local-offer') {
+          await pc.setLocalDescription({ type: 'rollback' });
+        }
+        if (pc.signalingState !== 'stable') return;
+        await attachLocalTracksToPC(pc, true);
+        if (pc.signalingState !== 'stable') return;
+        const offer = await pc.createOffer(restart ? { iceRestart: true } : undefined);
+        if (pc.signalingState !== 'stable') return;
         await pc.setLocalDescription(offer);
-        if (socket) {
+        if (socket?.connected && peerConnections.current.get(targetId) === pc) {
           socket.emit('webrtc-offer', {
             targetSocketId: targetId,
             offer: pc.localDescription,
@@ -379,63 +372,34 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       } catch (err) {
         console.error(`[WebRTC] Error sending offer to ${targetId}:`, err);
       } finally {
-        makingOfferRef.current.set(targetId, false);
+        if (peerConnections.current.get(targetId) === pc) makingOfferRef.current.delete(targetId);
       }
     },
-    [getOrCreatePeerConnection, socket, userName, isLeader]
+    [attachLocalTracksToPC, getOrCreatePeerConnection, socket, userName, isLeader]
   );
 
-  // ── ICE restart ante señal caída: re-oferta sobre la misma PC si vive,
-  // si no recreación completa. Con backoff y tope (luego se suelta al peer).
   const restartPeerConnection = useCallback(
-    async (targetSocketId: string) => {
+    async (targetSocketId: string, force = false) => {
       const pc = peerConnections.current.get(targetSocketId);
       const meta = peerMeta.current.get(targetSocketId);
-      const name = meta?.userName ?? 'Participante';
-      const leader = meta?.isLeader ?? false;
-      if (!pc || pc.connectionState === 'closed') {
-        if (pc) {
-          try { pc.close(); } catch {}
-          peerConnections.current.delete(targetSocketId);
-        }
-        restartAttempts.current.delete(targetSocketId);
-        sendOffer(targetSocketId, name, leader);
+      if (!socket?.connected || !pc || pc.connectionState === 'closed') return;
+      if (!force && pc.connectionState === 'connected') return;
+      if (makingOfferRef.current.get(targetSocketId) || pc.signalingState === 'have-remote-offer') {
+        schedulePeerCheck(targetSocketId, pc);
         return;
       }
       const attempts = restartAttempts.current.get(targetSocketId) ?? 0;
       if (attempts >= MAX_ICE_RESTARTS) {
-        console.log(`[WebRTC] Peer ${targetSocketId} sin recuperación tras ${attempts} reintentos: se suelta`);
-        cleanupPeer(targetSocketId);
+        setFailedPeers((previous) => new Set(previous).add(targetSocketId));
         return;
       }
-      const delay = nextRestartDelayMs(attempts);
       restartAttempts.current.set(targetSocketId, attempts + 1);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      const current = peerConnections.current.get(targetSocketId);
-      if (!current || current.connectionState === 'connected') {
-        return;
-      }
-      try {
-        makingOfferRef.current.set(targetSocketId, true);
-        current.restartIce();
-        const offer = await current.createOffer({
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: true,
-        });
-        await current.setLocalDescription(offer);
-        socket?.emit('webrtc-offer', {
-          targetSocketId,
-          offer: current.localDescription,
-          callerName: userName,
-          callerIsLeader: isLeader,
-        });
-      } catch {
-        cleanupPeer(targetSocketId);
-      } finally {
-        makingOfferRef.current.set(targetSocketId, false);
+      await sendOffer(targetSocketId, meta?.userName ?? 'Participante', meta?.isLeader ?? false, true);
+      if (peerConnections.current.get(targetSocketId) === pc && pc.connectionState !== 'connected') {
+        schedulePeerCheck(targetSocketId, pc, 8_000 + nextRestartDelayMs(attempts));
       }
     },
-    [socket, userName, isLeader, sendOffer, cleanupPeer]
+    [socket, sendOffer, schedulePeerCheck]
   );
 
   // Referencia estable para el monitor de ICE (definido antes que sendOffer).
@@ -443,14 +407,13 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     restartPeerRef.current = restartPeerConnection;
   }, [restartPeerConnection]);
 
-  // ── Renegotiate with all peers ────────────────────────────────────────────
-  const renegotiateAllPeers = useCallback(() => {
-    peerConnections.current.forEach((pc, socketId) => {
-      const meta = peerMeta.current.get(socketId) || { userName: 'Participante', isLeader: false };
-      attachLocalTracksToPC(pc);
-      sendOffer(socketId, meta.userName, meta.isLeader);
-    });
-  }, [attachLocalTracksToPC, sendOffer]);
+  const retryMediaConnection = useCallback(() => {
+    setFailedPeers(new Set());
+    restartAttempts.current.clear();
+    for (const socketId of peerConnections.current.keys()) {
+      void restartPeerConnection(socketId, true);
+    }
+  }, [restartPeerConnection]);
 
   // ── Enable / Disable Media Dynamically with Hardware Switching ────────────
   const enableMedia = useCallback(
@@ -465,12 +428,9 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
               audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             });
             const realAudioTrack = stream.getAudioTracks()[0];
-            if (realAudioTrack) {
-              if (localAudioTrackRef.current && localAudioTrackRef.current.readyState === 'live') {
-                localAudioTrackRef.current.stop();
-              }
-              localAudioTrackRef.current = realAudioTrack;
-            }
+            if (!realAudioTrack) throw new DOMException('No se recibió una pista de audio.', 'NotFoundError');
+            localAudioTrackRef.current?.stop();
+            localAudioTrackRef.current = realAudioTrack;
           } else {
             if (localAudioTrackRef.current) {
               localAudioTrackRef.current.stop();
@@ -488,12 +448,9 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
               video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
             });
             const realVideoTrack = stream.getVideoTracks()[0];
-            if (realVideoTrack) {
-              if (localVideoTrackRef.current && localVideoTrackRef.current.readyState === 'live') {
-                localVideoTrackRef.current.stop();
-              }
-              localVideoTrackRef.current = realVideoTrack;
-            }
+            if (!realVideoTrack) throw new DOMException('No se recibió una pista de video.', 'NotFoundError');
+            localVideoTrackRef.current?.stop();
+            localVideoTrackRef.current = realVideoTrack;
           } else {
             if (localVideoTrackRef.current) {
               localVideoTrackRef.current.stop();
@@ -503,32 +460,6 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
           setIsCameraOn(videoRequested);
           isCameraOnRef.current = videoRequested;
         }
-
-        // 3. Update master local stream state
-        const tracks: MediaStreamTrack[] = [];
-        if (localAudioTrackRef.current) tracks.push(localAudioTrackRef.current);
-        if (localVideoTrackRef.current) tracks.push(localVideoTrackRef.current);
-        const updatedStream = tracks.length > 0 ? new MediaStream(tracks) : null;
-        localStreamRef.current = updatedStream;
-        setLocalStream(updatedStream ? new MediaStream(tracks) : null);
-
-        // 4. Update tracks across all peer connections and renegotiate
-        renegotiateAllPeers();
-
-        // 5. Broadcast instant state over Direct P2P DataChannels
-        broadcastMediaStateP2P(videoRequested, audioRequested);
-
-        // 6. Broadcast state via Socket.io
-        if (socket) {
-          socket.emit('peer-media-state', {
-            roomId,
-            userName,
-            isCameraOn: videoRequested,
-            isMicOn: audioRequested,
-          });
-        }
-
-        return updatedStream;
       } catch (err: any) {
         console.warn('⚠️ Media access error:', err.name, err.message);
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -540,11 +471,44 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
         } else {
           setMediaError(`Error de dispositivo: ${err.message || err.name}`);
         }
-        return null;
       }
+
+      // Publicar el estado real aunque el otro dispositivo haya fallado.
+      const tracks = [localAudioTrackRef.current, localVideoTrackRef.current]
+        .filter((track): track is MediaStreamTrack => track !== null);
+      const updatedStream = tracks.length > 0 ? new MediaStream(tracks) : null;
+      setLocalStream(updatedStream);
+      for (const [socketId, pc] of peerConnections.current) {
+        void attachLocalTracksToPC(pc).catch((error) => {
+          console.warn('[WebRTC] No se pudo actualizar la pista local:', error);
+          if (peerConnections.current.get(socketId) === pc) {
+            void restartPeerConnection(socketId, true);
+          }
+        });
+      }
+      const cameraOn = isCameraOnRef.current;
+      const micOn = isMicOnRef.current;
+      broadcastMediaStateP2P(cameraOn, micOn);
+      if (socket?.connected) {
+        socket.emit('peer-media-state', { roomId, userName, isCameraOn: cameraOn, isMicOn: micOn });
+      }
+      return updatedStream;
     },
-    [socket, roomId, userName, renegotiateAllPeers, broadcastMediaStateP2P]
+    [socket, roomId, userName, attachLocalTracksToPC, broadcastMediaStateP2P, restartPeerConnection]
   );
+
+  useEffect(() => {
+    const track = localStream?.getAudioTracks()[0];
+    if (!track) return;
+    const onEnded = () => {
+      if (localAudioTrackRef.current !== track) return;
+      void enableMedia(false, isCameraOnRef.current);
+      setMediaError('Se desconectó el micrófono. Vuelve a conectarlo y actívalo de nuevo.');
+    };
+    track.addEventListener('ended', onEnded);
+    if (track.readyState === 'ended') onEnded();
+    return () => track.removeEventListener('ended', onEnded);
+  }, [enableMedia, localStream]);
 
   // ── Toggle Microphone ──────────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {
@@ -726,18 +690,38 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     const onRoomState = (s: {
       peers?: Array<{ socketId: string; userName: string; isLeader: boolean }>;
       mediaStates?: Record<string, { isCameraOn: boolean; isMicOn: boolean; userName?: string }>;
+      turnServer?: RTCIceServer;
     }) => {
+      iceConfiguration.current = s.turnServer
+        ? { iceServers: [...(ICE_SERVERS.iceServers ?? []), s.turnServer] }
+        : ICE_SERVERS;
       if (s.peers && s.peers.length > 0) {
         console.log(`[WebRTC] Room state received: connecting to ${s.peers.length} peers`);
         for (const p of s.peers) {
           if (p.socketId && p.socketId !== socket.id) {
-            sendOffer(p.socketId, p.userName, p.isLeader);
+            const existing = peerConnections.current.get(p.socketId);
+            if (existing && s.turnServer) {
+              try {
+                existing.setConfiguration(iceConfiguration.current);
+              } catch {
+                console.warn('[WebRTC] No se pudo actualizar el relay de una conexión existente.');
+              }
+            }
+            if (existing?.connectionState !== 'connected') {
+              void sendOffer(p.socketId, p.userName, p.isLeader);
+            }
           }
         }
       }
       if (s.mediaStates) {
         setPeerMediaStates((prev) => ({ ...prev, ...s.mediaStates }));
       }
+      socket.emit('peer-media-state', {
+        roomId,
+        userName,
+        isCameraOn: isCameraOnRef.current,
+        isMicOn: isMicOnRef.current,
+      });
     };
 
     // 2. User Joined: prepare connection and announce our media state
@@ -775,11 +759,12 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
         await pc.setRemoteDescription(new RTCSessionDescription(d.offer));
         await drainPendingCandidates(d.senderSocketId, pc);
 
-        attachLocalTracksToPC(pc);
+        await attachLocalTracksToPC(pc);
 
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
+        if (!socket.connected || peerConnections.current.get(d.senderSocketId) !== pc) return;
         socket.emit('webrtc-answer', {
           targetSocketId: d.senderSocketId,
           answer: pc.localDescription,
@@ -863,32 +848,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
 
     // 7. Peer Left
     const onUserLeft = (d: { socketId: string; userName?: string }) => {
-      console.log(`[WebRTC] Peer disconnected: ${d.socketId}`);
-      const pc = peerConnections.current.get(d.socketId);
-      if (pc) {
-        try { pc.close(); } catch {}
-        peerConnections.current.delete(d.socketId);
-      }
-      dataChannels.current.delete(d.socketId);
-      peerMeta.current.delete(d.socketId);
-      pendingCandidates.current.delete(d.socketId);
-      remoteStreams.current.delete(d.socketId);
-      makingOfferRef.current.delete(d.socketId);
-      restartAttempts.current.delete(d.socketId);
-      lastFramesRef.current.delete(d.socketId);
-      const timer = disconnectTimers.current.get(d.socketId);
-      if (timer) {
-        clearTimeout(timer);
-        disconnectTimers.current.delete(d.socketId);
-      }
-      setPeerSignalStates((prev) => {
-        if (!(d.socketId in prev)) return prev;
-        const next = { ...prev };
-        delete next[d.socketId];
-        return next;
-      });
-      syncRemotePeersState();
-
+      cleanupPeer(d.socketId);
       setPeerMediaStates((prev) => {
         const next = { ...prev };
         delete next[d.socketId];
@@ -897,6 +857,15 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       });
     };
 
+    const onDisconnect = () => {
+      // El nuevo socket tiene otra identidad. Conservar las pistas locales para
+      // la malla nueva que se negocia al recibir room-state tras volver a entrar.
+      for (const peerId of peerConnections.current.keys()) cleanupPeer(peerId);
+      pendingCandidates.current.clear();
+      setPeerMediaStates({});
+    };
+
+    socket.on('disconnect', onDisconnect);
     socket.on('room-state', onRoomState);
     socket.on('user-joined', onUserJoined);
     socket.on('webrtc-offer', onOffer);
@@ -907,6 +876,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     socket.on('participant-renamed', onParticipantRenamed);
 
     return () => {
+      socket.off('disconnect', onDisconnect);
       socket.off('room-state', onRoomState);
       socket.off('user-joined', onUserJoined);
       socket.off('webrtc-offer', onOffer);
@@ -916,7 +886,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
       socket.off('user-left', onUserLeft);
       socket.off('participant-renamed', onParticipantRenamed);
     };
-  }, [socket, roomId, userName, sendOffer, getOrCreatePeerConnection, attachLocalTracksToPC, syncRemotePeersState, updatePeerMediaState]);
+  }, [socket, roomId, userName, sendOffer, getOrCreatePeerConnection, attachLocalTracksToPC, syncRemotePeersState, updatePeerMediaState, cleanupPeer]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -953,6 +923,8 @@ export function useWebRTC(socket: Socket | null, roomId: string, userName: strin
     isMicOn,
     isCameraOn,
     mediaError,
+    mediaConnectionFailed: failedPeers.size > 0,
+    retryMediaConnection,
     toggleMic,
     toggleCamera,
     enableMedia,

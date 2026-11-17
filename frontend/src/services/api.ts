@@ -1,4 +1,4 @@
-import { IRoomData, IRoomSettings, IVideoMetadata } from '../types/room';
+import { IMusicTrack, IRoomData, IRoomSettings, IVideoMetadata } from '../types/room';
 import { buildRestAuthHeaders, getStoredUserId } from '../shared/utils';
 import type { DemoAvailability } from '../shared/demo';
 
@@ -11,6 +11,17 @@ export { BACKEND_BASE };
 
 
 export class ApiService {
+  static async youtubeSearch(query: string, signal: AbortSignal): Promise<IMusicTrack[]> {
+    const params = new URLSearchParams({ q: query });
+    const response = await fetch(`${API_BASE_URL}/youtube/search?${params}`, { signal });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'No se pudo buscar en YouTube');
+    }
+    const { tracks } = await response.json();
+    return tracks;
+  }
+
   /**
    * Request backend to create a new room.
    */

@@ -1,20 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Youtube } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { notify } from "../services/notifications";
 import { BottomSheet } from "../shared/components/BottomSheet";
 import { isDemoMode } from "../shared/demo";
 import type { IRoomSettings } from "../types/room";
 import { DUCK_DEFAULT_PCT, DUCK_MAX_PCT, DUCK_MIN_PCT, clampDuckPct } from "../shared/perf";
-import { ApiService } from "../services/api";
-import {
-  clearOwnSpotify,
-  getOwnClientId,
-  getSelfStatus,
-  openOAuthTab,
-  setOwnClientId,
-  startSelfOAuth,
-} from "../features/room/components/spotifyUser";
-import { SelfSpotifyLink } from "../features/room/components/SelfSpotifyLink";
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -47,17 +36,6 @@ interface RoomSettingsModalProps {
   barShowLabels?: boolean;
   barLayout?: 'spread' | 'centered';
   onBarPrefsChange?: (patch: { showLabels?: boolean; layout?: 'spread' | 'centered' }) => void;
-  /** Sala para el bloque de conexión Spotify (sin roomId se oculta). */
-  roomId?: string;
-  /** Música y Karaoke (YouTube) (todo se emite por onUpdatePerf como Rendimiento). */
-  musicEnabled?: boolean;
-  musicAllowSearch?: boolean;
-  musicCanAdd?: 'anyone' | 'moderator';
-  musicQueueMode?: 'fifo' | 'votes';
-  musicCanRemove?: 'proposer' | 'moderator';
-  musicAllowReorder?: boolean;
-  musicRequireApproval?: boolean;
-  musicMaxPerUser?: number;
 }
 
 const TIMER_OPTIONS = [15, 30, 45, 60, 120, 180];
@@ -88,22 +66,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   barShowLabels = true,
   barLayout = 'spread',
   onBarPrefsChange,
-  roomId,
-  musicEnabled = false,
-  musicAllowSearch = true,
-  musicCanAdd = 'anyone',
-  musicQueueMode = 'fifo',
-  musicCanRemove = 'proposer',
-  musicAllowReorder = true,
-  musicRequireApproval = false,
-  musicMaxPerUser = 3,
 }) => {
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
   const [choice, setChoice] = useState<number | null>(timerMinutes);
-  // Organización por pestañas: General (sala+timer), Música, Barra (local),
-  // Rendimiento. Mismo contenido y handlers, solo agrupado.
-  const [tab, setTab] = useState<'general' | 'musica' | 'barra' | 'rendimiento'>('general');
+  // Organización por pestañas: General, Barra (local) y Rendimiento.
+  // Mismo contenido y handlers, solo agrupado.
+  const [tab, setTab] = useState<'general' | 'barra' | 'rendimiento'>('general');
 
   // Demo: la persistencia y el cierre automático configurable quedan
   // deshabilitados solo visualmente (el timer lo pone el servidor).
@@ -147,103 +116,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   const perfDisabled = !canEdit || !onUpdatePerf;
   const duckPct = clampDuckPct(duckingLevelPct);
 
-  const refreshSpotStatus = useCallback(async () => {
-    if (!roomId) return;
-    try {
-      const s = await ApiService.spotifyStatus(roomId);
-      setSpotConnected(s.connected === true);
-      setSpotConfigured(s.configured !== false);
-    } catch {
-      setSpotConnected(null);
-    }
-  }, [roomId]);
-
-  // ── Música y Spotify: estado de conexión (solo con roomId) ─────────────
-  const [spotConnected, setSpotConnected] = useState<boolean | null>(null);
-  const [spotConfigured, setSpotConfigured] = useState(true);
-  const [spotBusy, setSpotBusy] = useState(false);
-  // Cuenta propia (sin .env): se ofrece cuando el servidor no la da.
-  const [selfLinked, setSelfLinked] = useState(false);
-  const [selfAccount, setSelfAccount] = useState<string | null>(null);
-  const refreshSelfStatus = useCallback(async () => {
-    try {
-      const s = await getSelfStatus();
-      setSelfLinked(s.connected);
-      setSelfAccount(s.accountName);
-    } catch {
-      setSelfLinked(false);
-      setSelfAccount(null);
-    }
-  }, []);
-  useEffect(() => {
-    if (!isOpen || !roomId) return;
-    let alive = true;
-    setSpotConnected(null);
-    ApiService.spotifyStatus(roomId)
-      .then((s) => {
-        if (!alive) return;
-        setSpotConnected(s.connected === true);
-        setSpotConfigured(s.configured !== false);
-      })
-      .catch(() => {
-        if (alive) setSpotConnected(null);
-      });
-    void refreshSelfStatus();
-    // Al volver de la pestaña de Spotify, re-consulta el estado.
-    const onFocus = () => {
-      void refreshSpotStatus();
-      void refreshSelfStatus();
-    };
-    window.addEventListener('focus', onFocus);
-    return () => {
-      alive = false;
-      window.removeEventListener('focus', onFocus);
-    };
-  }, [isOpen, roomId, refreshSpotStatus, refreshSelfStatus]);
-
-  const handleSpotConnect = async () => {
-    if (!roomId || spotBusy) return;
-    setSpotBusy(true);
-    try {
-      const ok = await openOAuthTab(async () => (await ApiService.spotifyAuthUrl(roomId)).authUrl);
-      if (!ok) notify('error', 'Spotify no está configurado en este servidor.', 'Spotify');
-    } catch (err: unknown) {
-      notify('error', err instanceof Error ? err.message : 'No se pudo conectar Spotify', 'Spotify');
-    } finally {
-      setSpotBusy(false);
-    }
-  };
-
-  const handleSelfConnect = async () => {
-    const clientId = getOwnClientId();
-    if (!clientId) return;
-    setSpotBusy(true);
-    try {
-      const ok = await openOAuthTab(async () => (await startSelfOAuth(clientId, roomId ?? '')).authUrl);
-      if (!ok) notify('error', 'No se pudo iniciar la vinculación.', 'Spotify');
-    } finally {
-      setSpotBusy(false);
-    }
-  };
-
-  const handleSpotDisconnect = async () => {
-    if (!roomId || spotBusy) return;
-    setSpotBusy(true);
-    try {
-      await ApiService.spotifyDisconnect(roomId);
-      setSpotConnected(false);
-    } catch (err: unknown) {
-      notify('error', err instanceof Error ? err.message : 'No se pudo desconectar Spotify', 'Spotify');
-    } finally {
-      setSpotBusy(false);
-    }
-  };
-
-  const clampMaxPerUser = (v: number): number => {
-    if (!Number.isFinite(v)) return 3;
-    return Math.min(20, Math.max(1, Math.round(v)));
-  };
-
   return (
     <BottomSheet
       open={isOpen}
@@ -259,7 +131,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
           {(
             [
               ['general', 'General'],
-              ['musica', 'Música'],
               ['barra', 'Barra'],
               ['rendimiento', 'Rendimiento'],
             ] as const
@@ -617,236 +488,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             <p className="room-settings__box-desc">
               Izquierda, centro y derecha separados en PC.
             </p>
-        </div>
-        )}
-
-        {/* Música & YouTube: sub-secciones Cola / Permisos / Límites / Conexión */}
-        {tab === 'musica' && (
-        <div className="room-settings__box room-settings__box--full room-settings__music-container" style={{ padding: '1.25rem' }}>
-            <div className="room-settings__box-head room-settings__box-head--title">
-              <span className="room-settings__box-title">Música y Karaoke (YouTube)</span>
-            </div>
-
-            {/* Hero Banner: YouTube Music & Karaoke */}
-            <div className="room-settings__hero-banner">
-              <div className="room-settings__hero-icon">
-                <Youtube size={24} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <h3 className="room-settings__hero-title">
-                  <span>Música & Karaoke con YouTube</span>
-                  <span className="room-settings__hero-badge">Recomendado</span>
-                </h3>
-                <p className="room-settings__hero-desc">
-                  ¡Audio 100% compartido para toda la sala sin suscripciones de pago! Disfruta de canciones con letras sincronizadas y karaoke pegando cualquier enlace de <strong>YouTube</strong> directamente con el botón <em>"Cambiar"</em> del reproductor.
-                </p>
-              </div>
-            </div>
-
-            {!canEdit && (
-              <p className="room-settings__box-desc" style={{ marginTop: 0 }}>
-                Solo el anfitrión puede cambiar estos ajustes de la cola.
-              </p>
-            )}
-
-            {/* Subsección: Opciones de la Cola */}
-            <h4 className="room-settings__subhead">Cola de canciones</h4>
-
-            <div className="room-settings__grid-cards">
-              <div className="room-settings__card-row">
-                <div className="room-settings__card-info">
-                  <span className="room-settings__card-title">Funciones musicales</span>
-                  <p className="room-settings__card-desc">Habilita o desactiva la cola colaborativa de la sala.</p>
-                </div>
-                <label className="part-switch" style={{ margin: 0, flexShrink: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={musicEnabled}
-                    disabled={perfDisabled}
-                    onChange={(e) => onUpdatePerf?.({ musicEnabled: e.target.checked })}
-                    title="Activa la cola musical colaborativa de la sala"
-                  />
-                  <span className="part-slider" />
-                </label>
-              </div>
-
-              <div className="room-settings__card-row">
-                <div className="room-settings__card-info">
-                  <span className="room-settings__card-title">Búsqueda y propuestas</span>
-                  <p className="room-settings__card-desc">Permite a los miembros buscar temas y agregarlos a la cola.</p>
-                </div>
-                <label className="part-switch" style={{ margin: 0, flexShrink: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={musicAllowSearch}
-                    disabled={perfDisabled}
-                    onChange={(e) => onUpdatePerf?.({ musicAllowSearch: e.target.checked })}
-                    title="Permite proponer canciones a la cola"
-                  />
-                  <span className="part-slider" />
-                </label>
-              </div>
-
-              <div className="room-settings__card-row">
-                <div className="room-settings__card-info">
-                  <span className="room-settings__card-title">Reordenar (moderador)</span>
-                  <p className="room-settings__card-desc">Los moderadores pueden mover y priorizar temas.</p>
-                </div>
-                <label className="part-switch" style={{ margin: 0, flexShrink: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={musicAllowReorder}
-                    disabled={perfDisabled}
-                    onChange={(e) => onUpdatePerf?.({ musicAllowReorder: e.target.checked })}
-                    title="Los moderadores pueden reordenar la cola"
-                  />
-                  <span className="part-slider" />
-                </label>
-              </div>
-
-              <div className="room-settings__card-row">
-                <div className="room-settings__card-info">
-                  <span className="room-settings__card-title">Aprobar propuestas</span>
-                  <p className="room-settings__card-desc">Las canciones requieren visto bueno antes de sonar.</p>
-                </div>
-                <label className="part-switch" style={{ margin: 0, flexShrink: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={musicRequireApproval}
-                    disabled={perfDisabled}
-                    onChange={(e) => onUpdatePerf?.({ musicRequireApproval: e.target.checked })}
-                    title="Las propuestas esperan aprobación de un moderador"
-                  />
-                  <span className="part-slider" />
-                </label>
-              </div>
-            </div>
-
-            {/* Subsección: Permisos y Reglas */}
-            <h4 className="room-settings__subhead">Permisos</h4>
-
-            <div className="room-settings__form-grid">
-              <div className="room-settings__field-card">
-                <label className="room-settings__field-label" htmlFor="music-can-add">
-                  Quién puede proponer
-                </label>
-                <select
-                  id="music-can-add"
-                  className="room-settings__input"
-                  value={musicCanAdd}
-                  disabled={perfDisabled}
-                  onChange={(e) => onUpdatePerf?.({ musicCanAdd: e.target.value as 'anyone' | 'moderator' })}
-                >
-                  <option value="anyone">Todos los miembros</option>
-                  <option value="moderator">Solo moderadores</option>
-                </select>
-              </div>
-
-              <div className="room-settings__field-card">
-                <label className="room-settings__field-label" htmlFor="music-order">
-                  Orden de la cola
-                </label>
-                <select
-                  id="music-order"
-                  className="room-settings__input"
-                  value={musicQueueMode}
-                  disabled={perfDisabled}
-                  onChange={(e) => onUpdatePerf?.({ musicQueueMode: e.target.value as 'fifo' | 'votes' })}
-                >
-                  <option value="fifo">Orden de llegada</option>
-                  <option value="votes">Por votación</option>
-                </select>
-              </div>
-
-              <div className="room-settings__field-card">
-                <label className="room-settings__field-label" htmlFor="music-can-remove">
-                  Quién puede quitar
-                </label>
-                <select
-                  id="music-can-remove"
-                  className="room-settings__input"
-                  value={musicCanRemove}
-                  disabled={perfDisabled}
-                  onChange={(e) => onUpdatePerf?.({ musicCanRemove: e.target.value as 'proposer' | 'moderator' })}
-                >
-                  <option value="proposer">Proponente</option>
-                  <option value="moderator">Moderadores</option>
-                </select>
-              </div>
-            </div>
-
-            <h4 className="room-settings__subhead">Límites</h4>
-
-            <div className="room-settings__form-grid">
-              <div className="room-settings__field-card">
-                <label className="room-settings__field-label" htmlFor="music-max-user">
-                  Máximo por persona
-                </label>
-                <input
-                  id="music-max-user"
-                  type="number"
-                  className="room-settings__input"
-                  min={1}
-                  max={20}
-                  value={musicMaxPerUser}
-                  disabled={perfDisabled}
-                  onChange={(e) => onUpdatePerf?.({ musicMaxPerUser: clampMaxPerUser(Number(e.target.value)) })}
-                />
-              </div>
-            </div>
-
-            {/* Subsección: Conexión */}
-            {roomId && (
-              <>
-                <h4 className="room-settings__subhead">Conexión</h4>
-                {spotConfigured ? (
-                  <div className="room-settings__card-row">
-                    <div className="room-settings__card-info">
-                      <span className="room-settings__card-title">
-                        Spotify {spotConnected === null ? '' : spotConnected ? '● conectado' : '○ desconectado'}
-                      </span>
-                      <p className="room-settings__card-desc">
-                        {spotConnected 
-                          ? 'Cuenta conectada para buscar canciones en Spotify.' 
-                          : 'Opcional si deseas importar búsquedas desde tu cuenta.'}
-                      </p>
-                    </div>
-                    {spotConnected ? (
-                      <button
-                        type="button"
-                        className="leader-exit-modal__cancel-btn"
-                        disabled={spotBusy}
-                        onClick={() => void handleSpotDisconnect()}
-                      >
-                        Desconectar
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn--primary"
-                        disabled={spotBusy}
-                        onClick={() => void handleSpotConnect()}
-                      >
-                        Conectar
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <SelfSpotifyLink
-                    linked={selfLinked}
-                    accountName={selfAccount}
-                    ownClientId={getOwnClientId()}
-                    busy={spotBusy}
-                    onSaveClientId={(id) => setOwnClientId(id)}
-                    onConnect={() => void handleSelfConnect()}
-                    onUnlink={() => {
-                      clearOwnSpotify();
-                      void refreshSelfStatus();
-                    }}
-                  />
-                )}
-              </>
-            )}
         </div>
         )}
 

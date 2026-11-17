@@ -12,6 +12,7 @@ import {
   activeUsers,
   activeMediaStates,
   clearCinematicTrigger,
+  clearRoomMessageAuthors,
 } from '../sockets/socket-state.js';
 import { dropPosition, roomPlayback, roomPositions } from '../domain/playback-policy.js';
 import { clearVideoReady, pruneVideoReadySocket } from '../sockets/handlers/video-ready.handler.js';
@@ -126,6 +127,7 @@ async function closeRoomEverywhere(
   roomPositions.delete(cleanRoomId);
   clearVideoReady(cleanRoomId);
   clearCinematicTrigger(cleanRoomId);
+  clearRoomMessageAuthors(cleanRoomId);
   return RoomService.deleteRoom(cleanRoomId, forceDeleteVideo);
 }
 

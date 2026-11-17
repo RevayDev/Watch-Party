@@ -5,6 +5,9 @@ import { render, act, fireEvent } from '@testing-library/react';
 import { VideoPlayer } from '../src/features/player/VideoPlayer';
 
 vi.mock('../src/shared/components/BottomSheet', () => ({ BottomSheet: () => null }));
+vi.mock('../src/features/player/YouTubePlayerView', () => ({
+  YouTubePlayerView: ({ videoId }: { videoId: string }) => <div data-youtube-id={videoId} />,
+}));
 
 let mockPaused = true;
 
@@ -28,10 +31,24 @@ const VIDEO = {
 
 interface PlayerOpts {
   isLeader?: boolean;
-  video?: typeof VIDEO | null;
+  video?: React.ComponentProps<typeof VideoPlayer>['video'];
   cinematicKey?: number;
   cinematicQuotes?: [string, string, string] | null;
 }
+
+it('muestra en el reproductor principal un video ampliado con URL de privacidad', () => {
+  const { container } = renderPlayer(vi.fn(), {
+    video: {
+      ...VIDEO,
+      originalName: 'Bohemian Rhapsody',
+      fileName: 'https://www.youtube.com/watch?v=PW6ZSzdjrlo',
+      sourceType: 'youtube',
+      mimeType: 'video/youtube',
+      directUrl: 'https://www.youtube-nocookie.com/embed/PW6ZSzdjrlo?enablejsapi=1',
+    },
+  });
+  expect(container.querySelector('[data-youtube-id="PW6ZSzdjrlo"]')).not.toBeNull();
+});
 
 function renderPlayer(onSyncAction: ReturnType<typeof vi.fn>, opts: PlayerOpts = {}) {
   const props = {

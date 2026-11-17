@@ -43,9 +43,10 @@ function modalProps(overrides: Partial<Record<string, any>> = {}) {
 describe('RoomSettingsModal (Tu vista de la barra)', () => {
   it('muestra las pestañas y la sección personal tras pulsar Barra', async () => {
     render(<RoomSettingsModal {...modalProps()} />);
-    for (const t of ['General', 'Música', 'Barra', 'Rendimiento']) {
+    for (const t of ['General', 'Barra', 'Rendimiento']) {
       expect(screen.getByRole('tab', { name: t })).toBeDefined();
     }
+    expect(screen.queryByRole('tab', { name: 'Música' })).toBeNull();
     // La barra no se ve hasta pulsar su pestaña.
     expect(screen.queryByText(/tu vista de la barra/i)).toBeNull();
     await act(async () => {
@@ -89,8 +90,8 @@ describe('RoomSettingsModal (Tu vista de la barra)', () => {
   });
 });
 
-describe('RoomSettingsModal (Música por secciones)', () => {
-  function musicProps(overrides: Partial<Record<string, any>> = {}) {
+describe('RoomSettingsModal (sin pestaña de Música)', () => {
+  function baseProps(overrides: Partial<Record<string, any>> = {}) {
     return {
       isOpen: true,
       onClose: vi.fn(),
@@ -101,66 +102,17 @@ describe('RoomSettingsModal (Música por secciones)', () => {
       onSaveDetails: vi.fn(),
       onSetTimer: vi.fn(),
       canEdit: true,
-      roomId: 'ABC123',
       onUpdatePerf: vi.fn(),
       ...overrides,
     };
   }
 
-  it('muestra las sub-secciones Cola, Permisos, Límites y Conexión', async () => {
-    render(<RoomSettingsModal {...musicProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Música' }));
-    });
-    for (const h of ['Cola de canciones', 'Permisos', 'Límites', 'Conexión']) {
-      expect(screen.getByText(h)).toBeDefined();
+  it('solo ofrece General, Barra y Rendimiento', () => {
+    render(<RoomSettingsModal {...baseProps()} />);
+    for (const t of ['General', 'Barra', 'Rendimiento']) {
+      expect(screen.getByRole('tab', { name: t })).toBeDefined();
     }
-  });
-
-  it('los selects van apilados con su etiqueta accesible y emiten', async () => {
-    const onUpdatePerf = vi.fn();
-    render(<RoomSettingsModal {...musicProps({ onUpdatePerf })} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Música' }));
-    });
-    const sel = screen.getByLabelText('Quién puede proponer') as HTMLSelectElement;
-    await act(async () => {
-      fireEvent.change(sel, { target: { value: 'moderator' } });
-    });
-    expect(onUpdatePerf).toHaveBeenCalledWith({ musicCanAdd: 'moderator' });
-    expect(screen.getByLabelText('Orden de la cola')).toBeDefined();
-    expect(screen.getByLabelText('Quién puede quitar')).toBeDefined();
-    expect(screen.getByLabelText('Máximo por persona')).toBeDefined();
-  });
-
-  it('Conectar abre el OAuth en pestaña nueva sin perder el modal', async () => {
-    const location = { href: '' };
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(
-      () => ({ closed: false, location }) as unknown as Window
-    );
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        json: async () => ({ authUrl: 'https://accounts.spotify.com/authorize?x=1' }),
-      }))
-    );
-    render(<RoomSettingsModal {...musicProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Música' }));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByText('Conectar'));
-    });
-    expect(openSpy).toHaveBeenCalledWith('about:blank', '_blank', 'noopener,noreferrer');
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(location.href).toBe('https://accounts.spotify.com/authorize?x=1');
-    // El modal sigue abierto.
-    expect(screen.getByText('Música y Spotify')).toBeDefined();
-    openSpy.mockRestore();
-    vi.unstubAllGlobals();
+    expect(screen.queryByRole('tab', { name: 'Música' })).toBeNull();
+    expect(screen.queryByText('Cola de canciones')).toBeNull();
   });
 });

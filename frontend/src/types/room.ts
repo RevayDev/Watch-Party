@@ -132,6 +132,7 @@ export interface IMusicNowPlaying {
   uri?: string;
   openUrl?: string;
   proposedBy?: string;
+  proposedByUserId?: string;
   startedAt: string;
   startedBy: string;
 }
@@ -141,6 +142,10 @@ export interface ChatMessage {
   user: string;
   text: string;
   timestamp: string;
+  /** Marca de edición (solo el autor puede editar). */
+  edited?: boolean;
+  /** Cita al responder (autor + fragmento del mensaje original). */
+  replyTo?: { id: string; user: string; text: string } | null;
 }
 
 export interface ReactionItem {

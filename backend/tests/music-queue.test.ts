@@ -45,32 +45,49 @@ afterEach(async () => {
 });
 
 describe('RoomService.addMusicEntry', () => {
-  it('encola un tema válido', async () => {
+  it('encola un tema válido (el primero arranca solo)', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     const updated = await RoomService.addMusicEntry(room.roomId, entryOf());
-    expect(updated?.musicQueue).toHaveLength(1);
-    const e = updated!.musicQueue![0];
-    expect(e.trackId).toBe(TRACK.trackId);
-    expect(e.status).toBe('queued');
-    expect(e.votes).toEqual([]);
-    expect(e.id).toBeTruthy();
+    expect(updated?.musicQueue).toHaveLength(0);
+    const np = updated!.musicNowPlaying!;
+    expect(np.trackId).toBe(TRACK.trackId);
+    expect(np.proposedBy).toBe('Ana');
+    expect(np.entryId).toBeTruthy();
   });
 
-  it('ignora duplicados (mismo trackId)', async () => {
+  it('el primer tema arranca solo (auto-start estilo Spotify)', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
+    const updated = await RoomService.addMusicEntry(room.roomId, entryOf());
+    // No queda en cola: pasa directo a sonar.
+    expect(updated?.musicQueue).toHaveLength(0);
+    expect(updated?.musicNowPlaying?.trackId).toBe(TRACK.trackId);
+    expect(updated?.musicNowPlaying?.startedBy).toBe('sala');
+    // El segundo sí queda en cola.
+    const again = await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'bbbbbbbbBB' }));
+    expect(again?.musicQueue).toHaveLength(1);
+    expect(again?.musicNowPlaying?.trackId).toBe(TRACK.trackId);
+  });
+
+  it('ignora duplicados (mismo trackId en cola o sonando)', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await RoomService.addMusicEntry(room.roomId, entryOf());
+    // Mismo track sonando: se rechaza aunque la cola esté vacía.
     const again = await RoomService.addMusicEntry(room.roomId, entryOf({ proposedBy: 'Beto' }));
-    expect(again?.musicQueue).toHaveLength(1);
+    expect(again?.musicQueue).toHaveLength(0);
+    expect(again?.musicNowPlaying?.trackId).toBe(TRACK.trackId);
   });
 
-  it('respeta el tope por usuario (musicMaxPerUser)', async () => {
+  it('respeta el tope por usuario (musicMaxPerUser, incluye lo que suena)', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await RoomService.updateSettings(room.roomId, { musicMaxPerUser: 2 });
     for (const id of ['aaaaaaaaAA', 'bbbbbbbbBB', 'ccccccccCC']) {
       await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: id, proposedBy: 'Ana' }));
     }
     const after = await RoomService.getRoomById(room.roomId);
-    expect(after?.musicQueue).toHaveLength(2);
+    // aaa suena + bbb en cola = tope de 2 → ccc bloqueada.
+    expect(after?.musicNowPlaying?.trackId).toBe('aaaaaaaaAA');
+    expect(after?.musicQueue).toHaveLength(1);
+    expect(after?.musicQueue?.[0].trackId).toBe('bbbbbbbbBB');
   });
 
   it('cuenta por userId (no por nombre) cuando hay identidad', async () => {
@@ -80,12 +97,14 @@ describe('RoomService.addMusicEntry', () => {
       room.roomId,
       entryOf({ proposedBy: 'Ana', proposedByUserId: 'u-1' })
     );
-    // Mismo userId con otro nombre visible: sigue siendo el mismo usuario.
+    // Mismo userId con otro nombre visible: sigue siendo el mismo usuario
+    // (lo que suena también cuenta para el tope).
     const blocked = await RoomService.addMusicEntry(
       room.roomId,
       entryOf({ trackId: 'bbbbbbbbBB', proposedBy: 'Otro', proposedByUserId: 'u-1' })
     );
-    expect(blocked?.musicQueue).toHaveLength(1);
+    expect(blocked?.musicQueue).toHaveLength(0);
+    expect(blocked?.musicNowPlaying?.trackId).toBe(TRACK.trackId);
   });
 
   it('rechaza entradas inválidas (trackId corto, campos vacíos)', async () => {
@@ -101,7 +120,7 @@ describe('RoomService.addMusicEntry', () => {
     expect(updated?.musicQueue?.[0].status).toBe('pending');
   });
 
-  it('10 adds concurrentes del mismo track → 1 entrada', async () => {
+  it('10 adds concurrentes del mismo track → 1 sonando, 0 en cola', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await Promise.all(
       Array.from({ length: 10 }, () =>
@@ -109,7 +128,8 @@ describe('RoomService.addMusicEntry', () => {
       )
     );
     const after = await RoomService.getRoomById(room.roomId);
-    expect(after?.musicQueue).toHaveLength(1);
+    expect(after?.musicQueue).toHaveLength(0);
+    expect(after?.musicNowPlaying?.trackId).toBe(TRACK.trackId);
   });
 });
 
@@ -117,8 +137,9 @@ describe('RoomService.toggleMusicVote', () => {
   it('alterna el voto por identidad (userId o nombre)', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await RoomService.updateSettings(room.roomId, { musicQueueMode: 'votes' });
-    const updated = await RoomService.addMusicEntry(room.roomId, entryOf());
-    const id = updated!.musicQueue![0].id;
+    await RoomService.addMusicEntry(room.roomId, entryOf());
+    const second = await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'bbbbbbbbBB' }));
+    const id = second!.musicQueue![0].id;
     const voted = await RoomService.toggleMusicVote(room.roomId, id, { name: 'Beto' });
     expect(voted?.musicQueue?.[0].votes).toEqual(['beto']);
     const unvoted = await RoomService.toggleMusicVote(room.roomId, id, { name: 'beto' });
@@ -143,8 +164,10 @@ describe('RoomService.removeMusicEntry', () => {
   async function roomWithEntry(mode?: 'proposer' | 'moderator') {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     if (mode) await RoomService.updateSettings(room.roomId, { musicCanRemove: mode });
-    const updated = await RoomService.addMusicEntry(room.roomId, entryOf());
-    return { roomId: room.roomId, entryId: updated!.musicQueue![0].id };
+    await RoomService.addMusicEntry(room.roomId, entryOf());
+    // El primero arranca solo; el segundo queda en cola para operar.
+    const second = await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'bbbbbbbbBB' }));
+    return { roomId: room.roomId, entryId: second!.musicQueue![0].id };
   }
 
   it('el proponente puede quitar su tema (default proposer)', async () => {
@@ -188,21 +211,24 @@ describe('RoomService.reorderMusicQueue', () => {
   async function roomWithQueue(): Promise<{ roomId: string; ids: string[] }> {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await RoomService.updateSettings(room.roomId, { musicAllowReorder: true });
-    for (const id of ['aaaaaaaaAA', 'bbbbbbbbBB', 'ccccccccCC']) {
-      await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: id }));
-    }
+    // El primero arranca solo; la cola queda con los otros dos.
+    await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'aaaaaaaaAA' }));
+    await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'bbbbbbbbBB' }));
+    await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'ccccccccCC' }));
     return { roomId: room.roomId, ids: await idsOf(room.roomId) };
   }
 
   it('reordena con moderador + musicAllowReorder', async () => {
     const { roomId, ids } = await roomWithQueue();
-    const res = await RoomService.reorderMusicQueue(roomId, [ids[2], ids[0], ids[1]], true);
-    expect((res?.musicQueue ?? []).map((e) => e.id)).toEqual([ids[2], ids[0], ids[1]]);
+    expect(ids).toHaveLength(2);
+    const res = await RoomService.reorderMusicQueue(roomId, [ids[1], ids[0]], true);
+    expect((res?.musicQueue ?? []).map((e) => e.id)).toEqual([ids[1], ids[0]]);
   });
 
   it('sin musicAllowReorder no reordena', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await RoomService.addMusicEntry(room.roomId, entryOf());
+    await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'bbbbbbbbBB' }));
     const ids = await idsOf(room.roomId);
     const res = await RoomService.reorderMusicQueue(room.roomId, [ids[0]], true);
     // No-op válido: la cola queda igual (el permiso falla silenciosamente).
@@ -211,13 +237,13 @@ describe('RoomService.reorderMusicQueue', () => {
 
   it('order con set distinto se ignora', async () => {
     const { roomId, ids } = await roomWithQueue();
-    const res = await RoomService.reorderMusicQueue(roomId, [ids[0], ids[1]], true);
+    const res = await RoomService.reorderMusicQueue(roomId, [ids[0]], true);
     expect((res?.musicQueue ?? []).map((e) => e.id)).toEqual(ids);
   });
 
   it('no moderador no reordena', async () => {
     const { roomId, ids } = await roomWithQueue();
-    const res = await RoomService.reorderMusicQueue(roomId, [ids[1], ids[2], ids[0]], false);
+    const res = await RoomService.reorderMusicQueue(roomId, [ids[1], ids[0]], false);
     expect((res?.musicQueue ?? []).map((e) => e.id)).toEqual(ids);
   });
 });
@@ -238,32 +264,45 @@ describe('RoomService.advanceMusicQueue', () => {
   async function roomWithTwo(mode: 'fifo' | 'votes') {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await RoomService.updateSettings(room.roomId, { musicQueueMode: mode });
-    // Orden garantizado por createdAt (creciente por ejecución secuencial).
+    // El primero arranca solo; el segundo queda en cola.
     const first = await RoomService.addMusicEntry(
       room.roomId,
       entryOf({ trackId: 'aaaaaaaaAA' })
     );
     await new Promise((r) => setTimeout(r, 5));
     await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'bbbbbbbbBB' }));
-    return { roomId: room.roomId, firstId: first!.musicQueue![0].id };
+    return {
+      roomId: room.roomId,
+      playingId: first!.musicNowPlaying!.entryId,
+      queuedIds: await idsOf(room.roomId),
+    };
   }
 
   it('fifo avanza el más antiguo sin tocar el video', async () => {
-    const { roomId, firstId } = await roomWithTwo('fifo');
+    const { roomId, playingId, queuedIds } = await roomWithTwo('fifo');
+    expect(playingId).toBeTruthy();
+    expect(queuedIds).toHaveLength(1);
     const res = await RoomService.advanceMusicQueue(roomId);
-    expect(res?.musicNowPlaying?.entryId).toBe(firstId);
+    expect(res?.musicNowPlaying?.entryId).toBe(queuedIds[0]);
     expect(res?.musicNowPlaying?.startedBy).toBe('sala');
     // Solo metadatos: el reproductor de películas queda intacto.
     expect(res?.video ?? null).toBeNull();
-    expect(res?.musicQueue).toHaveLength(1);
+    expect(res?.musicQueue).toHaveLength(0);
   });
 
   it('votes avanza el más votado (empate: el más antiguo)', async () => {
-    const { roomId } = await roomWithTwo('votes');
-    const ids = await idsOf(roomId);
-    // Voto al segundo: gana aunque sea más nuevo.
-    await RoomService.toggleMusicVote(roomId, ids[1], { name: 'Beto' });
-    const res = await RoomService.advanceMusicQueue(roomId);
+    const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
+    await RoomService.updateSettings(room.roomId, { musicQueueMode: 'votes' });
+    await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'aaaaaaaaAA' }));
+    await new Promise((r) => setTimeout(r, 5));
+    await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'bbbbbbbbBB' }));
+    await new Promise((r) => setTimeout(r, 5));
+    await RoomService.addMusicEntry(room.roomId, entryOf({ trackId: 'ccccccccCC' }));
+    const ids = await idsOf(room.roomId);
+    expect(ids).toHaveLength(2);
+    // Voto al segundo en cola: gana aunque sea más nuevo.
+    await RoomService.toggleMusicVote(room.roomId, ids[1], { name: 'Beto' });
+    const res = await RoomService.advanceMusicQueue(room.roomId);
     expect(res?.musicNowPlaying?.entryId).toBe(ids[1]);
   });
 
@@ -278,7 +317,6 @@ describe('RoomService.stopMusic', () => {
   it('limpia nowPlaying sin tocar el video', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'L', isTemporary: true });
     await RoomService.addMusicEntry(room.roomId, entryOf());
-    await RoomService.advanceMusicQueue(room.roomId);
     const stopped = await RoomService.stopMusic(room.roomId);
     expect(stopped?.musicNowPlaying ?? null).toBeNull();
     expect(stopped?.video ?? null).toBeNull();

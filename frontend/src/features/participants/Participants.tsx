@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { X } from 'lucide-react';
 import { IParticipant } from '../../types/room';
 import { RoomTab } from './components/RoomTab';
 import { RequestsTab } from './components/RequestsTab';
@@ -38,7 +37,6 @@ export const Participants: React.FC<ParticipantsProps> = ({
   onApproveJoin,
   onRejectJoin,
   onUpdateSettings,
-  onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'room' | 'requests' | 'kicked'>(
     'room',
@@ -153,24 +151,6 @@ export const Participants: React.FC<ParticipantsProps> = ({
     <div className="part-layout">
       {/* ── LEFT PANEL: PARTICIPANTS MAIN LIST ── */}
       <div className="part-main-panel">
-        {/* Header with Title and Close Button */}
-        <div className="part-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div className="part-header__title">
-            <h2>Participantes</h2>
-          </div>
-          {onClose && (
-            <button
-              type="button"
-              className="drawer-close-btn"
-              onClick={onClose}
-              title="Cerrar participantes"
-              aria-label="Cerrar participantes"
-            >
-              <X size={18} />
-            </button>
-          )}
-        </div>
-
         {/* Top 3 Navigation Tabs */}
         <div className="part-tabs">
           <button

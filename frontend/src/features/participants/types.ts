@@ -43,7 +43,6 @@ export interface ParticipantsProps {
     ban: boolean,
   ) => void;
   onUpdateSettings?: (settings: Partial<IRoomSettings>) => void;
-  onClose?: () => void;
 }
 
 export type ParticipantsTab = 'room' | 'requests' | 'kicked';

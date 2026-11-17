@@ -274,6 +274,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     isMicOn,
     isCameraOn,
     mediaError,
+    mediaConnectionFailed,
+    retryMediaConnection,
     toggleMic,
     toggleCamera,
     enableMedia,
@@ -597,6 +599,15 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       }
     };
 
+    // Edición validada por el servidor (solo el autor): actualiza por id.
+    const handleMessageEdited = (data: { id?: string; text?: string } | undefined) => {
+      if (!data || typeof data.id !== 'string' || typeof data.text !== 'string') return;
+      if (!data.id || !data.text.trim()) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === data.id ? { ...m, text: data.text as string, edited: true } : m))
+      );
+    };
+
     const handleReactionEvent = (reaction: ReactionItem) => {
       setReactions((prev) => [...prev, reaction]);
       // Limpieza tras la animación de globo de helio (máx 5.5 s + margen)
@@ -913,6 +924,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     socket.on('sync-video', handleSyncVideo);
     socket.on('upload-progress', handleUploadProgressEvent);
     socket.on('chat-message', handleChatMessage);
+    socket.on('message-edited', handleMessageEdited);
     socket.on('reaction', handleReactionEvent);
     socket.on('cinematic-trigger', handleCinematicEvent);
     socket.on('cinematic-skip', handleCinematicSkip);
@@ -965,6 +977,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       socket.off('sync-video', handleSyncVideo);
       socket.off('upload-progress', handleUploadProgressEvent);
       socket.off('chat-message', handleChatMessage);
+      socket.off('message-edited', handleMessageEdited);
       socket.off('reaction', handleReactionEvent);
       socket.off('cinematic-trigger', handleCinematicEvent);
       socket.off('cinematic-skip', handleCinematicSkip);
@@ -1244,8 +1257,15 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     [socket, roomId]
   );
 
-  const handleSendMessage = (text: string) => {
-    socket.emit('send-message', { roomId, text, userName: myName });
+  const handleSendMessage = (
+    text: string,
+    replyTo?: { id: string; user: string; text: string } | null
+  ) => {
+    socket.emit('send-message', { roomId, text, userName: myName, replyTo: replyTo ?? null });
+  };
+
+  const handleEditMessage = (id: string, text: string) => {
+    socket.emit('edit-message', { roomId, id, text });
   };
 
   // Emisión throttled del indicador "escribiendo": máx 1 cada 2 s.
@@ -1292,6 +1312,12 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
 
   const musicNext = () => {
     socket.emit('music-next', { roomId, ...buildSocketAuth(roomId, myName) });
+  };
+
+  // Avance automático al terminar un tema (cualquier miembro; con rate-limit
+  // en servidor). El Siguiente manual sigue siendo solo de moderador.
+  const musicAutoNext = () => {
+    socket.emit('music-auto-next', { roomId });
   };
 
   const musicStop = () => {
@@ -1382,6 +1408,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     isMicOn,
     isCameraOn,
     mediaError,
+    mediaConnectionFailed,
+    retryMediaConnection,
     toggleMic,
     toggleCamera,
     handleToggleTemporaryMode,
@@ -1408,6 +1436,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     handlePlaybackHeartbeat,
     handleVideoReady,
     handleSendMessage,
+    handleEditMessage,
     handleReaction,
     musicQueue,
     musicNowPlaying,
@@ -1417,6 +1446,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     musicReorder,
     musicApprove,
     musicNext,
+    musicAutoNext,
     musicStop,
     searchMusic,
     handleCancelWaiting,

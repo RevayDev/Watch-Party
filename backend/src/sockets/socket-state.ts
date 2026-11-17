@@ -29,3 +29,43 @@ export function clearCinematicTrigger(roomId: string): void {
   if (typeof roomId !== 'string' || !roomId.trim()) return;
   lastCinematicTrigger.delete(roomId.toUpperCase().trim());
 }
+
+/** Tope de autores recordados por sala (solo para validar edición). */
+const MAX_AUTHORS_PER_ROOM = 200;
+
+/**
+ * Autor de cada mensaje reciente por sala: id mensaje -> nombre.
+ * Efímero (sin persistencia): solo sirve para que únicamente el autor pueda
+ * editar sus mensajes. Se poda FIFO y se limpia al cerrar la sala.
+ */
+export const roomMessageAuthors = new Map<string, Map<string, string>>();
+
+/** Registra quién envió un mensaje (para validar su edición posterior). */
+export function trackRoomMessage(roomId: string, messageId: string, userName: string): void {
+  if (!roomId || !messageId || !userName) return;
+  const key = roomId.toUpperCase().trim();
+  let authors = roomMessageAuthors.get(key);
+  if (!authors) {
+    authors = new Map<string, string>();
+    roomMessageAuthors.set(key, authors);
+  }
+  authors.delete(messageId);
+  authors.set(messageId, userName);
+  while (authors.size > MAX_AUTHORS_PER_ROOM) {
+    const oldest = authors.keys().next().value;
+    if (oldest === undefined) break;
+    authors.delete(oldest);
+  }
+}
+
+/** Autor registrado de un mensaje, o null si no consta (ya podado). */
+export function roomMessageAuthor(roomId: string, messageId: string): string | null {
+  if (!roomId || !messageId) return null;
+  return roomMessageAuthors.get(roomId.toUpperCase().trim())?.get(messageId) ?? null;
+}
+
+/** Libera los autores de una sala (al cerrarla/eliminarla o quedar vacía). */
+export function clearRoomMessageAuthors(roomId: string): void {
+  if (typeof roomId !== 'string' || !roomId.trim()) return;
+  roomMessageAuthors.delete(roomId.toUpperCase().trim());
+}

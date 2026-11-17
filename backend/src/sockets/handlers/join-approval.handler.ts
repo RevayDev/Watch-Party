@@ -11,7 +11,7 @@ import { dropPosition, roomPlayback, roomPositions } from '../../domain/playback
 import { clearVideoReady, pruneVideoReadySocket } from './video-ready.handler.js';
 import { findBannedEntry, isNameTaken } from '../../domain/room.entity.js';
 import { requireLeader, requireModerator } from '../../domain/auth-policy.js';
-import { SocketUser, activeUsers, activeMediaStates, clearCinematicTrigger } from '../socket-state.js';
+import { SocketUser, activeUsers, activeMediaStates, clearCinematicTrigger, clearRoomMessageAuthors } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 import {
   cancelPendingGrace,
@@ -19,6 +19,7 @@ import {
   schedulePendingGrace,
 } from '../disconnect-grace.js';
 import { checkSocketRateLimit, clearSocketLimits } from '../socket-limits.js';
+import { createTurnCredentials } from '../../config/turn.js';
 
 const MODERATOR_ONLY = 'Solo el anfitrión o un co-anfitrión puede realizar esta acción.';
 
@@ -222,6 +223,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         joinRequests: room?.joinRequests || [],
         kickedUsers: room?.kickedUsers || [],
         peers: existingPeers,
+        turnServer: createTurnCredentials(socket.id),
         mediaStates: existingMediaStates,
         playback: synced !== null
           ? { currentTime: synced.currentTime, isPlaying: synced.isPlaying }
@@ -254,6 +256,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
     roomPositions.delete(cleanRoomId);
     clearVideoReady(cleanRoomId);
     clearCinematicTrigger(cleanRoomId);
+    clearRoomMessageAuthors(cleanRoomId);
     await RoomService.deleteRoom(cleanRoomId, true);
   });
 
@@ -517,6 +520,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
             roomPositions.delete(roomId);
             clearVideoReady(roomId);
             clearCinematicTrigger(roomId);
+            clearRoomMessageAuthors(roomId);
           }
         });
         return;
@@ -559,6 +563,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         roomPositions.delete(user.roomId);
         clearVideoReady(user.roomId);
         clearCinematicTrigger(user.roomId);
+        clearRoomMessageAuthors(user.roomId);
       }
     }
   });

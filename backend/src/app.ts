@@ -7,6 +7,7 @@ import roomRoutes from './routes/room.routes.js';
 import demoRoutes from './routes/demo.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import spotifyRoutes from './routes/spotify.routes.js';
+import youtubeRoutes from './routes/youtube.routes.js';
 import proxyRoutes from './routes/proxy.routes.js';
 import docsRoutes from './routes/docs.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
@@ -58,6 +59,7 @@ export function createApp(): Express {
   // anti-abuso que rooms/demo (en test se autobypassea).
   app.use('/api/admin', globalLimiter, adminRoutes);
   app.use('/api/spotify', globalLimiter, spotifyRoutes);
+  app.use('/api/youtube', globalLimiter, youtubeRoutes);
 
   // Documentación OpenAPI + Swagger UI (sin rate-limit: es documentación).
   // UI en /api/docs, JSON crudo en /api/docs/json.

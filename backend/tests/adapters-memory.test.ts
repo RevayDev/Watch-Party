@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -88,6 +88,8 @@ describe('MemoryRoomRepository: contrato del adaptador en memoria', () => {
   it('fichero corrupto en disco no tumba el adaptador (sigue utilizable)', async () => {
     fs.mkdirSync(path.dirname(roomsFile), { recursive: true });
     fs.writeFileSync(roomsFile, '{{{no-json', 'utf-8');
+    // Silencia el warn esperado para no ensuciar la salida.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       let repo: MemoryRoomRepository | undefined;
       expect(() => {
@@ -96,7 +98,16 @@ describe('MemoryRoomRepository: contrato del adaptador en memoria', () => {
       const id = uniqueId('ADP');
       await repo?.create(makeRoom(id));
       expect(await repo?.exists(id)).toBe(true);
+      // El corrupto se respalda con timestamp y se avisa en una línea.
+      const backups = fs
+        .readdirSync(path.dirname(roomsFile))
+        .filter((f) => f.startsWith('rooms.json.corrupt-'));
+      expect(backups.length).toBeGreaterThan(0);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(String(warnSpy.mock.calls[0][0])).toMatch(/respaldó|respald/);
+      for (const f of backups) fs.unlinkSync(path.join(path.dirname(roomsFile), f));
     } finally {
+      warnSpy.mockRestore();
       // Restauración inmediata: no depende del debounce de persistencia.
       await restoreRoomsFile();
       backupRoomsFile();

@@ -89,6 +89,7 @@ describe('music-queue.handler', () => {
   });
 
   it('musicEnabled=false deniega vía action-denied', async () => {
+    await RoomService.updateSettings(roomId, { musicEnabled: false });
     const registered = new Map<string, (data: unknown) => void>();
     const denied: Array<{ event: string; message: string }> = [];
     const socket = {
@@ -119,7 +120,9 @@ describe('music-queue.handler', () => {
     admit('s1', roomId, 'Ana', 'u-1');
     await registered.get('music-add')?.({ roomId, track: TRACK });
     const mine = await queuePayload(emitted, roomId);
-    expect(mine?.queue).toHaveLength(1);
+    // El primero arranca solo: cola vacía + nowPlaying fijado.
+    expect(mine?.queue).toHaveLength(0);
+    expect((mine?.nowPlaying as { trackId?: string } | null)?.trackId).toBe(TRACK.id);
     expect(emitted.every((e) => e.room !== other.roomId)).toBe(true);
   });
 
@@ -170,6 +173,12 @@ describe('music-queue.handler', () => {
       artists: TRACK.artists,
       proposedBy: 'Ana',
     });
+    await RoomService.addMusicEntry(roomId, {
+      trackId: 'bbbbbbbbBB',
+      name: 'Segunda',
+      artists: TRACK.artists,
+      proposedBy: 'Ana',
+    });
     const registered = new Map<string, (data: unknown) => void>();
     const socket = {
       id: 's1',
@@ -200,5 +209,127 @@ describe('music-queue.handler', () => {
     expect(update).toBeDefined();
     // La cola es solo metadatos: la película sigue intacta.
     expect(video).toBeUndefined();
+  });
+
+  it('music-next sin nada sonando lo arranca un miembro común', async () => {
+    await RoomService.updateSettings(roomId, { musicEnabled: true });
+    await RoomService.addMusicEntry(roomId, {
+      trackId: TRACK.id,
+      name: TRACK.name,
+      artists: TRACK.artists,
+      proposedBy: 'Ana',
+    });
+    await RoomService.addMusicEntry(roomId, {
+      trackId: 'bbbbbbbbBB',
+      name: 'Segunda',
+      artists: TRACK.artists,
+      proposedBy: 'Ana',
+    });
+    // Con la cola detenida (sin nowPlaying), cualquiera puede darle play.
+    await RoomService.stopMusic(roomId);
+    const registered = new Map<string, (data: unknown) => void>();
+    const socket = {
+      id: 's-member',
+      on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb),
+    } as unknown as Socket;
+    const { io, emitted } = makeIo();
+    registerMusicQueueHandlers(io, socket);
+    admit('s-member', roomId, 'Beto', 'u-9');
+    await registered.get('music-next')?.({ roomId });
+    const update = emitted.find((e) => e.event === 'music-queue-updated');
+    expect(update).toBeDefined();
+    expect((await RoomService.getRoomById(roomId))?.musicNowPlaying?.trackId).toBe('bbbbbbbbBB');
+  });
+
+  it('music-next con algo sonando sigue negado al miembro común', async () => {
+    await RoomService.updateSettings(roomId, { musicEnabled: true });
+    await RoomService.addMusicEntry(roomId, {
+      trackId: TRACK.id,
+      name: TRACK.name,
+      artists: TRACK.artists,
+      proposedBy: 'Ana',
+    });
+    const denied: string[] = [];
+    const registered = new Map<string, (data: unknown) => void>();
+    const socket = {
+      id: 's-member',
+      on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb),
+      emit: (event: string, payload: unknown) => {
+        if (event === 'action-denied') denied.push((payload as { event: string }).event);
+      },
+    } as unknown as Socket;
+    const { io } = makeIo();
+    registerMusicQueueHandlers(io, socket);
+    admit('s-member', roomId, 'Beto', 'u-9');
+    await registered.get('music-next')?.({ roomId });
+    expect(denied).toContain('music-next');
+  });
+
+  it('music-auto-next lo puede pedir cualquier miembro al terminar un tema', async () => {
+    await RoomService.updateSettings(roomId, { musicEnabled: true });
+    await RoomService.addMusicEntry(roomId, {
+      trackId: TRACK.id,
+      name: TRACK.name,
+      artists: TRACK.artists,
+      proposedBy: 'Ana',
+    });
+    await RoomService.addMusicEntry(roomId, {
+      trackId: 'bbbbbbbbBB',
+      name: 'Segunda',
+      artists: TRACK.artists,
+      proposedBy: 'Ana',
+    });
+    const registered = new Map<string, (data: unknown) => void>();
+    const socket = {
+      id: 's-member',
+      on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb),
+    } as unknown as Socket;
+    const { io, emitted } = makeIo();
+    registerMusicQueueHandlers(io, socket);
+    // Miembro común (no moderador): el avance manual se le negaría.
+    admit('s-member', roomId, 'Beto', 'u-9');
+    const before = (await RoomService.getRoomById(roomId))?.musicNowPlaying?.entryId;
+    await registered.get('music-auto-next')?.({ roomId });
+    const update = emitted.find((e) => e.event === 'music-queue-updated');
+    expect(update).toBeDefined();
+    const after = (await RoomService.getRoomById(roomId))?.musicNowPlaying;
+    expect(after).not.toBeNull();
+    expect(after?.entryId).not.toBe(before);
+    // Sin video-changed: la película no se toca.
+    expect(emitted.some((e) => e.event === 'video-changed')).toBe(false);
+  });
+
+  it('music-auto-next sin nada sonando no emite nada', async () => {
+    await RoomService.updateSettings(roomId, { musicEnabled: true });
+    const registered = new Map<string, (data: unknown) => void>();
+    const socket = {
+      id: 's-member',
+      on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb),
+    } as unknown as Socket;
+    const { io, emitted } = makeIo();
+    registerMusicQueueHandlers(io, socket);
+    admit('s-member', roomId, 'Beto', 'u-9');
+    await registered.get('music-auto-next')?.({ roomId });
+    expect(emitted).toHaveLength(0);
+  });
+
+  it('music-auto-next de no-miembro se ignora', async () => {
+    await RoomService.updateSettings(roomId, { musicEnabled: true });
+    await RoomService.addMusicEntry(roomId, {
+      trackId: TRACK.id,
+      name: TRACK.name,
+      artists: TRACK.artists,
+      proposedBy: 'Ana',
+    });
+    const registered = new Map<string, (data: unknown) => void>();
+    const socket = {
+      id: 's-ghost',
+      on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb),
+    } as unknown as Socket;
+    const { io, emitted } = makeIo();
+    registerMusicQueueHandlers(io, socket);
+    admit('s-ghost', 'OTRA', 'Fantasma');
+    await registered.get('music-auto-next')?.({ roomId });
+    expect(emitted).toHaveLength(0);
   });
 });

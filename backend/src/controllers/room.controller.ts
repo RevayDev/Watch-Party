@@ -8,7 +8,7 @@ import { IVideoMetadata } from '../types/room.types.js';
 import { findBannedEntry, isNameTaken } from '../domain/room.entity.js';
 import { AuthClaim, requireLeader, requireModerator } from '../domain/auth-policy.js';
 import { parseSpotifyUrl } from '../domain/spotify.js';
-import { clearCinematicTrigger } from '../sockets/socket-state.js';
+import { clearCinematicTrigger, clearRoomMessageAuthors } from '../sockets/socket-state.js';
 import { sanitizeRoomSettings } from '../domain/settings-policy.js';
 import {
   DEMO_ROOM_FULL_MESSAGE,
@@ -412,7 +412,7 @@ export class RoomController {
       }
 
       // YouTube link conversion / detection
-      const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+      const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtube-nocookie\.com\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
       const isYouTube = Boolean(ytMatch && ytMatch[1]);
       let ytVideoId: string | undefined;
 
@@ -497,6 +497,7 @@ export class RoomController {
         return;
       }
       clearCinematicTrigger(roomId);
+      clearRoomMessageAuthors(roomId);
 
       res.json({ message: 'Sala y archivos de video eliminados exitosamente', roomId });
     } catch (error) {

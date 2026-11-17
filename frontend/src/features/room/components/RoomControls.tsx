@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
-import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff } from 'lucide-react';
+import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff, Music } from 'lucide-react';
 import { Reactions } from '../../../components/Reactions';
-import { SpotifyListenButton, type SpotifyConnState } from './SpotifyListenButton';
 
 /**
  * Barra inferior de la sala (extraída verbatim de pages/Room.tsx, solo composición).
@@ -30,18 +29,12 @@ interface RoomControlsProps {
   isBarVisible: boolean;
   uiPinned?: boolean;
   toggleBarsVisibility: () => void;
-  /** Sala (informativa; el estado Spotify lo da el padre). */
+  /** Sala (informativa; sin uso directo, se conserva por compatibilidad). */
   roomId?: string;
-  /** Estado de la conexión Spotify (punto del botón). */
-  spotifyState?: SpotifyConnState;
-  /** Cuenta vinculada, si se conoce (tooltip). */
-  spotifyAccount?: string | null;
   /** ¿Está abierto el panel musical? (anillo activo + toggle). */
   musicOpen?: boolean;
-  /** Conectado: abre/cierra el panel musical. */
+  /** Abre/cierra el panel musical. */
   onToggleMusic?: () => void;
-  /** Desconectado o error: inicia el OAuth en pestaña nueva. */
-  onSpotifyConnect?: () => void;
   /** Distribución en PC: repartida o píldora centrada (gusto personal). */
   layout?: 'spread' | 'centered';
   /** Etiquetas bajo los iconos (gusto personal). */
@@ -89,11 +82,8 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   isBarVisible,
   uiPinned = true,
   toggleBarsVisibility,
-  spotifyState = 'loading',
-  spotifyAccount = null,
   musicOpen = false,
   onToggleMusic = () => undefined,
-  onSpotifyConnect = () => undefined,
   layout = 'spread',
   showLabels = true,
 }) => {
@@ -275,14 +265,15 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       {/* ── Derecha: música ── */}
       <div className="meet-bar-group meet-bar-group--right">
       <BarItem label="Música">
-        {/* Spotify: sin vincular abre el OAuth; vinculado abre/cierra el panel */}
-        <SpotifyListenButton
-          state={spotifyState}
-          accountName={spotifyAccount}
-          panelOpen={musicOpen}
-          onTogglePanel={onToggleMusic}
-          onConnect={onSpotifyConnect}
-        />
+        <button
+          type="button"
+          onClick={onToggleMusic}
+          className={`meet-circle-btn meet-circle-btn--music${musicOpen ? ' meet-circle-btn--active' : ''}`}
+          title={musicOpen ? 'Cerrar panel de música' : 'Abrir música (YouTube)'}
+          aria-label={musicOpen ? 'Cerrar panel de música' : 'Abrir música (YouTube)'}
+        >
+          <Music size={18} />
+        </button>
       </BarItem>
       </div>
 

@@ -108,6 +108,8 @@ export type IMusicNowPlaying = {
   albumArt?: string;
   uri?: string;
   openUrl?: string;
+  proposedBy: string;
+  proposedByUserId?: string;
   startedAt: Date;
   startedBy: string;
 } | null;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Users, Music, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { BottomSheet } from '../../../shared/components/BottomSheet';
 import { Chat } from '../../chat/Chat';
 import { Participants } from '../../participants/Participants';
@@ -16,8 +16,14 @@ interface RoomDrawerProps {
   sideTabView: 'chat' | 'participants' | 'music';
   setActiveSideTab: React.Dispatch<React.SetStateAction<'chat' | 'participants' | 'music' | null>>;
   messages: ChatMessage[];
-  handleSendMessage: (text: string) => void;
+  handleSendMessage: (
+    text: string,
+    replyTo?: { id: string; user: string; text: string } | null
+  ) => void;
+  handleEditMessage: (id: string, text: string) => void;
   typingUsers: string[];
+  /** No leídos acumulados (insignia de la flecha para bajar). */
+  unreadCount?: number;
   onTyping: () => void;
   myName: string;
   roomData: IRoomData;
@@ -30,20 +36,19 @@ interface RoomDrawerProps {
   toggleCamera: () => void;
   socket: Socket;
   roomId: string;
-  musicOpen?: boolean;
-  onOpenMusic?: () => void;
   musicQueue?: IMusicQueueEntry[];
   musicNowPlaying?: IMusicNowPlaying | null;
   musicSettings?: IRoomSettings;
   musicIsModerator?: boolean;
   onAddMusicUrl?: (url: string) => Promise<boolean>;
   onMusicAdd?: (t: IMusicTrack) => void;
-  onMusicVote?: (id: string) => void;
   onMusicRemove?: (id: string) => void;
   onMusicReorder?: (ids: string[]) => void;
   onMusicApprove?: (id: string) => void;
   onMusicNext?: () => void;
+  onMusicAutoNext?: () => void;
   onMusicStop?: () => void;
+  onExpandToMain?: (url: string, title: string) => void;
 }
 
 export const RoomDrawer: React.FC<RoomDrawerProps> = ({
@@ -52,7 +57,9 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   setActiveSideTab,
   messages,
   handleSendMessage,
+  handleEditMessage,
   typingUsers,
+  unreadCount = 0,
   onTyping,
   myName,
   roomData,
@@ -65,20 +72,19 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   toggleCamera,
   socket,
   roomId,
-  musicOpen = false,
-  onOpenMusic = () => undefined,
   musicQueue = [],
   musicNowPlaying = null,
   musicSettings,
   musicIsModerator = false,
   onAddMusicUrl,
   onMusicAdd = () => undefined,
-  onMusicVote = () => undefined,
   onMusicRemove = () => undefined,
   onMusicReorder = () => undefined,
   onMusicApprove = () => undefined,
   onMusicNext = () => undefined,
+  onMusicAutoNext = () => undefined,
   onMusicStop = () => undefined,
+  onExpandToMain = () => undefined,
 }) => {
   const auth = () => buildSocketAuth(roomId, myName);
   const currentTab = activeSideTab ?? sideTabView;
@@ -88,48 +94,23 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
       open={!!activeSideTab}
       onClose={() => setActiveSideTab(null)}
       variant="inline"
-      desktopClassName={`meet-drawer ${currentTab === 'participants' ? 'meet-drawer--wide' : ''}`}
+      desktopClassName={`meet-drawer ${currentTab === 'participants' || currentTab === 'music' ? 'meet-drawer--wide' : ''}`}
       height={85}
       label={currentTab === 'participants' ? 'Participantes' : currentTab === 'music' ? 'Música' : 'Chat'}
     >
       <div className="meet-drawer__body">
-        {/* Header con pestañas integradas SIEMPRE visible en el drawer */}
+        {/* Solo el título de la sección + cerrar (sin pestañas) */}
         <div className="meet-drawer__tab-header">
-          <div className="meet-drawer__tab-group" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={currentTab === 'chat'}
-              className={`meet-drawer__tab-btn ${currentTab === 'chat' ? 'meet-drawer__tab-btn--active' : ''}`}
-              onClick={() => setActiveSideTab('chat')}
-            >
-              <MessageSquare size={16} />
-              <span>Chat</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={currentTab === 'participants'}
-              className={`meet-drawer__tab-btn ${currentTab === 'participants' ? 'meet-drawer__tab-btn--active' : ''}`}
-              onClick={() => setActiveSideTab('participants')}
-            >
-              <Users size={16} />
-              <span>Participantes ({roomData.participants.length})</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={currentTab === 'music'}
-              className={`meet-drawer__tab-btn ${currentTab === 'music' ? 'meet-drawer__tab-btn--active' : ''}`}
-              onClick={() => setActiveSideTab('music')}
-            >
-              <Music size={16} />
-              <span>Música</span>
-              {musicQueue.length > 0 && (
-                <span className="meet-drawer__tab-badge">{musicQueue.length}</span>
-              )}
-            </button>
-          </div>
+          <span className="meet-drawer__title">
+            {currentTab === 'participants'
+              ? `Participantes (${roomData.participants.length})`
+              : currentTab === 'music'
+                ? 'Música'
+                : 'Chat'}
+            {currentTab === 'music' && musicQueue.length > 0 && (
+              <span className="meet-drawer__tab-badge">{musicQueue.length}</span>
+            )}
+          </span>
           <button
             type="button"
             className="drawer-close-btn"
@@ -143,20 +124,18 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
 
         {currentTab === 'chat' && (
           <Chat
+            isOpen={activeSideTab === 'chat'}
             messages={messages}
             onSendMessage={handleSendMessage}
+            onEditMessage={handleEditMessage}
             currentUserName={myName}
             typingUsers={typingUsers}
             onTyping={onTyping}
-            onClose={() => setActiveSideTab(null)}
-            roomId={roomId}
-            musicOpen={musicOpen}
-            onOpenMusic={onOpenMusic}
+            unreadCount={unreadCount}
           />
         )}
         {currentTab === 'participants' && (
           <Participants
-            onClose={() => setActiveSideTab(null)}
             participants={roomData.participants}
             currentUserName={myName}
             currentUserId={userId}
@@ -243,12 +222,13 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             userId={userId}
             onAddUrl={onAddMusicUrl}
             onAdd={onMusicAdd}
-            onVote={onMusicVote}
             onRemove={onMusicRemove}
             onReorder={onMusicReorder}
             onApprove={onMusicApprove}
             onNext={onMusicNext}
+            onAutoNext={onMusicAutoNext}
             onStop={onMusicStop}
+            onExpandToMain={onExpandToMain}
           />
         )}
       </div>

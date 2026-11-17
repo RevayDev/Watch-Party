@@ -8,7 +8,7 @@ export interface YouTubeRef {
   embedUrl: string;
 }
 
-const YT_REGEX = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+const YT_REGEX = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtube-nocookie\.com\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
 
 export function parseYouTubeUrl(raw: unknown): YouTubeRef | null {
   if (typeof raw !== 'string') return null;

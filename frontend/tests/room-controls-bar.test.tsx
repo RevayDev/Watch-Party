@@ -37,11 +37,8 @@ function barProps(overrides: Partial<Record<string, any>> = {}) {
     uiPinned: true,
     toggleBarsVisibility: noop,
     roomId: 'ABC123',
-    spotifyState: 'disconnected',
-    spotifyAccount: null,
     musicOpen: false,
     onToggleMusic: vi.fn(),
-    onSpotifyConnect: vi.fn(),
     ...overrides,
   };
 }
@@ -102,32 +99,22 @@ describe('RoomControls (orden y etiquetas)', () => {
     expect(footer?.classList.contains('meet-bottom-bar--spread')).toBe(false);
   });
 
-  it('botón Spotify junto a Salir con su title', () => {
+  it('botón Música junto a Salir con su title', () => {
     render(<RoomControls {...barProps()} />);
-    expect(screen.getByRole('button', { name: /spotify: vincular cuenta/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /abrir música/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /salir de la reunión/i })).toBeDefined();
   });
 
-  it('Spotify conectado abre/cierra el panel (toggle)', () => {
+  it('Música abre/cierra el panel (toggle)', () => {
     const onToggleMusic = vi.fn();
-    const onSpotifyConnect = vi.fn();
-    render(
-      <RoomControls
-        {...barProps({ spotifyState: 'connected', spotifyAccount: 'DjAna', onToggleMusic, onSpotifyConnect })}
-      />
-    );
-    fireEvent.click(screen.getByRole('button', { name: /abrir panel/i }));
+    render(<RoomControls {...barProps({ onToggleMusic })} />);
+    fireEvent.click(screen.getByRole('button', { name: /abrir música/i }));
     expect(onToggleMusic).toHaveBeenCalledTimes(1);
-    expect(onSpotifyConnect).not.toHaveBeenCalled();
   });
 
-  it('Spotify desconectado inicia el OAuth al pulsar', () => {
-    const onToggleMusic = vi.fn();
-    const onSpotifyConnect = vi.fn();
-    render(<RoomControls {...barProps({ onToggleMusic, onSpotifyConnect })} />);
-    fireEvent.click(screen.getByRole('button', { name: /spotify: vincular cuenta/i }));
-    expect(onSpotifyConnect).toHaveBeenCalledTimes(1);
-    expect(onToggleMusic).not.toHaveBeenCalled();
+  it('con el panel abierto el botón ofrece cerrarlo', () => {
+    render(<RoomControls {...barProps({ musicOpen: true })} />);
+    expect(screen.getByRole('button', { name: /cerrar panel de música/i })).toBeDefined();
   });
 
   it('etiquetas dinámicas según estado (mic off / cámaras ocultas)', () => {

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Youtube, Plus, Trash2, ArrowUp, ArrowDown, Check, Disc, Volume2, Sparkles } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Youtube, Plus, Trash2, ArrowUp, ArrowDown, Check, Disc, Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Maximize2, AudioLines, ListMusic, MoreVertical, ExternalLink, Square } from 'lucide-react';
 import type { IMusicNowPlaying, IMusicQueueEntry, IMusicTrack, IRoomSettings } from '../../../types/room';
 import { parseYouTubeUrl } from '../../../shared/youtube';
+import { YouTubePlayerView } from '../../player/YouTubePlayerView';
+import { YouTubeSearch } from './YouTubeSearch';
 
 export interface MusicPanelProps {
   roomId: string;
@@ -13,18 +15,433 @@ export interface MusicPanelProps {
   userId?: string;
   onAddUrl?: (url: string) => Promise<boolean>;
   onAdd: (t: IMusicTrack) => void;
-  onVote: (id: string) => void;
   onRemove: (id: string) => void;
   onReorder: (ids: string[]) => void;
   onApprove: (id: string) => void;
   onNext: () => void;
+  onAutoNext: () => void;
   onStop: () => void;
+  /** Muestra el tema actual en la pantalla principal de la sala (moderador). */
+  onExpandToMain?: (url: string, title: string) => void;
 }
 
-function hasVoted(entry: { votes: string[] }, myName: string, userId?: string): boolean {
-  if (userId && entry.votes.includes(userId)) return true;
-  return entry.votes.includes(myName);
+/**
+ * ID de video para lo que suena: prueba trackId/uri/openUrl (URL completa o
+ * ID suelto de 11 caracteres, que es como lo guarda la cola).
+ */
+export function resolveNowPlayingVideoId(
+  np: { trackId?: string; uri?: string; openUrl?: string } | null | undefined
+): string {
+  if (!np) return '';
+  for (const raw of [np.trackId, np.uri, np.openUrl]) {
+    if (!raw) continue;
+    const ref = parseYouTubeUrl(raw);
+    if (ref) return ref.videoId;
+    if (/^[a-zA-Z0-9_-]{11}$/.test(raw.trim())) return raw.trim();
+  }
+  return '';
 }
+
+function formatPlayerTime(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '0:00';
+  const t = Math.floor(totalSeconds);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Mini-reproductor audible de lo que suena: monta el IFrame de YouTube y
+ * reintenta play al cambiar de tema. Si el navegador bloquea el autoplay
+ * con sonido, muestra un botón grande para arrancar con un toque (gesto).
+ * Al terminar el tema avisa con `onEnded` para avanzar la cola en la sala.
+ */
+const NowPlayingPlayer: React.FC<{
+  trackKey: string;
+  videoId: string;
+  title: string;
+  subtitle: string;
+  thumb?: string;
+  onEnded: () => void;
+  onNext: () => void;
+  onStop: () => void;
+  onExpand: () => void;
+  showModerator: boolean;
+}> = ({ trackKey, videoId, title, subtitle, thumb, onEnded, onNext, onStop, onExpand, showModerator }) => {
+  const playerRef = useRef<any>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(80);
+  const [current, setCurrent] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const onEndedRef = useRef(onEnded);
+  onEndedRef.current = onEnded;
+
+  const tryPlay = () => {
+    try {
+      const p = playerRef.current;
+      if (!p) return;
+      if (typeof p.unMute === 'function') p.unMute();
+      if (typeof p.setVolume === 'function') p.setVolume(volume);
+      if (typeof p.playVideo === 'function') p.playVideo();
+      setMuted(false);
+    } catch {
+      /* noop: el overlay invita al toque manual */
+    }
+  };
+
+  const togglePlay = () => {
+    try {
+      const p = playerRef.current;
+      if (!p) return;
+      if (playing) {
+        if (typeof p.pauseVideo === 'function') p.pauseVideo();
+      } else {
+        // Arranque con gesto: quita mute y reproduce (desbloquea autoplay).
+        if (typeof p.unMute === 'function') p.unMute();
+        if (typeof p.setVolume === 'function') p.setVolume(volume);
+        if (typeof p.playVideo === 'function') p.playVideo();
+        setMuted(false);
+      }
+    } catch {
+      /* noop */
+    }
+  };
+
+  const restart = () => {
+    seekTo(0);
+    try {
+      playerRef.current?.playVideo?.();
+    } catch {
+      /* noop */
+    }
+  };
+
+  const seekTo = (seconds: number) => {
+    try {
+      const p = playerRef.current;
+      if (p && typeof p.seekTo === 'function') p.seekTo(seconds, true);
+      setCurrent(seconds);
+    } catch {
+      /* noop */
+    }
+  };
+
+  const toggleMute = () => {
+    try {
+      const p = playerRef.current;
+      if (!p) return;
+      if (muted) {
+        if (typeof p.unMute === 'function') p.unMute();
+        setMuted(false);
+      } else {
+        if (typeof p.mute === 'function') p.mute();
+        setMuted(true);
+      }
+    } catch {
+      /* noop */
+    }
+  };
+
+  const changeVolume = (v: number) => {
+    const next = Math.min(100, Math.max(0, Math.round(v)));
+    setVolume(next);
+    try {
+      const p = playerRef.current;
+      if (!p) return;
+      if (typeof p.setVolume === 'function') p.setVolume(next);
+      if (next > 0 && typeof p.unMute === 'function') {
+        p.unMute();
+        setMuted(false);
+      }
+    } catch {
+      /* noop */
+    }
+  };
+
+  useEffect(() => {
+    setPlaying(false);
+    setCurrent(0);
+    setDuration(0);
+  }, [trackKey]);
+
+  // Reloj de progreso mientras suena (para la barra y los tiempos).
+  useEffect(() => {
+    if (!playing) return;
+    const iv = window.setInterval(() => {
+      try {
+        const p = playerRef.current;
+        if (!p) return;
+        if (typeof p.getCurrentTime === 'function') {
+          const cur = p.getCurrentTime();
+          if (Number.isFinite(cur)) setCurrent(cur);
+        }
+        if (typeof p.getDuration === 'function') {
+          const d = p.getDuration();
+          if (Number.isFinite(d) && d > 0) setDuration(d);
+        }
+      } catch {
+        /* noop */
+      }
+    }, 500);
+    return () => window.clearInterval(iv);
+  }, [playing, trackKey]);
+
+  const progressPct = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
+
+  return (
+    <div>
+    {/* Cabecera estilo mockup: título + píldoras de moderador */}
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.65rem' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#a78bfa', fontSize: '0.84rem', fontWeight: 600 }}>
+        <AudioLines size={15} />
+        Sonando ahora
+      </span>
+      {showModerator && (
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <button
+            type="button"
+            onClick={onNext}
+            title="Pasar al siguiente tema"
+            style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: 999,
+              padding: '0.28rem 0.75rem',
+              fontSize: '0.76rem',
+              fontWeight: 600,
+              color: '#e2e8f0',
+              cursor: 'pointer',
+            }}
+          >
+            Siguiente
+          </button>
+          <button
+            type="button"
+            onClick={onStop}
+            title="Detener música"
+            style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: 999,
+              padding: '0.28rem 0.75rem',
+              fontSize: '0.76rem',
+              fontWeight: 600,
+              color: '#f87171',
+              cursor: 'pointer',
+            }}
+          >
+            Detener
+          </button>
+        </div>
+      )}
+    </div>
+    {/* Fila de título con tiempos */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '0.6rem' }}>
+      {thumb ? (
+        <img
+          src={thumb}
+          alt=""
+          style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
+        />
+      ) : (
+        <div
+          style={{
+            width: '52px',
+            height: '52px',
+            borderRadius: '8px',
+            background: 'rgba(139, 92, 246, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#a78bfa',
+            flexShrink: 0,
+          }}
+        >
+          <Youtube size={22} />
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9rem', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {title}
+        </p>
+        <p style={{ margin: '0.1rem 0 0', fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {subtitle}
+        </p>
+      </div>
+      <div style={{ flexShrink: 0, width: 112 }}>
+        <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontVariantNumeric: 'tabular-nums', textAlign: 'right', marginBottom: '0.3rem' }}>
+          {formatPlayerTime(current)} / {formatPlayerTime(duration)}
+        </div>
+        <div style={{ height: 3, borderRadius: 999, background: 'rgba(255, 255, 255, 0.12)', overflow: 'hidden' }}>
+          <div style={{ width: `${progressPct}%`, height: '100%', background: '#8b5cf6', borderRadius: 999 }} />
+        </div>
+      </div>
+    </div>
+    {/* El IFrame queda oculto: el diseño muestra solo los controles */}
+    <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
+      <YouTubePlayerView
+        key={trackKey}
+        videoId={videoId}
+        className=""
+        onReady={(player) => {
+          playerRef.current = player;
+          tryPlay();
+        }}
+        onStateChange={(event) => {
+          if (event.data === 1) setPlaying(true);
+          else if (event.data === 2) setPlaying(false);
+          else if (event.data === 0) {
+            // Tema terminado: avanzar la cola en la sala (auto-next).
+            setPlaying(false);
+            onEndedRef.current();
+          }
+        }}
+      />
+    </div>
+    <div
+      className="yt-miniplayer-controls"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        marginTop: '0.5rem',
+      }}
+    >
+      <button
+        type="button"
+        onClick={restart}
+        title="Reiniciar canción"
+        aria-label="Reiniciar canción"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 30,
+          height: 30,
+          borderRadius: '50%',
+          background: 'transparent',
+          color: '#cbd5e1',
+          border: 'none',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        <SkipBack size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={togglePlay}
+        title={playing ? 'Pausar' : 'Reproducir'}
+        aria-label={playing ? 'Pausar' : 'Reproducir'}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          background: '#7c3aed',
+          color: '#fff',
+          border: 'none',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        {playing ? <Pause size={17} /> : <Play size={17} style={{ marginLeft: 2 }} />}
+      </button>
+      {showModerator && (
+        <button
+          type="button"
+          onClick={onNext}
+          title="Siguiente canción"
+          aria-label="Siguiente canción"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 30,
+            height: 30,
+            borderRadius: '50%',
+            background: 'transparent',
+            color: '#cbd5e1',
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <SkipForward size={14} />
+        </button>
+      )}
+      <input
+        type="range"
+        min={0}
+        max={Math.max(1, Math.floor(duration))}
+        step={1}
+        value={Math.min(Math.floor(current), Math.max(1, Math.floor(duration)))}
+        onChange={(e) => seekTo(Number(e.target.value))}
+        title="Adelantar o retroceder"
+        aria-label="Adelantar o retroceder"
+        disabled={duration <= 0}
+        style={{ flex: 1, minWidth: 0, accentColor: '#8b5cf6', cursor: 'pointer' }}
+      />
+      <button
+        type="button"
+        onClick={toggleMute}
+        title={muted ? 'Activar sonido' : 'Silenciar'}
+        aria-label={muted ? 'Activar sonido' : 'Silenciar'}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 30,
+          height: 30,
+          borderRadius: '50%',
+          background: 'transparent',
+          color: '#cbd5e1',
+          border: 'none',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        {muted || volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={muted ? 0 : volume}
+        onChange={(e) => changeVolume(Number(e.target.value))}
+        title="Volumen"
+        aria-label="Volumen"
+        style={{ width: 64, flexShrink: 0, accentColor: '#8b5cf6', cursor: 'pointer' }}
+      />
+      {showModerator && (
+        <button
+          type="button"
+          onClick={onExpand}
+          title="Ampliar a la pantalla de la sala"
+          aria-label="Ampliar a la pantalla de la sala"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 30,
+            height: 30,
+            borderRadius: '50%',
+            background: 'transparent',
+            color: '#cbd5e1',
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <Maximize2 size={15} />
+        </button>
+      )}
+    </div>
+    </div>
+  );
+};
 
 export const MusicPanel: React.FC<MusicPanelProps> = ({
   queue,
@@ -32,20 +449,21 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   settings,
   isModerator,
   myName,
-  userId,
   onAddUrl,
   onAdd,
-  onVote,
   onRemove,
   onReorder,
   onApprove,
   onNext,
+  onAutoNext,
   onStop,
+  onExpandToMain = () => undefined,
 }) => {
   const [ytInput, setYtInput] = useState('');
   const [addingYt, setAddingYt] = useState(false);
   const [inputError, setInputError] = useState('');
   const [customTitle, setCustomTitle] = useState('');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const musicEnabled = settings.musicEnabled !== false;
   const allowAdd = isModerator || settings.musicCanAdd !== 'moderator';
@@ -113,25 +531,122 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
 
   const pending = queue.filter((e) => e.status === 'pending');
   const active = queue.filter((e) => e.status !== 'pending');
+  const nowVideoId = resolveNowPlayingVideoId(nowPlaying);
+  const matchedPlaying = nowPlaying
+    ? active.find((e) => e.trackId && e.trackId === nowPlaying.trackId)
+    : undefined;
+
+  const menuItemStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: '7px',
+    padding: '0.45rem 0.6rem',
+    fontSize: '0.78rem',
+    fontWeight: 600,
+    color: '#e2e8f0',
+    cursor: 'pointer',
+    textAlign: 'left',
+  };
+
+  /** Menú ⋮ de las filas de la cola (diseño mockup). */
+  const PlayingMenu: React.FC<{
+    rowId: string;
+    url: string;
+    title: string;
+    openUrl?: string;
+    entryId?: string;
+    canDelete: boolean;
+    /** Solo la fila en reproducción ofrece Siguiente/Detener. */
+    isCurrentlyPlaying: boolean;
+  }> = ({ rowId, url, title: menuTitle, openUrl, entryId, canDelete, isCurrentlyPlaying }) => {
+    void rowId;
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          right: '0.4rem',
+          top: '2.7rem',
+          zIndex: 30,
+          minWidth: 190,
+          background: '#1d2438',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: 10,
+          padding: '0.3rem',
+          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.55)',
+        }}
+      >
+        {isModerator && (
+          <>
+            {url && <button
+              type="button"
+              onClick={() => {
+                if (url) onExpandToMain(url, menuTitle);
+                setOpenMenuId(null);
+              }}
+              style={menuItemStyle}
+            >
+              <Maximize2 size={13} /> Ampliar a la sala
+            </button>}
+            {isCurrentlyPlaying && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNext();
+                    setOpenMenuId(null);
+                  }}
+                  style={menuItemStyle}
+                >
+                  <SkipForward size={13} /> Siguiente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStop();
+                    setOpenMenuId(null);
+                  }}
+                  style={{ ...menuItemStyle, color: '#f87171' }}
+                >
+                  <Square size={13} /> Detener
+                </button>
+              </>
+            )}
+          </>
+        )}
+        {openUrl && (
+          <a
+            href={openUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setOpenMenuId(null)}
+            style={{ ...menuItemStyle, textDecoration: 'none' }}
+          >
+            <ExternalLink size={13} /> Abrir en YouTube
+          </a>
+        )}
+        {canDelete && entryId && (
+          <button
+            type="button"
+            onClick={() => {
+              onRemove(entryId);
+              setOpenMenuId(null);
+            }}
+            style={{ ...menuItemStyle, color: '#f87171' }}
+          >
+            <Trash2 size={13} /> Eliminar
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="drawer-chat__messages" aria-label="Música y Karaoke de YouTube" style={{ padding: '0.85rem' }}>
-      {/* Banner Principal de YouTube Karaoke */}
-      <div className="room-settings__hero-banner" style={{ marginBottom: '1rem', padding: '1rem' }}>
-        <div className="room-settings__hero-icon" style={{ background: 'rgba(239, 68, 68, 0.25)', color: '#ef4444' }}>
-          <Youtube size={22} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <h4 className="room-settings__hero-title" style={{ fontSize: '0.92rem', marginBottom: '0.2rem' }}>
-            <span>Cola Musical con YouTube</span>
-            <span className="room-settings__hero-badge">Audio Compartido</span>
-          </h4>
-          <p className="room-settings__hero-desc" style={{ fontSize: '0.78rem' }}>
-            Pega enlaces de canciones o karaokes de YouTube. Todos escuchan sincronizados sin necesidad de Spotify ni cuentas de pago.
-          </p>
-        </div>
-      </div>
-
+      {allowAdd && <YouTubeSearch onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
       {/* Formulario para agregar canciones/karaokes de YouTube */}
       {allowAdd ? (
         <form onSubmit={handlePasteSubmit} className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
@@ -174,8 +689,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                   gap: '0.35rem',
                   fontSize: '0.82rem',
                   padding: '0.5rem 0.9rem',
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  border: 'none',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -197,90 +710,29 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         </p>
       )}
 
-      {/* Lo que suena ahora */}
-      {nowPlaying ? (
-        <div
-          className="room-settings__box"
+      {/* El reproductor "Sonando ahora" va debajo de la tarjeta de cola (diseño mockup). */}
+
+      {/* Cola con temas pero nada sonando: cualquiera puede arrancar */}
+      {!nowPlaying && active.length > 0 && (
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={onNext}
+          title="Empezar a reproducir la cola"
           style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.45rem',
+            width: '100%',
             marginBottom: '1rem',
-            padding: '0.85rem',
-            border: '1px solid rgba(239, 68, 68, 0.35)',
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(15, 23, 42, 0.6) 100%)',
+            padding: '0.6rem',
           }}
         >
-          <div className="room-settings__box-head" style={{ marginBottom: '0.45rem' }}>
-            <span className="room-settings__box-title" style={{ color: '#ef4444', fontSize: '0.85rem' }}>
-              <Volume2 size={16} />
-              Sonando ahora
-            </span>
-            {isModerator && (
-              <div style={{ display: 'flex', gap: '0.35rem' }}>
-                <button
-                  type="button"
-                  className="leader-exit-modal__cancel-btn"
-                  style={{ width: 'auto', margin: 0, padding: '0.25rem 0.6rem', fontSize: '0.74rem' }}
-                  onClick={onNext}
-                  title="Pasar al siguiente tema"
-                >
-                  Siguiente
-                </button>
-                <button
-                  type="button"
-                  className="leader-exit-modal__cancel-btn"
-                  style={{ width: 'auto', margin: 0, padding: '0.25rem 0.6rem', fontSize: '0.74rem', color: '#f87171' }}
-                  onClick={onStop}
-                  title="Detener música"
-                >
-                  Detener
-                </button>
-              </div>
-            )}
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {nowPlaying.albumArt ? (
-              <img
-                src={nowPlaying.albumArt}
-                alt=""
-                style={{ width: '48px', height: '36px', objectFit: 'cover', borderRadius: '6px' }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '48px',
-                  height: '36px',
-                  borderRadius: '6px',
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ef4444',
-                }}
-              >
-                <Youtube size={20} />
-              </div>
-            )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {nowPlaying.name}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.76rem', color: '#94a3b8' }}>
-                {nowPlaying.artists || 'YouTube'} · <span>propuesto por {nowPlaying.proposedBy}</span>
-              </p>
-            </div>
-            {nowPlaying.openUrl && (
-              <a
-                href={nowPlaying.openUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}
-              >
-                Abrir ↗
-              </a>
-            )}
-          </div>
-        </div>
-      ) : null}
+          <Play size={16} />
+          Reproducir ({active.length})
+        </button>
+      )}
 
       {/* Pendientes de aprobación (moderador) */}
       {isModerator && pending.length > 0 && (
@@ -295,6 +747,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
               <div
                 key={e.id}
                 style={{
+                  position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.6rem',
@@ -323,16 +776,25 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                 >
                   <Check size={14} /> Aprobar
                 </button>
-                {canRemove(e) && (
-                  <button
-                    type="button"
-                    className="leader-exit-modal__cancel-btn"
-                    style={{ width: 'auto', margin: 0, padding: '0.3rem 0.5rem', color: '#f87171' }}
-                    onClick={() => onRemove(e.id)}
-                    title="Rechazar"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                <button
+                  type="button"
+                  className="music-row-options"
+                  aria-label={`Opciones de ${e.name}`}
+                  aria-expanded={openMenuId === e.id}
+                  onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
+                >
+                  <MoreVertical size={15} />
+                </button>
+                {openMenuId === e.id && (
+                  <PlayingMenu
+                    rowId={e.id}
+                    url=""
+                    title={e.name}
+                    openUrl={e.openUrl}
+                    entryId={e.id}
+                    canDelete={canRemove(e)}
+                    isCurrentlyPlaying={false}
+                  />
                 )}
               </div>
             ))}
@@ -340,12 +802,15 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         </div>
       )}
 
-      {/* Lista de la cola musical */}
-      <div>
-        <div className="room-settings__box-head" style={{ marginBottom: '0.55rem' }}>
-          <span className="room-settings__box-title" style={{ fontSize: '0.84rem' }}>
-            <Sparkles size={15} style={{ color: '#818cf8' }} />
-            Cola de reproducción ({active.length})
+      {/* Tarjeta de la cola musical (diseño mockup) */}
+      <div className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.6rem' }}>
+          <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#f1f5f9' }}>
+            Cola de reproducción
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', color: '#64748b' }}>
+            {active.length} vídeo{active.length === 1 ? '' : 's'}
+            <ListMusic size={14} />
           </span>
         </div>
 
@@ -357,10 +822,89 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+            {/* Tema sonando fuera de la cola: fila compacta estilo mockup */}
+            {nowPlaying && !matchedPlaying && nowVideoId ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  padding: '0.6rem 0.75rem 0.6rem 0.9rem',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(139, 92, 246, 0.45)',
+                  borderRadius: '10px',
+                  position: 'relative',
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 8,
+                    bottom: 8,
+                    width: 3,
+                    borderRadius: 999,
+                    background: '#8b5cf6',
+                  }}
+                />
+                <span role="img" aria-label="Sonando ahora" style={{ color: '#60a5fa', display: 'flex', flexShrink: 0 }}>
+                  <Pause size={13} />
+                </span>
+                <img
+                  src={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
+                  alt=""
+                  style={{ width: '42px', height: '32px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {nowPlaying.name}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {nowPlaying.artists || 'YouTube Music'} · propuesto por {nowPlaying.proposedBy}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label={`Opciones de ${nowPlaying.name}`}
+                  title="Opciones"
+                  onClick={() => setOpenMenuId((v) => (v === `now-${nowPlaying.entryId}` ? null : `now-${nowPlaying.entryId}`))}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: 'transparent',
+                    color: '#94a3b8',
+                    border: 'none',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <MoreVertical size={15} />
+                </button>
+                {openMenuId === `now-${nowPlaying.entryId}` && (
+                  <PlayingMenu
+                    rowId={`now-${nowPlaying.entryId}`}
+                    url={nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`}
+                    title={nowPlaying.name}
+                    openUrl={nowPlaying.openUrl}
+                    entryId={nowPlaying.entryId}
+                    canDelete={isModerator || (settings.musicCanRemove !== 'moderator' && nowPlaying.proposedBy === myName)}
+                    isCurrentlyPlaying
+                  />
+                )}
+              </div>
+            ) : null}
             {active.map((e, i) => {
-              const voted = hasVoted(e, myName, userId);
               const ytRef = parseYouTubeUrl(e.trackId || e.uri || e.openUrl);
               const thumb = e.albumArt || (ytRef ? `https://img.youtube.com/vi/${ytRef.videoId}/hqdefault.jpg` : undefined);
+              const isPlayingNow = !!nowPlaying && nowPlaying.trackId === e.trackId;
+              const rowDuration = typeof e.durationMs === 'number' && e.durationMs > 0
+                ? formatPlayerTime(e.durationMs / 1000)
+                : null;
 
               return (
                 <div
@@ -368,14 +912,39 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.65rem',
-                    padding: '0.55rem 0.75rem',
-                    background: 'rgba(255, 255, 255, 0.035)',
+                    gap: '0.6rem',
+                    padding: '0.6rem 0.75rem 0.6rem 0.9rem',
+                    background: 'rgba(255, 255, 255, 0.04)',
                     border: '1px solid rgba(255, 255, 255, 0.07)',
                     borderRadius: '10px',
                     transition: 'border-color 0.15s ease',
+                    position: 'relative',
+                    borderColor: isPlayingNow ? 'rgba(139, 92, 246, 0.45)' : 'rgba(255, 255, 255, 0.07)',
                   }}
                 >
+                  {isPlayingNow && (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 8,
+                        bottom: 8,
+                        width: 3,
+                        borderRadius: 999,
+                        background: '#8b5cf6',
+                      }}
+                    />
+                  )}
+                  {isPlayingNow && (
+                    <span
+                      role="img"
+                      aria-label="Sonando ahora"
+                      style={{ color: '#60a5fa', display: 'flex', flexShrink: 0 }}
+                    >
+                      <Pause size={13} />
+                    </span>
+                  )}
                   {thumb ? (
                     <img
                       src={thumb}
@@ -404,28 +973,54 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                     <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {e.name}
                     </p>
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8' }}>
-                      {e.artists || 'YouTube'} · por {e.proposedBy}
-                      {e.votes.length > 0 && ` · ${e.votes.length} voto${e.votes.length === 1 ? '' : 's'}`}
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {e.artists || 'YouTube Music'} · propuesto por {e.proposedBy}
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    style={{
-                      padding: '0.28rem 0.65rem',
-                      fontSize: '0.72rem',
-                      background: voted ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.08)',
-                      borderColor: voted ? '#6366f1' : 'rgba(255, 255, 255, 0.15)',
-                      color: voted ? '#fff' : '#cbd5e1',
-                    }}
-                    onClick={() => onVote(e.id)}
-                    title={voted ? 'Retirar voto' : 'Votar canción'}
-                  >
-                    {voted ? '✓ Votado' : 'Votar'}
-                  </button>
+                  {rowDuration && (
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                      {rowDuration}
+                    </span>
+                  )}
 
+                  {isPlayingNow ? (
+                    <>
+                      <button
+                        type="button"
+                        aria-label={`Opciones de ${e.name}`}
+                        title="Opciones"
+                        onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          background: 'transparent',
+                          color: '#94a3b8',
+                          border: 'none',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <MoreVertical size={15} />
+                      </button>
+                      {openMenuId === e.id && (
+                        <PlayingMenu
+                          rowId={e.id}
+                          url={e.openUrl || e.uri || (ytRef ? `https://www.youtube.com/watch?v=${ytRef.videoId}` : '')}
+                          title={e.name}
+                          openUrl={e.openUrl}
+                          entryId={e.id}
+                          canDelete={canRemove(e)}
+                          isCurrentlyPlaying={isPlayingNow}
+                        />
+                      )}
+                    </>
+                  ) : (
+                  <>
                   {canRemove(e) && (
                     <button
                       type="button"
@@ -438,8 +1033,42 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                       <Trash2 size={13} />
                     </button>
                   )}
+                  <button
+                    type="button"
+                    aria-label={`Opciones de ${e.name}`}
+                    title="Opciones"
+                    onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: 'transparent',
+                      color: '#94a3b8',
+                      border: 'none',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <MoreVertical size={15} />
+                  </button>
+                  {openMenuId === e.id && (
+                    <PlayingMenu
+                      rowId={e.id}
+                      url={e.openUrl || e.uri || (ytRef ? `https://www.youtube.com/watch?v=${ytRef.videoId}` : '')}
+                      title={e.name}
+                      openUrl={e.openUrl}
+                      entryId={e.id}
+                      canDelete={canRemove(e)}
+                      isCurrentlyPlaying={false}
+                    />
+                  )}
+                  </>
+                  )}
 
-                  {isModerator && settings.musicAllowReorder === true && (
+                  {!isPlayingNow && isModerator && settings.musicAllowReorder === true && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <button
                         type="button"
@@ -481,6 +1110,35 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
           </div>
         )}
       </div>
+
+      {/* Reproductor "Sonando ahora" debajo de la tarjeta (diseño mockup) */}
+      {nowPlaying && nowVideoId ? (
+        <div
+          className="room-settings__box"
+          style={{
+            marginBottom: '1rem',
+            padding: '0.85rem',
+            border: '1px solid rgba(139, 92, 246, 0.22)',
+            background: 'rgba(15, 20, 35, 0.55)',
+          }}
+        >
+          <NowPlayingPlayer
+            trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
+            videoId={nowVideoId}
+            title={nowPlaying.name}
+            subtitle={`${nowPlaying.artists || 'YouTube Music'} · propuesto por ${nowPlaying.proposedBy}`}
+            thumb={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
+            onEnded={onAutoNext}
+            onNext={onNext}
+            onStop={onStop}
+            onExpand={() => {
+              const url = nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`;
+              if (url) onExpandToMain(url, nowPlaying.name);
+            }}
+            showModerator={isModerator}
+          />
+        </div>
+      ) : null}
 
       <p className="room-settings__box-desc" style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.74rem' }}>
         🎵 La cola reproduce canciones de YouTube en grupo. Disfruta con letras sincronizadas y sin límites.

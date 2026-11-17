@@ -32,8 +32,27 @@ export class MemoryRoomRepository implements RoomRepository {
     try {
       if (!fs.existsSync(roomsFile)) return;
       const raw = fs.readFileSync(roomsFile, 'utf-8');
-      const parsed = JSON.parse(raw) as IRoom[];
-      for (const room of parsed) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = null;
+      }
+      // Archivo ilegible o con forma inesperada: se respalda para no perder
+      // evidencia y se arranca vacío (el próximo persist lo regenera sano).
+      if (!Array.isArray(parsed)) {
+        const backup = `${roomsFile}.corrupt-${Date.now()}`;
+        try {
+          fs.renameSync(roomsFile, backup);
+        } catch {
+          /* noop: si no se puede mover, se ignora igual */
+        }
+        console.warn(
+          `⚠️ data/rooms.json ilegible (se respaldó en ${backup}). Se arranca sin salas guardadas.`
+        );
+        return;
+      }
+      for (const room of parsed as IRoom[]) {
         if (!room?.roomId) continue;
         room.createdAt = reviveDate(room.createdAt);
         room.updatedAt = reviveDate(room.updatedAt);

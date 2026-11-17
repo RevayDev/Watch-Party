@@ -1,80 +1,105 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, Music } from 'lucide-react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
+import { Send, X, ArrowDown, Pencil, Reply } from 'lucide-react';
 import { ChatMessage } from '../../types/room';
 import { getAvatarColor, getInitials } from '../../shared/utils';
 
 interface ChatProps {
+  isOpen?: boolean;
   messages: ChatMessage[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, replyTo?: { id: string; user: string; text: string } | null) => void;
+  onEditMessage?: (id: string, text: string) => void;
   currentUserName?: string;
-  onClose?: () => void;
   /** Usuarios escribiendo ahora (ya filtrados y sin expirar, ordenados). */
   typingUsers?: string[];
   /** Se llama al teclear con texto no vacío (el hook lo throttlea a 1/2 s). */
   onTyping?: () => void;
-  /** Sala para el icono de música (opcional: sin esto no se muestra). */
-  roomId?: string;
-  /** ¿Está abierto el panel musical? */
-  musicOpen?: boolean;
-  /** Abre/cierra el panel musical. */
-  onOpenMusic?: () => void;
+  /** No leídos acumulados (insignia de la flecha para bajar). */
+  unreadCount?: number;
 }
 
 export const Chat: React.FC<ChatProps> = ({
+  isOpen = true,
   messages,
   onSendMessage,
+  onEditMessage = () => undefined,
   currentUserName,
-  onClose,
   typingUsers = [],
   onTyping,
-  roomId,
-  musicOpen = false,
-  onOpenMusic = () => undefined,
+  unreadCount = 0,
 }) => {
   const [input, setInput] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isNearBottomRef = useRef(true);
-  const prevMessagesCountRef = useRef(messages.length);
+  const [showJump, setShowJump] = useState(false);
+  // Mensaje en edición (solo propios) y cita de respuesta.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; user: string; text: string } | null>(null);
+  const prevMessagesCountRef = useRef(0);
+  const wasOpenRef = useRef(false);
 
   // Check scroll position to determine if user is reading previous messages
   const handleScroll = () => {
     if (bodyRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = bodyRef.current;
-      // User is considered near bottom if within 80px of bottom
-      isNearBottomRef.current = scrollHeight - scrollTop - clientHeight <= 80;
+      const near = scrollHeight - scrollTop - clientHeight <= 24;
+      isNearBottomRef.current = near;
+      setShowJump(!near);
     }
   };
 
-  // Smart auto-scroll on new messages
-  useEffect(() => {
-    if (!bodyRef.current) return;
+  const jumpToLatest = () => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    body.scrollTo({ top: body.scrollHeight, behavior: reduceMotion ? 'auto' : 'smooth' });
+  };
 
-    const isFirstLoad = prevMessagesCountRef.current === 0 && messages.length > 0;
-    const isNewMessage = messages.length > prevMessagesCountRef.current;
+  useLayoutEffect(() => {
+    const justOpened = isOpen && !wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+    if (!isOpen || !bodyRef.current) return;
+
+    const prev = prevMessagesCountRef.current;
     prevMessagesCountRef.current = messages.length;
-
-    if (isFirstLoad) {
+    if (justOpened || prev === 0 || messages.length === 0) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+      isNearBottomRef.current = true;
+      setShowJump(false);
       return;
     }
 
-    if (isNewMessage) {
+    if (messages.length > prev) {
       const lastMessage = messages[messages.length - 1];
       const isMyMessage =
         lastMessage &&
         currentUserName &&
         lastMessage.user.trim().toLowerCase() === currentUserName.trim().toLowerCase();
 
-      // Always scroll for own messages, or if user is already near bottom
+      // Always scroll for own messages, or if user is already near bottom.
+      // Ráfaga (>3 de golpe): salto instantáneo para no perseguir la
+      // animación suave sin asentarse nunca en el último.
       if (isMyMessage || isNearBottomRef.current) {
+        const burst = messages.length - prev > 3;
         bodyRef.current.scrollTo({
           top: bodyRef.current.scrollHeight,
-          behavior: isMyMessage ? 'smooth' : 'auto',
+          behavior: isMyMessage && !burst ? 'smooth' : 'auto',
         });
+        isNearBottomRef.current = true;
+        setShowJump(false);
       }
     }
-  }, [messages, currentUserName]);
+  }, [isOpen, messages, currentUserName]);
+
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (!isOpen || !body || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (isNearBottomRef.current) body.scrollTop = body.scrollHeight;
+    });
+    observer.observe(body);
+    return () => observer.disconnect();
+  }, [isOpen]);
 
   const handleInputFocus = () => {
     // Keep input visible above virtual keyboard on mobile
@@ -93,8 +118,39 @@ export const Chat: React.FC<ChatProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    onSendMessage(input.trim());
+    if (editingId) {
+      onEditMessage(editingId, input.trim());
+      setEditingId(null);
+    } else {
+      onSendMessage(input.trim(), replyTo);
+      setReplyTo(null);
+    }
     setInput('');
+  };
+
+  const isMine = (user: string) =>
+    !!currentUserName && user.trim().toLowerCase() === currentUserName.trim().toLowerCase();
+
+  const startEdit = (m: ChatMessage) => {
+    setReplyTo(null);
+    setEditingId(m.id);
+    setInput(m.text);
+    inputRef.current?.focus();
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setInput('');
+  };
+
+  const startReply = (m: ChatMessage) => {
+    setEditingId(null);
+    setReplyTo({ id: m.id, user: m.user, text: m.text });
+    inputRef.current?.focus();
+  };
+
+  const jumpToMessage = (id: string) => {
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const typingText =
@@ -107,74 +163,98 @@ export const Chat: React.FC<ChatProps> = ({
           : '';
 
   return (
-    <div className="drawer-chat" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header with Title and Close Button */}
-      <div
-        className="meet-drawer__header part-header"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '1rem 1.25rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        }}
-      >
-        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-          Mensajes del chat
-        </h3>
-        {onClose && (
-          <button
-            type="button"
-            className="drawer-close-btn"
-            onClick={onClose}
-            title="Cerrar chat"
-            aria-label="Cerrar chat"
-          >
-            <X size={18} />
-          </button>
-        )}
-      </div>
-
-      {/* Message list */}
-      <div
-        ref={bodyRef}
-        onScroll={handleScroll}
-        className="drawer-chat__messages"
-        style={{ flex: 1, overflowY: 'auto' }}
-      >
-        {messages.length === 0 ? (
-          <div className="drawer-chat__empty">
-            Sin mensajes aún. ¡Di algo! 👋
-          </div>
-        ) : (
-          messages.map((m) => {
-            const isSystem = m.user === 'Sistema';
-            if (isSystem) {
-              return (
-                <div key={m.id} className="drawer-chat__system-row">
-                  <div className="drawer-chat__system-pill">
-                    <span>{m.text}</span>
+    <div className="drawer-chat">
+      <div className="drawer-chat__history">
+        <div
+          ref={bodyRef}
+          onScroll={handleScroll}
+          className="drawer-chat__messages"
+        >
+          {messages.length === 0 ? (
+            <div className="drawer-chat__empty">
+              Sin mensajes aún. ¡Di algo! 👋
+            </div>
+          ) : (
+            messages.map((m) => {
+              const isSystem = m.user === 'Sistema';
+              if (isSystem) {
+                return (
+                  <div key={m.id} className="drawer-chat__system-row">
+                    <div className="drawer-chat__system-pill">
+                      <span>{m.text}</span>
+                    </div>
                   </div>
+                );
+              }
+              return (
+                <div
+                  key={m.id}
+                  id={`msg-${m.id}`}
+                  className={`drawer-chat__msg ${
+                    isMine(m.user) ? 'drawer-chat__msg--mine' : ''
+                  }`}
+                >
+                  {m.replyTo && (
+                    <button
+                      type="button"
+                      className="drawer-chat__quote"
+                      onClick={() => jumpToMessage(m.replyTo!.id)}
+                      title={`Ir al mensaje de ${m.replyTo.user}`}
+                    >
+                      <span className="drawer-chat__quote-user">{m.replyTo.user}</span>
+                      <span className="drawer-chat__quote-text">{m.replyTo.text}</span>
+                    </button>
+                  )}
+                  <span className="drawer-chat__author">{m.user}</span>
+                  <span className="drawer-chat__text">
+                    {m.text}
+                    {m.edited && <em className="drawer-chat__edited"> · editado</em>}
+                  </span>
+                  <span className="drawer-chat__time">{m.timestamp}</span>
+                  <span className="drawer-chat__actions">
+                    <button
+                      type="button"
+                      className="drawer-chat__action"
+                      title={`Responder a ${m.user}`}
+                      aria-label={`Responder a ${m.user}`}
+                      onClick={() => startReply(m)}
+                    >
+                      <Reply size={13} />
+                    </button>
+                    {isMine(m.user) && (
+                      <button
+                        type="button"
+                        className="drawer-chat__action"
+                        title="Editar mensaje"
+                        aria-label="Editar mensaje"
+                        onClick={() => startEdit(m)}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    )}
+                  </span>
                 </div>
               );
-            }
-            return (
-              <div
-                key={m.id}
-                className={`drawer-chat__msg ${
-                  currentUserName &&
-                  m.user.trim().toLowerCase() ===
-                    currentUserName.trim().toLowerCase()
-                    ? 'drawer-chat__msg--mine'
-                    : ''
-                }`}
-              >
-                <span className="drawer-chat__author">{m.user}</span>
-                <span className="drawer-chat__text">{m.text}</span>
-                <span className="drawer-chat__time">{m.timestamp}</span>
-              </div>
-            );
-          })
+            })
+          )}
+        </div>
+
+        {/* Flechita para bajar al último mensaje (estilo WhatsApp) */}
+        {isOpen && showJump && (
+          <button
+            type="button"
+            className="drawer-chat__jump"
+            title="Bajar al último mensaje"
+            aria-label="Bajar al último mensaje"
+            onClick={jumpToLatest}
+          >
+            <ArrowDown size={18} />
+            {unreadCount > 0 && (
+              <span className="drawer-chat__jump-badge">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
         )}
       </div>
 
@@ -202,24 +282,45 @@ export const Chat: React.FC<ChatProps> = ({
         </div>
       )}
 
-      {/* Input bar always visible */}
-      <form onSubmit={handleSubmit} className="drawer-chat__input-bar">
-        {roomId && (
+      {/* Barra de contexto: editando o respondiendo */}
+      {editingId && (
+        <div className="drawer-chat__context" role="status">
+          <span className="drawer-chat__context-label">Editando mensaje</span>
           <button
             type="button"
-            onClick={onOpenMusic}
-            className={`meet-circle-btn meet-circle-btn--music${musicOpen ? ' meet-circle-btn--active' : ''}`}
-            title={musicOpen ? 'Cerrar panel de música' : 'Abrir música (YouTube)'}
-            aria-label={musicOpen ? 'Cerrar panel de música' : 'Abrir música (YouTube)'}
+            className="drawer-chat__context-close"
+            title="Cancelar edición"
+            aria-label="Cancelar edición"
+            onClick={cancelEditing}
           >
-            <Music size={18} />
+            <X size={14} />
           </button>
-        )}
+        </div>
+      )}
+      {!editingId && replyTo && (
+        <div className="drawer-chat__context" role="status">
+          <span className="drawer-chat__context-label">
+            Respondiendo a <strong>{replyTo.user}</strong>: {replyTo.text}
+          </span>
+          <button
+            type="button"
+            className="drawer-chat__context-close"
+            title="Quitar respuesta"
+            aria-label="Quitar respuesta"
+            onClick={() => setReplyTo(null)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Input bar always visible */}
+      <form onSubmit={handleSubmit} className="drawer-chat__input-bar">
         <input
           ref={inputRef}
           type="text"
           className="drawer-chat__input"
-          placeholder="Escribe un mensaje…"
+          placeholder={editingId ? 'Edita tu mensaje…' : 'Escribe un mensaje…'}
           value={input}
           onChange={handleInputChange}
           onFocus={handleInputFocus}

@@ -1,6 +1,11 @@
 import { Server, Socket } from 'socket.io';
 import { checkSocketRateLimit } from '../socket-limits.js';
-import { activeUsers, lastCinematicTrigger } from '../socket-state.js';
+import {
+  activeUsers,
+  lastCinematicTrigger,
+  roomMessageAuthor,
+  trackRoomMessage,
+} from '../socket-state.js';
 
 // Anti-spam por socket (el excedente se ignora en silencio): ~8 mensajes,
 // ~20 reacciones y ~10 typing por ventana de 10s. Sin librerías nuevas.
@@ -10,6 +15,8 @@ const TYPING_LIMIT = { max: 10, windowMs: 10_000 };
 const CINEMATIC_LIMIT = { max: 5, windowMs: 10_000 };
 const MAX_MESSAGE_CHARS = 500;
 const MAX_EMOJI_CHARS = 20;
+const MAX_QUOTE_NAME_CHARS = 50;
+const MAX_QUOTE_TEXT_CHARS = 200;
 const MAX_COMBO_ID_CHARS = 64;
 const MAX_QUOTE_CHARS = 200;
 // Solo el primer trigger dentro de la ventana se reenvía a la sala.
@@ -40,16 +47,56 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
     if (!serverName) return;
     const cleanText = text.trim().slice(0, MAX_MESSAGE_CHARS);
     if (!cleanText) return;
+    // Cita opcional (responder): solo texto libre validado, sin spread ciego.
+    let replyTo: { id: string; user: string; text: string } | null = null;
+    const rawReply = (data as { replyTo?: unknown }).replyTo;
+    if (rawReply && typeof rawReply === 'object') {
+      const rq = rawReply as Record<string, unknown>;
+      const qUser = typeof rq.user === 'string' ? rq.user.trim().slice(0, MAX_QUOTE_NAME_CHARS) : '';
+      const qText = typeof rq.text === 'string' ? rq.text.trim().slice(0, MAX_QUOTE_TEXT_CHARS) : '';
+      const qId = typeof rq.id === 'string' ? rq.id.trim().slice(0, 32) : '';
+      if (qUser && qText) replyTo = { id: qId, user: qUser, text: qText };
+    }
 
-    const messagePayload = {
+    const messagePayload: {
+      id: string;
+      user: string;
+      text: string;
+      timestamp: string;
+      replyTo: { id: string; user: string; text: string } | null;
+    } = {
       id: Math.random().toString(36).substring(2, 9),
       user: serverName,
       text: cleanText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      replyTo,
     };
+    trackRoomMessage(cleanRoomId, messagePayload.id, serverName);
 
     io.to(cleanRoomId).emit('chat-message', messagePayload);
   });
+
+  // 7b. Edit Message (solo el autor, validado contra el registro efímero).
+  socket.on(
+    'edit-message',
+    (data: { roomId: string; id: string; text: string } | undefined) => {
+      if (!data) return;
+      const { roomId, id, text } = data;
+      if (typeof roomId !== 'string' || !roomId.trim()) return;
+      if (typeof id !== 'string' || !id.trim()) return;
+      if (typeof text !== 'string' || !text.trim()) return;
+      if (!checkSocketRateLimit(socket.id, 'send-message', MESSAGE_LIMIT.max, MESSAGE_LIMIT.windowMs)) return;
+      const cleanRoomId = roomId.toUpperCase().trim();
+      const serverName = memberNameOf(socket.id, cleanRoomId);
+      if (!serverName) return;
+      const author = roomMessageAuthor(cleanRoomId, id.trim());
+      if (!author || author.toLowerCase() !== serverName.toLowerCase()) return;
+      const cleanText = text.trim().slice(0, MAX_MESSAGE_CHARS);
+      if (!cleanText) return;
+
+      io.to(cleanRoomId).emit('message-edited', { id: id.trim(), text: cleanText });
+    }
+  );
 
   // 8. Reaction (Emoji float animation)
   socket.on('send-reaction', (data: { roomId: string; emoji: string; userName?: string } | undefined) => {

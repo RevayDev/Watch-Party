@@ -814,8 +814,9 @@ export class RoomService {
       if (!name || !artists || !proposedBy) return room;
 
       if (name.length > 200 || artists.length > 200) return room;
-      // Dupe: mismo trackId ya en cola (queued/pending).
+      // Dupe: mismo trackId ya en cola o sonando (queued/pending/nowPlaying).
       if (queue.some((e) => e.trackId === trackId)) return room;
+      if (room.musicNowPlaying?.trackId === trackId) return room;
       // Límite por usuario (default 5).
       const max = room.settings?.musicMaxPerUser ?? 5;
       const key = entry.proposedByUserId ? entry.proposedByUserId : proposedBy.toLowerCase();
@@ -824,7 +825,14 @@ export class RoomService {
       const mineCount = entry.proposedByUserId
         ? queue.filter((e) => e.proposedByUserId === entry.proposedByUserId).length
         : queue.filter((e) => !e.proposedByUserId && e.proposedBy.trim().toLowerCase() === key).length;
-      if (mineCount >= max) return room;
+      // Lo que suena también cuenta para el tope (es "suyo" igual).
+      const playing = room.musicNowPlaying;
+      const playingMine = playing
+        ? entry.proposedByUserId
+          ? playing.proposedByUserId === entry.proposedByUserId
+          : !playing.proposedByUserId && (playing.proposedBy ?? '').trim().toLowerCase() === key
+        : false;
+      if (mineCount + (playingMine ? 1 : 0) >= max) return room;
       const now = new Date();
       const full: IMusicQueueEntry = {
         id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -843,6 +851,25 @@ export class RoomService {
         createdAt: now,
       };
       queue.push(full);
+      // Auto-arranque estilo Spotify: si no suena nada y el tema entra
+      // directo a la cola (no pendiente), empieza a sonar sin esperar a que
+      // un moderador pulse Siguiente. Con 1-2 temas la música no se queda muda.
+      if (!room.musicNowPlaying && full.status === 'queued') {
+        room.musicQueue = queue.filter((e) => e.id !== full.id);
+        room.musicNowPlaying = {
+          entryId: full.id,
+          trackId,
+          name,
+          artists,
+          albumArt: entry.albumArt,
+          uri: entry.uri,
+          openUrl: entry.openUrl,
+          proposedBy,
+          proposedByUserId: entry.proposedByUserId,
+          startedAt: now,
+          startedBy: 'sala',
+        };
+      }
       room.updatedAt = new Date();
       await roomRepository.save(room);
       return room;
@@ -997,6 +1024,8 @@ export class RoomService {
         albumArt: next.albumArt,
         uri: next.uri,
         openUrl: next.openUrl,
+        proposedBy: next.proposedBy,
+        proposedByUserId: next.proposedByUserId,
         startedAt: new Date(),
         startedBy: 'sala',
       };

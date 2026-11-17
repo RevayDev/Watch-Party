@@ -12,6 +12,7 @@ const MUSIC_DISABLED = 'La música está desactivada en esta sala.';
 const ADD_LIMIT = { max: 12, windowMs: 60_000 };
 const VOTE_LIMIT = { max: 30, windowMs: 60_000 };
 const DEFAULT_LIMIT = { max: 20, windowMs: 60_000 };
+const AUTO_NEXT_LIMIT = { max: 10, windowMs: 60_000 };
 const DEDUP_WINDOW_MS = 2_000;
 
 /**
@@ -75,7 +76,7 @@ export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
       if (!member) return;
       const room = await RoomService.getRoomById(cleanRoomId);
       if (!room) return;
-      if (room.settings?.musicEnabled !== true) {
+      if (room.settings?.musicEnabled === false) {
         denySocket(socket, 'music-add', MUSIC_DISABLED);
         return;
       }
@@ -126,7 +127,7 @@ export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
       if (!member) return;
       const room = await RoomService.getRoomById(cleanRoomId);
       if (!room) return;
-      if (room.settings?.musicEnabled !== true) return;
+      if (room.settings?.musicEnabled === false) return;
       if ((room.settings?.musicQueueMode ?? 'fifo') !== 'votes') return;
       const updated = await RoomService.toggleMusicVote(cleanRoomId, data.entryId, {
         userId: member.userId,
@@ -221,10 +222,32 @@ export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
     if (!member) return;
     const room = await RoomService.getRoomById(cleanRoomId);
     if (!room) return;
-    if (!requireModerator(room, resolveSocketClaim(socket, data))) {
+    // Sin nada sonando cualquiera puede arrancar (play); saltar con música
+    // sonando sigue siendo solo de moderadores.
+    if (room.musicNowPlaying && !requireModerator(room, resolveSocketClaim(socket, data))) {
       denySocket(socket, 'music-next', MODERATOR_ONLY);
       return;
     }
+    const updated = await RoomService.advanceMusicQueue(cleanRoomId);
+    if (!updated) return;
+    emitQueue(io, cleanRoomId, updated);
+  });
+
+  // Avance automático al terminar un tema: lo puede pedir CUALQUIER miembro
+  // (su reproductor detecta el fin). Con rate-limit + dedup anti-spam.
+  // Solo avanza si hay algo sonando; el Siguiente manual sigue moderador-only.
+  socket.on('music-auto-next', async (data: { roomId: string } | undefined) => {
+    if (!data || typeof data !== 'object') return;
+    const cleanRoomId = cleanRoomIdOf(data.roomId);
+    if (!cleanRoomId) return;
+    if (!checkSocketRateLimit(socket.id, 'music-auto-next', AUTO_NEXT_LIMIT.max, AUTO_NEXT_LIMIT.windowMs)) return;
+    if (isDuplicateSocketEvent(socket.id, 'music-auto-next', cleanRoomId, DEDUP_WINDOW_MS)) return;
+    const member = memberOf(socket.id, cleanRoomId);
+    if (!member) return;
+    const room = await RoomService.getRoomById(cleanRoomId);
+    if (!room) return;
+    if (room.settings?.musicEnabled === false) return;
+    if (!room.musicNowPlaying) return;
     const updated = await RoomService.advanceMusicQueue(cleanRoomId);
     if (!updated) return;
     emitQueue(io, cleanRoomId, updated);

@@ -15,7 +15,7 @@ interface CameraGridProps {
   peerMediaStates?: Record<string, PeerMediaState>;
   /**
    * Rol B (ahorro de datos): con true, las cámaras REMOTAS se muestran como
-   * avatar (audio-only). El elemento <audio> remoto sigue sonando; no se toca
+   * avatar (audio-only). El audio remoto se reproduce a nivel de sala; no se toca
    * nada de useWebRTC (solo presentación). Agente A: si deshabilita pistas a
    * nivel WebRTC, compone sin conflicto con este interruptor.
    */
@@ -88,31 +88,16 @@ const CameraTile: React.FC<{
   isCameraOn?: boolean;
   /** El remoto se congeló o pierde paquetes: avatar + "señal débil" (el audio sigue). */
   weakSignal?: boolean;
-  /** Nivel crítico: audio-only en recepción (se oculta su <video>, nunca su <audio>). */
+  /** Nivel crítico: audio-only en recepción (se oculta su video). */
   criticalSignal?: boolean;
 }> = ({ stream = null, userName, isLeader = false, isLocal = false, isMicOn = false, isCameraOn = false, weakSignal = false, criticalSignal = false }) => {
   const isSpeaking = useIsSpeaking(stream, isLocal, isMicOn);
   const initial = (userName || '?').charAt(0).toUpperCase();
-  // Remoto con señal débil/crítica: no mostrar el frame congelado; el <audio>
-  // remoto de arriba sigue sonando siempre (audio-only en recepción).
+  // Con señal débil/crítica, se oculta el frame congelado.
   const showFrozenAvatar = !isLocal && (weakSignal || criticalSignal);
 
   return (
     <div className={`cam-tile ${isSpeaking ? 'cam-tile--speaking' : ''}`}>
-      {/* Remote Audio Track Player (Always active to ensure clear sound output) */}
-      {!isLocal && stream && (
-        <audio
-          ref={(el) => {
-            if (el && el.srcObject !== stream) {
-              el.srcObject = stream;
-              el.play().catch(() => {});
-            }
-          }}
-          autoPlay
-          playsInline
-        />
-      )}
-
       {/* Video Element when Camera is ON */}
       {isCameraOn && (isLocal || stream) && !showFrozenAvatar ? (
         <video
@@ -124,7 +109,7 @@ const CameraTile: React.FC<{
           }}
           autoPlay
           playsInline
-          muted={isLocal}
+          muted
           className={`cam-tile__video ${isLocal ? 'cam-tile__video--mirror' : ''}`}
         />
       ) : (
@@ -235,7 +220,7 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
             isLocal={false}
             isMicOn={peerMicOn}
             // Rol B (ahorro): avatar en vez de vídeo remoto; el audio sigue
-            // sonando por el <audio> dedicado del tile.
+            // sonando por el reproductor de audio de la sala.
             isCameraOn={dataSaverMode ? false : peerCameraOn}
             weakSignal={signal?.weak === true}
             criticalSignal={signal?.critical === true}
