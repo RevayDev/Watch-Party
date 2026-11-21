@@ -16,6 +16,9 @@ interface RoomHeaderProps {
   /** Estado de la sala (demo: se muestra como píldora informativa). */
   roomStatus?: 'waiting' | 'active' | 'closed';
   onOpenSettings?: () => void;
+  inviteUrl?: string;
+  capacity?: number;
+  showSettings?: boolean;
   onOpenMediaSettings?: () => void;
   onLeaveClick?: () => void;
   /** Abre/cierra el panel de participantes (igual que el botón de abajo) */
@@ -34,6 +37,9 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   timerEndsAt,
   roomStatus,
   onOpenSettings,
+  inviteUrl,
+  capacity,
+  showSettings = false,
   onOpenMediaSettings,
   onOpenParticipants,
   participantsActive = false,
@@ -62,7 +68,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   const shareRef = useRef<HTMLDivElement>(null);
   const clockRef = useRef<HTMLDivElement>(null);
 
-  const fullUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+  const fullUrl = inviteUrl ?? `${window.location.origin}${window.location.pathname}?room=${roomId}`;
 
   // Close menus on outside click / Escape
   useEffect(() => {
@@ -254,13 +260,13 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           className={`header__users-pill ${participantsActive ? 'header__users-pill--active' : ''}`}
           title={
             demo
-              ? `${participantCount} de ${DEMO_MAX_USERS_PER_ROOM} participantes — ver lista`
+              ? `${participantCount} de ${capacity ?? DEMO_MAX_USERS_PER_ROOM} participantes — ver lista`
               : `${participantCount} participantes — ver lista`
           }
           data-testid="room-capacity"
         >
           <Users size={14} />
-          <span>{demo ? `${participantCount}/${DEMO_MAX_USERS_PER_ROOM}` : participantCount}</span>
+          <span>{demo || capacity ? `${participantCount}/${capacity ?? DEMO_MAX_USERS_PER_ROOM}` : participantCount}</span>
         </button>
 
 
@@ -347,7 +353,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           </button>
         )}
         {/* ⚙ Room settings (leader only): name, info, save-mode, approval, timer */}
-        {isLeader && onOpenSettings && (
+        {(isLeader || showSettings) && onOpenSettings && (
           <button
             type="button"
             onClick={onOpenSettings}

@@ -14,6 +14,7 @@ import { buildSocketAuth } from '../../shared/utils';
 import { parseYouTubeUrl } from '../../shared/youtube';
 import { notify } from '../../services/notifications';
 import { RoomControls } from './components/RoomControls';
+import { RoomLayout } from './components/RoomLayout';
 import { RoomDrawer } from './components/RoomDrawer';
 import { useBarPrefs } from './hooks/useBarPrefs';
 
@@ -137,9 +138,11 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
   }
 
   return (
-    <div className={`meet-layout ${!r.uiPinned ? 'meet-layout--bars-hidden' : ''}`}>
-      {/* ── Top Header (Google Meet style) ── */}
-      <RoomHeader
+    <RoomLayout
+      uiPinned={r.uiPinned}
+      camerasCollapsed={r.isRightPanelCollapsed}
+      header={
+        <RoomHeader
         roomId={r.roomData.roomId}
         participantCount={r.roomData.participants.length}
         isLeader={r.isLeader}
@@ -155,12 +158,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
         onLeaveClick={r.handleLeaveClick}
         className={!r.uiPinned ? 'header--hidden' : ''}
       />
-
-      {/* ── Main Stage Area: Left Video + Right Vertical Cameras Strip ── */}
-      <main className={`meet-stage ${r.isRightPanelCollapsed ? 'meet-stage--cams-collapsed' : ''}`}>
-        {/* Cinematic Video Card */}
-        <section className="meet-stage__video-wrapper">
-          <RemoteAudio peers={r.remotePeers} />
+      }
+      player={<>
+        <RemoteAudio peers={r.remotePeers} />
           <VideoPlayer
             roomId={roomId}
             video={r.roomData.video}
@@ -200,12 +200,9 @@ onVideoReady={r.handleVideoReady}
               <span>Reconectando…</span>
             </div>
           )}
-        </section>
-
-        {/* Right Vertical Camera Strip (Collapsible Accordion Style) */}
-        {!r.isRightPanelCollapsed && (
-          <aside className="meet-stage__cams-strip">
-            <CameraGrid
+      </>}
+      cameras={
+        <CameraGrid
               localStream={r.localStream}
               remotePeers={r.remotePeers}
               participants={r.roomData.participants}
@@ -217,10 +214,8 @@ onVideoReady={r.handleVideoReady}
               peerSignalStates={r.peerSignalStates}
               dataSaverMode={r.dataSaver}
             />
-          </aside>
-        )}
-
-        {/* ── Slide-over Right Drawer for Chat or Participants ── */}
+      }
+      drawer={
         <RoomDrawer
           activeSideTab={r.activeSideTab}
           sideTabView={r.sideTabView}
@@ -256,10 +251,9 @@ onVideoReady={r.handleVideoReady}
           onMusicStop={r.musicStop}
           onExpandToMain={handleExpandMusicToMain}
         />
-      </main>
-
-      {/* ── Bottom Bar (text buttons) ── */}
-      <RoomControls
+      }
+      controls={
+        <RoomControls
         roomId={roomId}
         musicOpen={r.activeSideTab === 'music'}
         onToggleMusic={toggleMusicPanel}
@@ -289,7 +283,8 @@ onVideoReady={r.handleVideoReady}
         uiPinned={r.uiPinned}
         toggleBarsVisibility={r.toggleBarsVisibility}
       />
-
+      }
+    >
       {r.mediaError && <div className="meet-error-banner">⚠️ {r.mediaError}</div>}
       {r.mediaConnectionFailed && (
         <div className="meet-error-banner" role="status">
@@ -359,7 +354,7 @@ onVideoReady={r.handleVideoReady}
           if (patch.layout !== undefined) barPrefs.setLayout(patch.layout);
         }}
       />
-    </div>
+    </RoomLayout>
   );
 };
 

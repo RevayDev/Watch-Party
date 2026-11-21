@@ -10,6 +10,19 @@ export const videoSchema = z.object({
   id, name: z.string().min(1).max(200), source: z.enum(['file', 'youtube', 'url']),
   url: z.string().max(2048).optional(), size: z.number().int().min(0).max(MAX_VIDEO_BYTES), mime: z.string().max(100),
 });
+const musicTrackSchema = z.object({
+  id, name: z.string().min(1).max(200), artists: z.string().max(200),
+  albumArt: z.string().max(2048).optional(), durationMs: z.number().finite().nonnegative().optional(),
+  uri: z.string().max(2048).optional(), openUrl: z.string().max(2048).optional(),
+});
+const musicEntrySchema = musicTrackSchema.omit({ id: true }).extend({
+  id, trackId: id, proposedBy: name, proposedByUserId: id.optional(),
+  status: z.enum(['queued', 'pending']), votes: z.array(id).max(MAX_HOST_MEMBERS), createdAt: z.string(),
+});
+const musicPlayingSchema = musicTrackSchema.omit({ id: true, durationMs: true }).extend({
+  entryId: id, trackId: id, proposedBy: name.optional(), proposedByUserId: id.optional(),
+  startedAt: z.string(), startedBy: name,
+});
 export const snapshotSchema = z.object({
   revision: z.number().int().nonnegative(), hostId: id,
   members: z.array(memberSchema).max(MAX_HOST_MEMBERS),
@@ -23,6 +36,8 @@ export const snapshotSchema = z.object({
     sentAt: z.number().finite(), timestamp: z.number().finite(),
   }).nullable(),
   automaticMigration: z.boolean(), replicateVideo: z.boolean(),
+  musicQueue: z.array(musicEntrySchema).max(40).default([]),
+  musicNowPlaying: musicPlayingSchema.nullable().default(null),
 });
 export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('chat'), text: z.string().trim().min(1).max(2000), id, replyTo: id.optional() }),
@@ -30,12 +45,17 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('video'), video: videoSchema }),
   z.object({ type: z.literal('playback'), action: z.enum(['play', 'pause', 'seek']), currentTime: z.number().finite().nonnegative() }),
   z.object({ type: z.literal('settings'), automaticMigration: z.boolean(), replicateVideo: z.boolean() }),
+  z.object({ type: z.literal('music-add'), track: musicTrackSchema }),
+  z.object({ type: z.literal('music-remove'), id }),
+  z.object({ type: z.literal('music-reorder'), ids: z.array(id).max(40) }),
+  z.object({ type: z.literal('music-next') }),
+  z.object({ type: z.literal('music-stop') }),
 ]);
 export const envelopeSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('hello'), proof: z.string().regex(/^[a-f0-9]{64}$/), member: memberSchema }),
   z.object({ type: z.literal('snapshot'), state: snapshotSchema }),
   z.object({ type: z.literal('command'), command: commandSchema }),
-  z.object({ type: z.literal('signal'), event: z.enum(['webrtc-offer', 'webrtc-answer', 'webrtc-ice-candidate', 'peer-media-state']), payload: z.record(z.string(), z.unknown()) }),
+  z.object({ type: z.literal('signal'), event: z.enum(['webrtc-offer', 'webrtc-answer', 'webrtc-ice-candidate', 'peer-media-state', 'reaction']), payload: z.record(z.string(), z.unknown()) }),
   z.object({ type: z.literal('file-request'), videoId: id }),
   z.object({ type: z.literal('file-start'), video: videoSchema }),
   z.object({ type: z.literal('file-chunk'), videoId: id, index: z.number().int().nonnegative(), data: z.instanceof(ArrayBuffer) }),
@@ -76,7 +96,8 @@ export function newHostRoom(name: string): HostRoomOptions {
 
 export function applyHostCommand(state: HostSnapshot, senderId: string, command: HostCommand): HostSnapshot {
   const member = state.members.find((candidate) => candidate.id === senderId);
-  if (!member || (command.type !== 'chat' && command.type !== 'edit-chat' && senderId !== state.hostId)) return state;
+  const memberAction = command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
+  if (!member || (!memberAction && senderId !== state.hostId)) return state;
   switch (command.type) {
     case 'chat': {
       if (state.messages.some((message) => message.id === command.id)) return state;
@@ -97,5 +118,31 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
       return { ...state, revision: state.revision + 1, automaticMigration: command.automaticMigration, replicateVideo: command.replicateVideo };
     case 'playback':
       return { ...state, revision: state.revision + 1, playback: { action: command.action, currentTime: command.currentTime, sentAt: Date.now(), timestamp: Date.now() } };
+    case 'music-add': {
+      if (state.musicQueue.length >= 40 || state.musicQueue.some((entry) => entry.trackId === command.track.id)) return state;
+      const entry = {
+        ...command.track, id: crypto.randomUUID(), trackId: command.track.id,
+        proposedBy: member.name, proposedByUserId: member.id, status: 'queued' as const,
+        votes: [], createdAt: new Date().toISOString(),
+      };
+      return { ...state, revision: state.revision + 1, musicQueue: [...state.musicQueue, entry] };
+    }
+    case 'music-remove':
+      return { ...state, revision: state.revision + 1, musicQueue: state.musicQueue.filter((entry) =>
+        entry.id !== command.id || (senderId !== state.hostId && entry.proposedByUserId !== senderId)) };
+    case 'music-reorder': {
+      if (command.ids.length !== state.musicQueue.length || new Set(command.ids).size !== command.ids.length ||
+        command.ids.some((entryId) => !state.musicQueue.some((entry) => entry.id === entryId))) return state;
+      const indices = new Map(command.ids.map((entryId, index) => [entryId, index]));
+      return { ...state, revision: state.revision + 1, musicQueue: [...state.musicQueue].sort((a, b) => indices.get(a.id)! - indices.get(b.id)!) };
+    }
+    case 'music-next': {
+      const [next, ...queue] = state.musicQueue;
+      return { ...state, revision: state.revision + 1, musicQueue: queue, musicNowPlaying: next ? {
+        ...next, entryId: next.id, startedAt: new Date().toISOString(), startedBy: member.name,
+      } : null };
+    }
+    case 'music-stop':
+      return { ...state, revision: state.revision + 1, musicNowPlaying: null };
   }
 }

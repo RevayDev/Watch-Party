@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Copy, Mic, MicOff, Settings, Video, VideoOff } from 'lucide-react';
-import { Chat } from '../chat/Chat';
+import { Loader2 } from 'lucide-react';
 import { VideoPlayer } from '../player/VideoPlayer';
 import { CameraGrid } from '../../components/CameraGrid';
 import { RemoteAudio } from '../../components/RemoteAudio';
 import { MediaSettings } from '../../components/MediaSettings';
+import { RoomHeader } from '../../components/RoomHeader';
+import { MemberExitModal } from '../../components/MemberExitModal';
+import { RoomLayout } from '../room/components/RoomLayout';
+import { RoomControls } from '../room/components/RoomControls';
+import { RoomDrawer } from '../room/components/RoomDrawer';
+import { useBarPrefs } from '../room/hooks/useBarPrefs';
+import { usePresence } from '../../hooks/usePresence';
+import { useSwipeDown } from '../../shared/hooks/useSheetDrag';
 import { BottomSheet } from '../../shared/components/BottomSheet';
 import { useWebRTC } from '../../hooks/useWebRTC';
 import { parseYouTubeUrl } from '../../shared/youtube';
 import { HostSession, type HostSessionView } from './HostSession';
 import { hostInvite, type HostRoomOptions } from './protocol';
-import type { IVideoMetadata } from '../../types/room';
+import type { IVideoMetadata, IRoomData, ReactionItem } from '../../types/room';
 import './host-room.css';
 
 const initialView: HostSessionView = {
@@ -46,9 +53,24 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
   const optionsRef = useRef(options);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [devicesOpen, setDevicesOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [url, setUrl] = useState('');
+  const [activeSideTab, setActiveSideTab] = useState<'chat' | 'participants' | 'music' | null>(null);
+  const [sideTabView, setSideTabView] = useState<'chat' | 'participants' | 'music'>('chat');
+  const [camerasCollapsed, setCamerasCollapsed] = useState(false);
+  const [uiPinned, setUiPinned] = useState(true);
+  const [isBarVisible, setIsBarVisible] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showExit, setShowExit] = useState(false);
+  const [reactions, setReactions] = useState<ReactionItem[]>([]);
+  const emojiPresence = usePresence(showEmojiPicker, 160);
+  const morePresence = usePresence(showMoreMenu, 160);
+  const emojiSheetRef = useSwipeDown<HTMLDivElement>(() => setShowEmojiPicker(false), showEmojiPicker);
+  const moreSheetRef = useSwipeDown<HTMLDivElement>(() => setShowMoreMenu(false), showMoreMenu);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const barPrefs = useBarPrefs();
+  const createdAt = useRef(new Date().toISOString());
   const state = view.state;
   const isHost = state?.hostId === view.id;
   const media = useWebRTC(session, options.roomId, options.name, isHost);
@@ -58,6 +80,45 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
     current.start();
     return () => current.stop();
   }, []);
+  useEffect(() => {
+    if (activeSideTab) setSideTabView(activeSideTab);
+  }, [activeSideTab]);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const activity = () => {
+      setIsBarVisible(true);
+      clearTimeout(timer);
+      if (!uiPinned && !showEmojiPicker && !showMoreMenu && !activeSideTab) {
+        timer = setTimeout(() => setIsBarVisible(false), 4500);
+      }
+    };
+    window.addEventListener('mousemove', activity);
+    window.addEventListener('touchstart', activity, { passive: true });
+    window.addEventListener('click', activity);
+    activity();
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('mousemove', activity);
+      window.removeEventListener('touchstart', activity);
+      window.removeEventListener('click', activity);
+    };
+  }, [uiPinned, showEmojiPicker, showMoreMenu, activeSideTab]);
+  useEffect(() => {
+    if (!session) return;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const receive = (packet: { id: string; emoji: string; userName: string }) => {
+      if (typeof packet.emoji !== 'string' || packet.emoji.length > 32) return;
+      const reaction = { id: packet.id, emoji: packet.emoji, user: packet.userName, xOffset: Math.random() * 80 + 10 };
+      setReactions((previous) => [...previous.slice(-39), reaction]);
+      const timer = setTimeout(() => {
+        setReactions((previous) => previous.filter((entry) => entry.id !== reaction.id));
+        timers.delete(timer);
+      }, 5000);
+      timers.add(timer);
+    };
+    session.on('reaction', receive);
+    return () => { session.off('reaction', receive); timers.forEach(clearTimeout); };
+  }, [session]);
 
   const selected = state?.video;
   let video: IVideoMetadata | null = null;
@@ -76,14 +137,14 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
     }
   };
 
-  const setVideoUrl = async (input: string) => {
+  const setVideoUrl = async (input: string, title?: string) => {
     setError('');
     try {
       const parsed = new URL(input);
       if (parsed.protocol !== 'https:') throw new Error('Usa un enlace HTTPS de video.');
       const youtube = parseYouTubeUrl(input);
       session?.command({ type: 'video', video: {
-        id: crypto.randomUUID(), name: youtube ? 'YouTube' : parsed.pathname.split('/').pop() || 'Video',
+        id: crypto.randomUUID(), name: title?.trim() || (youtube ? 'YouTube' : parsed.pathname.split('/').pop() || 'Video'),
         source: youtube ? 'youtube' : 'url', url: youtube?.cleanUrl ?? parsed.href, size: 0, mime: 'video/mp4',
       } });
       setUrl('');
@@ -92,71 +153,89 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
     }
   };
 
+  const roomData: IRoomData | null = state ? {
+    roomId: options.roomId, leaderName: state.members.find((member) => member.id === state.hostId)?.name ?? options.name,
+    status: selected ? 'active' : 'waiting', isTemporary: true, video, createdAt: createdAt.current,
+    participants: state.members.map((member) => ({
+      name: member.name, userId: member.id, socketId: member.id, isLeader: member.id === state.hostId,
+      role: member.id === state.hostId ? 'leader' : 'member', joinedAt: new Date(member.joinedAt).toISOString(),
+    })),
+    settings: { muteOnEntry: false, cameraOffOnEntry: false, allowMicReactivation: true, allowCamReactivation: true,
+      hostOnlySync: true, musicEnabled: true, musicCanAdd: 'anyone', musicAllowReorder: true, musicCanRemove: 'proposer' },
+    musicQueue: state.musicQueue, musicNowPlaying: state.musicNowPlaying,
+  } : null;
+
+  if (!roomData || !state || !session) return (
+    <div className="room-loading">
+      <Loader2 size={40} className="animate-spin room-loading__icon" />
+      <p className="room-loading__text" role="status">{view.status}</p>
+      {view.error && <p role="alert">{view.error}</p>}
+      <button type="button" className="btn btn--primary" onClick={onLeave}>Volver al inicio</button>
+    </div>
+  );
+
   return (
-    <div className="host-room">
-      <header className="host-room__header">
-        <button type="button" className="meet-circle-btn" aria-label="Salir de la sala" onClick={onLeave}><ArrowLeft size={18} /></button>
-        <div><strong>Sala entre navegadores</strong><p role="status">{view.status}</p></div>
-        <button type="button" className="btn btn--primary" onClick={() => {
-          void navigator.clipboard.writeText(hostInvite(options.roomId, options.key))
-            .then(() => setCopied(true)).catch(() => setError('No se pudo copiar. Copia el enlace desde la barra del navegador.'));
-        }}><Copy size={16} /> {copied ? 'Enlace copiado' : 'Invitar'}</button>
-        <button type="button" className="meet-circle-btn" aria-label="Configuración del servidor" onClick={() => setSettingsOpen(true)}><Settings size={18} /></button>
-      </header>
-      {(view.error || error || media.mediaError) && <p role="alert" className="meet-error-banner">{view.error || error || media.mediaError}</p>}
-      {media.mediaConnectionFailed && <button type="button" className="btn btn--primary" onClick={media.retryMediaConnection}>Reconectar micrófonos y cámaras</button>}
-      {!state ? (
-        <main className="host-room-entry">
-          <p role="status">{view.status} La señalización puede tardar unos segundos.</p>
-          <p>El anfitrión o un participante con una copia debe seguir conectado para recuperar una sala.</p>
-        </main>
-      ) : (
-        <>
-          <main className="host-room__stage">
-            <section className="host-room__player">
-              <RemoteAudio peers={media.remotePeers} />
-              {selected?.source === 'file' && !view.fileUrl ? (
-                <div className="drawer-chat__empty" role="status">
-                  Recibiendo el video completo antes de reproducir… {view.fileProgress}%
-                  <progress max={100} value={view.fileProgress} aria-label="Recepción del video" />
-                  <button type="button" className="btn btn--primary" onClick={() => session?.retryVideo()}>Reintentar copia</button>
-                </div>
-              ) : (
-                <VideoPlayer
-                  directPlayback roomId={options.roomId} video={video} isLeader={isHost}
-                  onUploadVideo={selectFile} onSetVideoUrl={setVideoUrl} uploadProgress={null}
-                  reactions={[]} isMicOn={media.isMicOn}
-                  onSyncAction={(action, currentTime) => session?.command({ type: 'playback', action, currentTime })}
-                  onPlaybackHeartbeat={isHost ? (currentTime, playing) => session?.command({
-                    type: 'playback', action: playing ? 'play' : 'pause', currentTime,
-                  }) : undefined}
-                  remoteAction={isHost ? null : state.playback}
-                />
-              )}
-            </section>
-            <aside className="host-room__chat"><Chat messages={state.messages} currentUserName={options.name}
-              onSendMessage={(text, reply) => session?.command({ type: 'chat', text, id: crypto.randomUUID(), replyTo: reply?.id })}
-              onEditMessage={(id, text) => session?.command({ type: 'edit-chat', id, text })} />
-            </aside>
-          </main>
-          <CameraGrid localStream={media.localStream} remotePeers={media.remotePeers}
-            participants={state.members.map((member) => ({
-              name: member.name, isLeader: member.id === state.hostId, socketId: member.id,
-              joinedAt: new Date(member.joinedAt).toISOString(),
-            }))}
-            currentUserName={options.name} isLeader={isHost} isMicOn={media.isMicOn} isCameraOn={media.isCameraOn}
-            peerMediaStates={media.peerMediaStates} peerSignalStates={media.peerSignalStates} />
-          <footer className="host-room__controls">
-            <button type="button" className="meet-circle-btn" onClick={() => void media.toggleMic()} aria-label={media.isMicOn ? 'Silenciar micrófono' : 'Activar micrófono'}>
-              {media.isMicOn ? <Mic size={18} /> : <MicOff size={18} />}
-            </button>
-            <button type="button" className="meet-circle-btn" onClick={() => void media.toggleCamera()} aria-label={media.isCameraOn ? 'Apagar cámara' : 'Activar cámara'}>
-              {media.isCameraOn ? <Video size={18} /> : <VideoOff size={18} />}
-            </button>
-            <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => setDevicesOpen(true)}>Probar dispositivos</button>
-          </footer>
-        </>
-      )}
+    <RoomLayout uiPinned={uiPinned} camerasCollapsed={camerasCollapsed}
+      header={<RoomHeader roomId={options.roomId} participantCount={state.members.length} capacity={8}
+        inviteUrl={hostInvite(options.roomId, options.key)} isLeader={isHost} showSettings
+        createdAt={createdAt.current} roomStatus={roomData.status}
+        onOpenSettings={() => setSettingsOpen(true)} onOpenMediaSettings={() => setDevicesOpen(true)}
+        onOpenParticipants={() => setActiveSideTab((tab) => tab === 'participants' ? null : 'participants')}
+        participantsActive={activeSideTab === 'participants'} onLeaveClick={() => setShowExit(true)}
+        className={!uiPinned ? 'header--hidden' : ''} />}
+      player={<>
+        <RemoteAudio peers={media.remotePeers} />
+        {selected?.source === 'file' && !view.fileUrl ? (
+          <div className="player-container"><div className="player-container__placeholder" role="status">
+            <p>Recibiendo el video… {view.fileProgress}%</p>
+            <progress max={100} value={view.fileProgress} aria-label="Recepción del video" />
+            <button type="button" className="btn btn--primary" onClick={() => session.retryVideo()}>Reintentar copia</button>
+          </div></div>
+        ) : (
+          <VideoPlayer directPlayback roomId={options.roomId} video={video} isLeader={isHost}
+            onUploadVideo={selectFile} onSetVideoUrl={setVideoUrl} uploadProgress={null}
+            reactions={reactions} isMicOn={media.isMicOn}
+            onSyncAction={(action, currentTime) => session.command({ type: 'playback', action, currentTime })}
+            onPlaybackHeartbeat={isHost ? (currentTime, playing) => session.command({
+              type: 'playback', action: playing ? 'play' : 'pause', currentTime,
+            }) : undefined} remoteAction={isHost ? null : state.playback} />
+        )}
+      </>}
+      cameras={<CameraGrid localStream={media.localStream} remotePeers={media.remotePeers}
+        participants={roomData.participants} currentUserName={options.name} isLeader={isHost}
+        isMicOn={media.isMicOn} isCameraOn={media.isCameraOn}
+        peerMediaStates={media.peerMediaStates} peerSignalStates={media.peerSignalStates} />}
+      drawer={<RoomDrawer activeSideTab={activeSideTab} sideTabView={sideTabView} setActiveSideTab={setActiveSideTab}
+        messages={state.messages}
+        handleSendMessage={(text, reply) => session.command({ type: 'chat', text, id: crypto.randomUUID(), replyTo: reply?.id })}
+        handleEditMessage={(id, text) => session.command({ type: 'edit-chat', id, text })}
+        typingUsers={[]} onTyping={() => {}} myName={options.name} roomData={roomData} userId={view.id}
+        isLeader={isHost} canManageParticipants={false} peerMediaStates={media.peerMediaStates}
+        isMicOn={media.isMicOn} isCameraOn={media.isCameraOn} toggleMic={media.toggleMic} toggleCamera={media.toggleCamera}
+        socket={session} roomId={options.roomId} musicQueue={state.musicQueue} musicNowPlaying={state.musicNowPlaying}
+        musicSettings={roomData.settings} musicIsModerator={isHost}
+        onMusicAdd={(track) => session.command({ type: 'music-add', track })}
+        onMusicRemove={(id) => session.command({ type: 'music-remove', id })}
+        onMusicReorder={(ids) => session.command({ type: 'music-reorder', ids })}
+        onMusicNext={() => session.command({ type: 'music-next' })}
+        onMusicAutoNext={() => { if (isHost) session.command({ type: 'music-next' }); }}
+        onMusicStop={() => session.command({ type: 'music-stop' })}
+        onExpandToMain={(link, title) => { void setVideoUrl(link, title); }} />}
+      controls={<RoomControls roomId={options.roomId} layout={barPrefs.layout} showLabels={barPrefs.showLabels}
+        isMicOn={media.isMicOn} isCameraOn={media.isCameraOn} toggleMic={media.toggleMic} toggleCamera={media.toggleCamera}
+        showEmojiPicker={showEmojiPicker} setShowEmojiPicker={setShowEmojiPicker} emojiPresence={emojiPresence}
+        emojiSheetRef={emojiSheetRef} handleReaction={(emoji) => session.emit('reaction', { emoji })}
+        activeSideTab={activeSideTab} setActiveSideTab={setActiveSideTab} unreadCount={0}
+        isRightPanelCollapsed={camerasCollapsed} setIsRightPanelCollapsed={setCamerasCollapsed}
+        showMoreMenu={showMoreMenu} setShowMoreMenu={setShowMoreMenu} morePresence={morePresence}
+        moreSheetRef={moreSheetRef} moreMenuRef={moreMenuRef} handleLeaveClick={() => setShowExit(true)}
+        isBarVisible={isBarVisible} uiPinned={uiPinned} toggleBarsVisibility={() => setUiPinned((value) => !value)}
+        musicOpen={activeSideTab === 'music'} onToggleMusic={() => setActiveSideTab((tab) => tab === 'music' ? null : 'music')} />}
+    >
+      {(view.error || error || media.mediaError) && <div role="alert" className="meet-error-banner">{view.error || error || media.mediaError}</div>}
+      {view.status.includes('relevo') && <div className="reconnect-pill" role="status">{view.status}</div>}
+      {media.mediaConnectionFailed && <div className="meet-error-banner"><button type="button" className="btn btn--primary" onClick={media.retryMediaConnection}>Reconectar micrófonos y cámaras</button></div>}
+      <MemberExitModal isOpen={showExit} onClose={() => setShowExit(false)} onConfirmLeave={onLeave} />
       {devicesOpen && <MediaSettings localStream={media.localStream} onClose={() => setDevicesOpen(false)} onRetry={media.retryMediaConnection} />}
       <BottomSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} label="Servidor de la sala" className="modal-card--settings host-server-settings">
         <h3>Servidor de la sala</h3>
@@ -193,6 +272,6 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         <p>Si todos salen, se pierde la sala. Una caída de la señalización o una red que requiera TURN puede impedir nuevas conexiones. El relevo puede tardar varios segundos.</p>
         <button type="button" className="btn btn--primary" onClick={() => setSettingsOpen(false)}>Cerrar</button>
       </BottomSheet>
-    </div>
+    </RoomLayout>
   );
 }

@@ -5,7 +5,6 @@ import { Chat } from '../../chat/Chat';
 import { Participants } from '../../participants/Participants';
 import { MusicPanel } from './MusicPanel';
 import type { IRoomData, IMusicQueueEntry, IMusicNowPlaying, IMusicTrack, IRoomSettings, ChatMessage } from '../../../types/room';
-import type { Socket } from 'socket.io-client';
 import { buildSocketAuth } from '../../../shared/utils';
 
 /**
@@ -29,12 +28,13 @@ interface RoomDrawerProps {
   roomData: IRoomData;
   userId: string;
   isLeader: boolean;
+  canManageParticipants?: boolean;
   peerMediaStates: Record<string, { isCameraOn: boolean; isMicOn: boolean; userName?: string }>;
   isMicOn: boolean;
   isCameraOn: boolean;
   toggleMic: () => void;
   toggleCamera: () => void;
-  socket: Socket;
+  socket: { emit: (event: string, data: unknown) => unknown };
   roomId: string;
   musicQueue?: IMusicQueueEntry[];
   musicNowPlaying?: IMusicNowPlaying | null;
@@ -65,6 +65,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   roomData,
   userId,
   isLeader,
+  canManageParticipants = true,
   peerMediaStates,
   isMicOn,
   isCameraOn,
@@ -139,8 +140,8 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             participants={roomData.participants}
             currentUserName={myName}
             currentUserId={userId}
-            isLeader={isLeader}
-            isCoLeader={roomData.participants.some(
+            isLeader={isLeader && canManageParticipants}
+            isCoLeader={canManageParticipants && roomData.participants.some(
               (p) =>
                 (p.userId ? p.userId === userId : p.name.toLowerCase() === myName.toLowerCase()) &&
                 p.role === 'coleader'

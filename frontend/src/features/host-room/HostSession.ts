@@ -170,6 +170,7 @@ export class HostSession implements WebRTCTransport {
       } : {
         revision: 0, hostId: this.id, members, messages: [], video: null, playback: null,
         automaticMigration: true, replicateVideo: true,
+        musicQueue: [], musicNowPlaying: null,
       };
       this.status = 'Servidor en tu navegador';
       this.error = '';
@@ -419,7 +420,11 @@ export class HostSession implements WebRTCTransport {
     const serialized: unknown = JSON.parse(JSON.stringify(data));
     if (!serialized || typeof serialized !== 'object' || Array.isArray(serialized)) return;
     const payload = serialized as Record<string, unknown>;
-    if (event === 'peer-media-state') {
+    if (event === 'reaction' && typeof payload.emoji === 'string' && payload.emoji.length <= 32) {
+      const reaction = { id: crypto.randomUUID(), emoji: payload.emoji, userName: this.self.name };
+      this.broadcast({ type: 'signal', event, payload: reaction });
+      this.publish(event, reaction);
+    } else if (event === 'peer-media-state') {
       this.broadcast({ type: 'signal', event, payload });
     } else if (event === 'webrtc-offer' || event === 'webrtc-answer' || event === 'webrtc-ice-candidate') {
       if (typeof payload.targetSocketId === 'string') {
