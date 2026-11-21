@@ -66,6 +66,7 @@ export function HostRoom({ options, onLeave }: { options: HostRoomOptions; onLea
 function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onLeave: () => void }) {
   const [view, setView] = useState(initialView);
   const [session, setSession] = useState<HostSession | null>(null);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const optionsRef = useRef(options);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [devicesOpen, setDevicesOpen] = useState(false);
@@ -92,6 +93,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
   const media = useWebRTC(session, options.roomId, options.name, isHost);
   useEffect(() => {
     let current: HostSession | undefined;
+    setView(initialView);
     try {
       current = new HostSession(optionsRef.current, setView);
       setSession(current);
@@ -102,7 +104,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         error: cause instanceof Error ? cause.message : 'Intenta abrir la sala de nuevo.' }));
     }
     return () => current?.stop();
-  }, []);
+  }, [connectionAttempt]);
   useEffect(() => {
     if (activeSideTab) setSideTabView(activeSideTab);
   }, [activeSideTab]);
@@ -167,7 +169,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       if (parsed.protocol !== 'https:') throw new Error('Usa un enlace HTTPS de video.');
       const youtube = parseYouTubeUrl(input);
       session?.command({ type: 'video', video: {
-        id: crypto.randomUUID(), name: title?.trim() || (youtube ? 'YouTube' : parsed.pathname.split('/').pop() || 'Video'),
+        id: crypto.randomUUID(), name: title?.trim() || (youtube ? 'YouTube' : parsed.hostname === 'drive.google.com' ? 'Video de Google Drive' : parsed.pathname.split('/').pop() || 'Video'),
         source: youtube ? 'youtube' : 'url', url: youtube?.cleanUrl ?? parsed.href, size: 0, mime: 'video/mp4',
       } });
       setUrl('');
@@ -190,9 +192,10 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
 
   if (!roomData || !state || !session) return (
     <div className="room-loading">
-      <Loader2 size={40} className="animate-spin room-loading__icon" />
+      {!view.error && <Loader2 size={40} className="animate-spin room-loading__icon" />}
       <p className="room-loading__text" role="status">{view.status}</p>
       {view.error && <p role="alert">{view.error}</p>}
+      {view.error && <button type="button" className="btn btn--primary" onClick={() => setConnectionAttempt((value) => value + 1)}>Reintentar conexión</button>}
       <button type="button" className="btn btn--primary" onClick={onLeave}>Volver al inicio</button>
     </div>
   );

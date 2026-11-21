@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import type Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../../types/room';
+import { googleDriveDownload } from '../../shared/googleDrive';
 
 // hls.js (~500KB) solo se carga cuando el video es HLS (dynamic import).
 let hlsModulePromise: Promise<typeof import('hls.js')> | null = null;
@@ -332,8 +333,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const backendBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
     const isExternal = (videoSourceType === 'url' || videoSourceType === 'hls') && !!videoDirectUrl;
     // External URLs go through the backend CORS proxy so hls.js/XHR are not blocked
-    const videoSrc = directPlayback && videoDirectUrl ? videoDirectUrl : isExternal
-      ? `${backendBase}/api/proxy?url=${encodeURIComponent(videoDirectUrl!)}`
+    const driveDownload = videoDirectUrl ? googleDriveDownload(videoDirectUrl) : null;
+    const videoSrc = directPlayback && videoDirectUrl && !driveDownload ? videoDirectUrl : isExternal
+      ? `${backendBase}/api/proxy?url=${encodeURIComponent(driveDownload ?? videoDirectUrl!)}`
       : `${backendBase}/api/rooms/${roomId}/video/stream`;
 
     const vid = videoRef.current;
@@ -671,6 +673,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleVideoElementError = () => {
     if (playbackError) return;
+    if (directPlayback && video?.directUrl && googleDriveDownload(video.directUrl)) {
+      setPlaybackError('No se pudo reproducir Google Drive mediante el proxy de video. Comprueba que el backend esté disponible y el archivo sea público. Para reproducir sin backend, descarga el archivo y compártelo desde tu PC.');
+      return;
+    }
     const kind = describeVideoSource();
     const src =
       videoRef.current?.currentSrc ||

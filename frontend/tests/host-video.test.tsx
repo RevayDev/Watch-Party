@@ -32,6 +32,24 @@ it('plays a browser replica directly without constructing a Render proxy URL', (
   expect(container.querySelector('video')?.getAttribute('src')).toBe('blob:https://example.com/local-file');
 });
 
+it('converts Drive view pages and uses the video proxy in browser-hosted rooms', () => {
+  const { container } = render(<VideoPlayer {...props} directPlayback
+    video={{ ...video, sourceType: 'url', directUrl: 'https://drive.google.com/file/d/public-file/view?resourcekey=access-key' }} remoteAction={null} />);
+  const source = new URL(container.querySelector('video')!.getAttribute('src')!, 'http://localhost');
+  expect(source.pathname).toBe('/api/proxy');
+  const download = new URL(source.searchParams.get('url')!);
+  expect(download.hostname).toBe('drive.usercontent.google.com');
+  expect(download.searchParams.get('id')).toBe('public-file');
+  expect(download.searchParams.get('confirm')).toBe('t');
+  expect(download.searchParams.get('resourcekey')).toBe('access-key');
+});
+
+it('keeps ordinary HTTPS videos direct in browser-hosted rooms', () => {
+  const { container } = render(<VideoPlayer {...props} directPlayback
+    video={{ ...video, sourceType: 'url', directUrl: 'https://example.com/video.mp4' }} remoteAction={null} />);
+  expect(container.querySelector('video')?.getAttribute('src')).toBe('https://example.com/video.mp4');
+});
+
 it('applies a remote YouTube checkpoint without an HTML video element', () => {
   render(<VideoPlayer {...props} directPlayback
     video={{ ...video, sourceType: 'youtube', directUrl: 'https://www.youtube.com/watch?v=PW6ZSzdjrlo' }}

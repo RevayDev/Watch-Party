@@ -41,6 +41,7 @@ export class HostSession implements WebRTCTransport {
   private lastHostSeen = Date.now();
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastJoin = 0;
+  private startedAt = Date.now();
   private joinedAt = Date.now();
   private files = new Map<string, Blob>();
   private incoming = new Map<DataConnection, IncomingFile>();
@@ -442,6 +443,10 @@ export class HostSession implements WebRTCTransport {
       this.claiming = false;
     }
     if (!this.state) {
+      if (Date.now() - this.startedAt > 20_000 && !this.error) {
+        this.error = 'La señalización está tardando demasiado. Comprueba tu conexión o reintenta la sala.';
+        this.status = 'No se pudo conectar con la sala';
+      }
       if (Date.now() - this.lastJoin > 10_000) this.findHost();
       this.notify();
       return;

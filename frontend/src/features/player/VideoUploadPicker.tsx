@@ -121,7 +121,7 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
 
           <div className="dropzone-supported-hints">
             <span>✓ Compatible con YouTube (ideal para Karaoke con letras y música sincronizada)</span>
-            <span>✓ Compatible con enlaces públicos de Google Drive</span>
+            <span>✓ Compatible con enlaces públicos de Google Drive{browserSharing ? ' (usa el proxy de video del backend)' : ''}</span>
             <span>✓ Compatible con transmisiones HLS (.m3u8) y URLs directas (.mp4)</span>
           </div>
 

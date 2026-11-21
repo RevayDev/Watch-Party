@@ -7953,3 +7953,15 @@ a.home-faq-hl--frontend {
 .server-selector__limits { display: block; margin-top: 12px; font-size: .75rem; color: #cbd5e1; }
 
 .create-room-modal { scrollbar-width: thin; scrollbar-color: #3a4254 transparent; }
+
+/* Two server choices fit beside each other; scrolling remains available on short screens. */
+.create-room-modal { width: min(880px, calc(100vw - 40px)); max-width: 880px; }
+.create-room-modal .sheet__body { scrollbar-width: none; }
+.create-room-modal .sheet__body::-webkit-scrollbar { display: none; }
+.create-room-modal .server-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 16px 0; gap: 12px; }
+.create-room-modal .server-selector__intro { grid-column: 1 / -1; }
+.create-room-modal .server-selector__card { min-width: 0; }
+.create-room-modal .leader-exit-modal__desc { margin-bottom: 12px; }
+@media (max-width: 560px) {
+  .create-room-modal .server-selector { grid-template-columns: 1fr; }
+}

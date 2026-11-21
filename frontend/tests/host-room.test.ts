@@ -149,6 +149,16 @@ it('round trips a private invitation and rejects invalid room credentials', () =
   expect(readHostInvite('https://example.com/?hostRoom=bad#key=bad')).toBeNull();
 });
 
+it('reports a connection timeout instead of leaving an absent room loading forever', async () => {
+  const update = vi.fn();
+  const session = new HostSession({ roomId: 'missing-room', key: 'secret', name: 'Ana' }, update).start();
+  sessions.push(session);
+  await vi.advanceTimersByTimeAsync(22_000);
+  expect(update).toHaveBeenLastCalledWith(expect.objectContaining({
+    state: null, status: 'No se pudo conectar con la sala', error: expect.stringContaining('tardando demasiado'),
+  }));
+});
+
 it('allows members to chat while restricting video and server settings to the current host', () => {
   const state: HostSnapshot = {
     revision: 0, hostId: 'host', members: [{ id: 'host', name: 'Ana', joinedAt: 1 }, { id: 'guest', name: 'Beto', joinedAt: 2 }],
