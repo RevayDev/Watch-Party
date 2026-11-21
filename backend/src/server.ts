@@ -45,6 +45,12 @@ async function startServer() {
   setupSocketHandlers(io);
 
   // 4. Start HTTP Server on all interfaces (0.0.0.0)
+  server.once('error', (error: NodeJS.ErrnoException) => {
+    console.error(error.code === 'EADDRINUSE'
+      ? `El puerto ${port} ya está en uso. Ejecuta npm run dev desde la raíz para reutilizar el servidor activo.`
+      : `No se pudo iniciar el servidor: ${error.message}`);
+    process.exit(1);
+  });
   server.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Watch Party server running at http://localhost:${port}`);
   });

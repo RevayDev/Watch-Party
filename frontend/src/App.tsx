@@ -5,6 +5,7 @@ import { NotificationProvider, notify } from './services/notifications';
 import { STORAGE_KEYS } from './shared/constants';
 import { saveLeaderSession } from './shared/utils';
 import { hostInvite, newHostRoom, readHostInvite, type HostRoomOptions } from './features/host-room/protocol';
+import { ScreenErrorBoundary } from './shared/components/ScreenErrorBoundary';
 
 const Home = lazy(() =>
   import('./features/home/Home').then((m) => ({ default: m.Home }))
@@ -116,6 +117,7 @@ export const App: React.FC = () => {
   return (
     <NotificationProvider>
       <div className="app">
+      <ScreenErrorBoundary>
       <Suspense fallback={<div className="app-loading">Cargando…</div>}>
       {hostRoom && <HostRoom key={hostRoom.roomId} options={hostRoom} onLeave={handleBackToHome} />}
       {!hostRoom && view === 'home' && (
@@ -145,6 +147,7 @@ export const App: React.FC = () => {
         <AdminPanel onLeave={handleBackToHome} />
       )}
       </Suspense>
+      </ScreenErrorBoundary>
       </div>
     </NotificationProvider>
   );

@@ -7939,3 +7939,17 @@ a.home-faq-hl--frontend {
   gap: 0.6rem;
   margin: 0.75rem 0;
 }
+
+/* Room server choices use the same visual rhythm as the create-room form. */
+.server-selector { border: 0; padding: 0; margin: 24px 0; min-width: 0; display: grid; gap: 12px; }
+.server-selector legend { padding: 0; margin-bottom: 8px; font-size: 1rem; font-weight: 600; }
+.server-selector__intro { margin: 0 0 4px; color: var(--text-secondary, #a6afbf); font-size: .875rem; }
+.server-selector__card { padding: 16px; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; background: rgba(255,255,255,.025); }
+.server-selector__card.is-selected { border-color: #818cf8; background: rgba(129,140,248,.07); }
+.server-selector__option { margin: 0 0 8px; font-size: .95rem; font-weight: 600; cursor: pointer; line-height: 1.5; }
+.server-selector__option input { flex: 0 0 auto; width: 16px; height: 16px; accent-color: #818cf8; margin: 0; }
+.server-selector__card p { margin: 8px 0 0; font-size: .8125rem; line-height: 1.55; color: #a6afbf; }
+.server-selector__card [role="status"] { font-size: .75rem; color: #cbd5e1; }
+.server-selector__limits { display: block; margin-top: 12px; font-size: .75rem; color: #cbd5e1; }
+
+.create-room-modal { scrollbar-width: thin; scrollbar-color: #3a4254 transparent; }

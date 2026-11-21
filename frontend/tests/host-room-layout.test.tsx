@@ -3,6 +3,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { HostRoom } from '../src/features/host-room/HostRoom';
+import { webcrypto } from 'node:crypto';
 
 const fixture = vi.hoisted(() => ({
   state: {
@@ -38,9 +39,17 @@ vi.mock('../src/hooks/useWebRTC', () => ({
 }));
 
 beforeEach(() => {
+  vi.stubGlobal('crypto', webcrypto);
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('shows recovery instructions instead of crashing on an insecure LAN address', () => {
+  vi.stubGlobal('crypto', { getRandomValues: vi.fn() });
+  render(<HostRoom options={{ roomId: 'a'.repeat(24), key: 'b'.repeat(64), name: 'Ana', create: true }} onLeave={vi.fn()} />);
+  expect(screen.getByRole('alert').textContent).toContain('conexión segura');
+  expect(screen.getByRole('link', { name: 'Abrir en este equipo' }).getAttribute('href')).toContain('localhost');
+});
 
 it('uses the Render layout with a lateral camera strip and the standard bottom controls', () => {
   const { container } = render(<HostRoom options={{ roomId: 'a'.repeat(24), key: 'b'.repeat(64), name: 'Ana', create: true }} onLeave={vi.fn()} />);

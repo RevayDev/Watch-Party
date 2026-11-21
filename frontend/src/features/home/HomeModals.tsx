@@ -40,14 +40,14 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
   const hostInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (open) {
+    if (open && !setServerMode) {
       const timer = setTimeout(() => {
         hostInputRef.current?.focus();
         hostInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 120);
       return () => clearTimeout(timer);
     }
-  }, [open]);
+  }, [open, setServerMode]);
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     setTimeout(() => {
@@ -64,7 +64,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
       open={open}
       onClose={onClose}
       label="Crear una nueva sala"
-      className="leader-exit-modal"
+      className="leader-exit-modal create-room-modal"
     >
       <div className="modal-card__header">
         <h3 className="leader-exit-modal__title">Crear una nueva sala</h3>
@@ -111,7 +111,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             onChange={(e) => setLeaderName(e.target.value)}
             onFocus={handleInputFocus}
             disabled={loading}
-            autoFocus
+            autoFocus={!setServerMode}
             required
           />
         </div>

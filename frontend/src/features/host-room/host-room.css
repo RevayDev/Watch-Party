@@ -5,3 +5,9 @@
 .host-server-settings input[type="file"] { max-width: 100%; }
 .host-room-entry { min-height: 65dvh; display: grid; place-content: center; gap: 1rem; padding: 1rem; }
 .host-room-entry form { max-width: 440px; }
+
+.host-room-entry__card { box-sizing: border-box; width: min(100%, 480px); display: grid; gap: 16px; padding: 28px; border: 1px solid rgba(255,255,255,.12); border-radius: 24px; background: #0e1320; }
+.host-room-entry__card h2 { margin: 0; font-size: 1.5rem; line-height: 1.25; }
+.host-room-entry__card p { margin: 0; color: #a6afbf; line-height: 1.6; font-size: .875rem; }
+.host-room-entry__eyebrow { font-size: .8125rem; color: #a6afbf; }
+.host-room-entry { place-items: center; place-content: initial; }

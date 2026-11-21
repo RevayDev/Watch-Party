@@ -27,10 +27,26 @@ const initialView: HostSessionView = {
 export function HostRoom({ options, onLeave }: { options: HostRoomOptions; onLeave: () => void }) {
   const [name, setName] = useState(options.name);
   const [entered, setEntered] = useState(!!options.name);
+  if (!globalThis.crypto?.subtle) {
+    const localUrl = new URL(window.location.href);
+    localUrl.hostname = 'localhost';
+    return (
+      <main className="host-room-entry">
+        <section className="host-room-entry__card" role="alert">
+          <span className="host-room-entry__eyebrow">Conexión de la sala</span>
+          <h2>Abre la sala con una conexión segura</h2>
+          <p>Esta dirección HTTP de la red local bloquea la conexión segura, el micrófono y la cámara del navegador.</p>
+          <p>En este equipo, abre localhost. Para entrar desde otro dispositivo, usa la web publicada con HTTPS y el enlace de invitación generado allí.</p>
+          <a className="btn btn--primary" href={localUrl.href}>Abrir en este equipo</a>
+          <button type="button" className="btn btn--secondary" onClick={onLeave}>Volver al inicio</button>
+        </section>
+      </main>
+    );
+  }
   if (!entered) {
     return (
       <main className="host-room-entry">
-        <form className="room-settings__box" onSubmit={(event) => {
+        <form className="host-room-entry__card" onSubmit={(event) => {
           event.preventDefault();
           if (name.trim()) setEntered(true);
         }}>
@@ -75,10 +91,17 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
   const isHost = state?.hostId === view.id;
   const media = useWebRTC(session, options.roomId, options.name, isHost);
   useEffect(() => {
-    const current = new HostSession(optionsRef.current, setView);
-    setSession(current);
-    current.start();
-    return () => current.stop();
+    let current: HostSession | undefined;
+    try {
+      current = new HostSession(optionsRef.current, setView);
+      setSession(current);
+      current.start();
+    } catch (cause) {
+      current?.stop();
+      setView((previous) => ({ ...previous, status: 'No se pudo iniciar la sala',
+        error: cause instanceof Error ? cause.message : 'Intenta abrir la sala de nuevo.' }));
+    }
+    return () => current?.stop();
   }, []);
   useEffect(() => {
     if (activeSideTab) setSideTabView(activeSideTab);
