@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Socket } from 'socket.io-client';
 import {
   assessQuality,
   assessPeerSignal,
@@ -45,7 +44,15 @@ const ICE_SERVERS: RTCConfiguration = {
   ],
 };
 
-export function useWebRTC(socket: Socket | null, roomId: string, userName: string, isLeader: boolean) {
+export interface WebRTCTransport {
+  id?: string;
+  connected: boolean;
+  emit: (event: string, data: unknown) => unknown;
+  on: <Args extends unknown[]>(event: string, listener: (...args: Args) => void) => unknown;
+  off: <Args extends unknown[]>(event: string, listener: (...args: Args) => void) => unknown;
+}
+
+export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userName: string, isLeader: boolean) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
   const [failedPeers, setFailedPeers] = useState<ReadonlySet<string>>(() => new Set());

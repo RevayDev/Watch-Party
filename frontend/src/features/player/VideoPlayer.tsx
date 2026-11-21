@@ -32,6 +32,7 @@ import {
 } from '../../shared/perf';
 
 interface VideoPlayerProps {
+  directPlayback?: boolean;
   roomId: string;
   video: IVideoMetadata | null | undefined;
   isLeader: boolean;
@@ -69,6 +70,7 @@ interface VideoPlayerProps {
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
+  directPlayback = false,
   roomId,
   video,
   isLeader,
@@ -101,7 +103,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Demo: la subida de archivos está deshabilitada → el picker arranca en el
   // tab de enlace. Con VITE_DEMO_MODE=false arranca como hoy (subida).
-  const demo = isDemoMode();
+  const demo = !directPlayback && isDemoMode();
   const [activeTab, setActiveTab] = useState<'upload' | 'url'>(demo ? 'url' : 'upload');
   const [urlInput, setUrlInput] = useState('');
   const [titleInput, setTitleInput] = useState('');
@@ -330,7 +332,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const backendBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
     const isExternal = (videoSourceType === 'url' || videoSourceType === 'hls') && !!videoDirectUrl;
     // External URLs go through the backend CORS proxy so hls.js/XHR are not blocked
-    const videoSrc = isExternal
+    const videoSrc = directPlayback && videoDirectUrl ? videoDirectUrl : isExternal
       ? `${backendBase}/api/proxy?url=${encodeURIComponent(videoDirectUrl!)}`
       : `${backendBase}/api/rooms/${roomId}/video/stream`;
 
@@ -437,14 +439,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hlsInstanceRef.current = null;
       }
     };
-  }, [videoSourceType, videoDirectUrl, videoFileName, roomId, retryToken]);
+  }, [directPlayback, videoSourceType, videoDirectUrl, videoFileName, roomId, retryToken]);
 
   // Apply incoming remote sync actions with latency compensation and smooth tolerance.
   // Anti-bucle (Rol A): el play de consenso/autoplay SOLO dispara `play`,
   // nunca `seek` repetido ni re-emite `sync-video` (isApplyingRemote +
   // supresión extendida para el play asíncrono del auto-play grupal).
   useEffect(() => {
-    if (!remoteAction || !videoRef.current) return;
+    if (!remoteAction) return;
 
     if (videoSourceType === 'youtube' && ytPlayerRef.current) {
       const yt = ytPlayerRef.current;
@@ -478,6 +480,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const vid = videoRef.current;
+    if (!vid) return;
     isApplyingRemote.current = true;
     if (remoteAction.autoplay === true) {
       suppressUntilRef.current = Date.now() + 2000;
@@ -708,6 +711,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const pickerProps = {
+    browserSharing: directPlayback,
     activeTab,
     setActiveTab,
     urlInput,

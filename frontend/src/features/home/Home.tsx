@@ -34,6 +34,7 @@ import {
 } from "./homeData";
 import { RecentRooms } from "./RecentRooms";
 import { CreateRoomModal, JoinRoomModal, TimelineModal } from "./HomeModals";
+import type { RoomServerMode } from './ServerSelector';
 import {
   formatDemoAvailability,
   isDemoMode,
@@ -45,6 +46,7 @@ interface HomeProps {
   onJoinRoom: (code: string, name: string) => void;
   onRoomCreated: (roomId: string, leaderName: string, leaderSecret: string) => void;
   onReconnectHost: (roomId: string, leaderName: string) => void;
+  onCreateHostRoom?: (name: string) => void;
 }
 
 /**
@@ -55,6 +57,7 @@ export const Home: React.FC<HomeProps> = ({
   onJoinRoom,
   onRoomCreated,
   onReconnectHost,
+  onCreateHostRoom,
 }) => {
   // Join Room Form state
   const [roomCode, setRoomCode] = useState(initialRoomCode || "");
@@ -72,6 +75,8 @@ export const Home: React.FC<HomeProps> = ({
   const [isTemporary, setIsTemporary] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [serverMode, setServerMode] = useState<RoomServerMode>('external');
+  const [externalAvailable, setExternalAvailable] = useState(false);
 
   // Demo gratuita: tras VITE_DEMO_MODE (default true en `demo-free`).
   // Con `false` todo lo demo (badge, contador, avisos) desaparece.
@@ -166,6 +171,14 @@ export const Home: React.FC<HomeProps> = ({
     e.preventDefault();
     if (!createLeaderName.trim()) {
       setCreateError("Por favor ingresa tu nombre");
+      return;
+    }
+    if (serverMode === 'host' && onCreateHostRoom) {
+      onCreateHostRoom(createLeaderName.trim());
+      return;
+    }
+    if (onCreateHostRoom && !externalAvailable) {
+      setCreateError('Render no está disponible. Elige el navegador del anfitrión.');
       return;
     }
 
@@ -757,6 +770,10 @@ export const Home: React.FC<HomeProps> = ({
         loading={createLoading}
         error={createError}
         onSubmit={handleCreateSubmit}
+        serverMode={serverMode}
+        setServerMode={onCreateHostRoom ? setServerMode : undefined}
+        onServerAvailability={onCreateHostRoom ? setExternalAvailable : undefined}
+        externalAvailable={onCreateHostRoom ? externalAvailable : true}
       />
 
       {/* ── Modal Pop-up: Unirse a Sala ── */}

@@ -4,6 +4,7 @@ import { saveRecentRoom, removeRecentRoom } from './services/recentRooms';
 import { NotificationProvider, notify } from './services/notifications';
 import { STORAGE_KEYS } from './shared/constants';
 import { saveLeaderSession } from './shared/utils';
+import { hostInvite, newHostRoom, readHostInvite, type HostRoomOptions } from './features/host-room/protocol';
 
 const Home = lazy(() =>
   import('./features/home/Home').then((m) => ({ default: m.Home }))
@@ -14,6 +15,7 @@ const Room = lazy(() =>
 const AdminPanel = lazy(() =>
   import('./features/admin/AdminPanel').then((m) => ({ default: m.AdminPanel }))
 );
+const HostRoom = lazy(() => import('./features/host-room/HostRoom').then((module) => ({ default: module.HostRoom })));
 
 type ViewState = 'home' | 'room' | 'admin';
 
@@ -29,6 +31,10 @@ function routeFromLocation(): { view: ViewState; roomId: string | null } {
 }
 
 export const App: React.FC = () => {
+  const [hostRoom, setHostRoom] = useState<HostRoomOptions | null>(() => {
+    const invite = readHostInvite(window.location.href);
+    return invite ? { ...invite, name: '' } : null;
+  });
   const [view, setView] = useState<ViewState>('home');
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>('');
@@ -37,6 +43,8 @@ export const App: React.FC = () => {
   // Parse URL if roomId query exists or restore active session.
   useEffect(() => {
     const applyRoute = () => {
+      const invite = readHostInvite(window.location.href);
+      setHostRoom((previous) => invite ? previous?.roomId === invite.roomId ? previous : { ...invite, name: '' } : null);
       const route = routeFromLocation();
       if (route.view === 'admin') {
         setView('admin');
@@ -53,6 +61,7 @@ export const App: React.FC = () => {
     window.history.pushState({}, '', path);
     setView('home');
     setCurrentRoomId(null);
+    setHostRoom(null);
   }, []);
 
   const handleBackToHome = () => {
@@ -108,16 +117,22 @@ export const App: React.FC = () => {
     <NotificationProvider>
       <div className="app">
       <Suspense fallback={<div className="app-loading">Cargando…</div>}>
-      {view === 'home' && (
+      {hostRoom && <HostRoom key={hostRoom.roomId} options={hostRoom} onLeave={handleBackToHome} />}
+      {!hostRoom && view === 'home' && (
         <Home
           initialRoomCode={currentRoomId}
           onJoinRoom={handleJoinRoom}
           onRoomCreated={handleRoomCreated}
           onReconnectHost={handleReconnectLeader}
+          onCreateHostRoom={(name) => {
+            const options = newHostRoom(name);
+            window.history.pushState({}, '', hostInvite(options.roomId, options.key));
+            setHostRoom(options);
+          }}
         />
       )}
 
-      {view === 'room' && currentRoomId && (
+      {!hostRoom && view === 'room' && currentRoomId && (
         <Room
           roomId={currentRoomId}
           userName={currentUserName || 'Invitado'}
@@ -126,7 +141,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {view === 'admin' && (
+      {!hostRoom && view === 'admin' && (
         <AdminPanel onLeave={handleBackToHome} />
       )}
       </Suspense>

@@ -34,6 +34,14 @@ The repository boundary keeps the storage choice out of controllers and socket h
 
 ## External integrations
 
+Browser-hosted rooms are an optional creation mode under `features/host-room`. A PeerJS data mesh carries room snapshots and WebRTC signaling independently of Render. The creator initially owns a stable room directory ID on PeerServer. Remaining members attempt to claim that ID after the host stops responding, so the original private invitation continues to locate the successor. The signaling server arbitrates ownership of that ID. A signaling outage can delay election and new admissions.
+
+The current host authorizes state changes. Members can send chat messages and edit their own messages, while playback, video selection, and server settings are host operations. HMAC proofs bind each admission handshake to both transport endpoints and the member identity, so the invitation secret is not sent in the greeting. Snapshots carry up to 300 messages, member state, settings, and the latest playback checkpoint. Pending chat messages retry with stable identifiers after host transfer. Complete local file replicas carry a SHA-256 digest and are reusable after host migration. Transfers use small blocks with backpressure and a 256 MB per-file limit. Rooms currently support eight participants. An interrupted transfer without another complete copy cannot recover the original file.
+
+Microphone and camera tracks retain the existing WebRTC lifecycle through a small transport interface. Already connected participants keep their direct media paths during host transfer. Local device previews use the existing device settings component. YouTube and direct HTTPS video URLs play from the provider in each browser. Direct sources requiring the backend CORS proxy should use external-server mode.
+
+The host mode uses browser memory. It ends when the last member leaves and does not provide the backend admin or persistent-storage workflows. Render rooms retain their existing server workflow. Switching the creation selector chooses the transport for a new room. Live conversion of an existing Render room into a browser room is not implemented.
+
 The music panel uses the YouTube Data API through the backend when enabled. The backend also retains Spotify resolver, search, and server-side OAuth routes. Spotify connection state is tied to the room, OAuth state is single-use, and persistent tokens require the configured encryption key. The old per-user Spotify documentation reflects historical UI behavior.
 
 ## Contract references

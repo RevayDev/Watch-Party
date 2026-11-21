@@ -5,6 +5,7 @@ import { DEMO_UPLOAD_DISABLED_MESSAGE, isDemoMode } from '../../shared/demo';
 export type PickerTab = 'upload' | 'url';
 
 export interface VideoUploadPickerProps {
+  browserSharing?: boolean;
   activeTab: PickerTab;
   setActiveTab: (t: PickerTab) => void;
   urlInput: string;
@@ -24,6 +25,7 @@ export interface VideoUploadPickerProps {
  * Picker subir-archivo vs enlace (JSX movido verbatim desde VideoPlayer.tsx).
  */
 export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
+  browserSharing = false,
   activeTab,
   setActiveTab,
   urlInput,
@@ -41,7 +43,7 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
   // Demo: la subida de archivos está deshabilitada solo visualmente (el tab
   // queda disabled con tooltip y siempre se muestra el formulario de enlace).
   // El código original queda intacto tras el flag.
-  const demo = isDemoMode();
+  const demo = !browserSharing && isDemoMode();
   return (
     <>
       <div className="dropzone-tabs">

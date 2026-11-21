@@ -38,6 +38,10 @@ Use English for new identifiers, technical comments, and documentation. Retain t
 
 ## Debug and deploy
 
+To test browser hosting locally, open the creation dialog and choose the browser-host option. Share the complete invitation URL, including its fragment key, in another browser profile. Copy a small video, wait for confirmed replicas in server settings, then close the creator's tab. Check that another participant becomes the host, retains chat and playback state, and can admit a new guest through the original URL. Repeat on separate networks to verify connectivity beyond local ICE candidates.
+
+The creation dialog checks `/api/health` with a bounded timeout. A failed check disables Render and selects browser hosting. A sleeping Render instance may become available after choosing to retry the check. The browser mode uses the public PeerJS signaling service by default. `VITE_PEER_HOST`, `VITE_PEER_PORT`, and `VITE_PEER_PATH` can point to an independently deployed TLS PeerServer. Those are public build settings. TURN infrastructure may still be necessary for restrictive networks.
+
 - **Two clients.** Join a room from separate browser profiles. Check admission, movie sync, music queue, chat, and microphone and camera. The personal device test checks capture locally. A real cross-network call is needed to verify TURN.
 - **Storage.** The backend reads `MONGODB_URI` for Mongoose. Prisma mode uses `ROOM_STORE=prisma` with `DATABASE_URL` or the MongoDB fallback. Run `npm --prefix backend run db:push` for an intended Prisma schema deployment. Inspect startup logs to confirm the selected store.
 - **External services.** Use the backend environment for `YOUTUBE_API_KEY`, `TURN_URLS`, `TURN_SHARED_SECRET`, `ADMIN_TOKEN`, or Spotify credentials. Vite variables are public build-time settings. Never place service secrets there. For Spotify, register the exact callback URL for each environment and configure `SPOTIFY_TOKEN_KEY` before enabling persistent tokens.

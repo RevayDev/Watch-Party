@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { BottomSheet } from '../../shared/components/BottomSheet';
 import { isDemoMode } from '../../shared/demo';
 import { TimelineEvent } from './homeData';
+import { ServerSelector, type RoomServerMode } from './ServerSelector';
 
 export interface CreateRoomModalProps {
   open: boolean;
@@ -14,6 +15,10 @@ export interface CreateRoomModalProps {
   loading: boolean;
   error: string;
   onSubmit: (e: React.FormEvent) => void;
+  serverMode?: RoomServerMode;
+  setServerMode?: (mode: RoomServerMode) => void;
+  onServerAvailability?: (available: boolean) => void;
+  externalAvailable?: boolean;
 }
 
 /** Modal crear sala (JSX movido verbatim desde Home.tsx). */
@@ -27,6 +32,10 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
   loading,
   error,
   onSubmit,
+  serverMode = 'external',
+  setServerMode,
+  onServerAvailability,
+  externalAvailable = true,
 }) => {
   const hostInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,6 +91,9 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
       )}
 
       <form onSubmit={onSubmit}>
+        {setServerMode && onServerAvailability && (
+          <ServerSelector mode={serverMode} onChange={setServerMode} onAvailability={onServerAvailability} />
+        )}
         <div className="form-group" style={{ marginBottom: '1rem' }}>
           <label
             className="form-group__label"
@@ -94,6 +106,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             type="text"
             className="form-group__input"
             placeholder="Ej. Roberto"
+            maxLength={50}
             value={leaderName}
             onChange={(e) => setLeaderName(e.target.value)}
             onFocus={handleInputFocus}
@@ -104,7 +117,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
         </div>
 
         {/* Modo de sala: Temporal vs Guardar Video */}
-        <div
+        {serverMode === 'external' && <div
           className="form-group"
           style={{
             marginBottom: '1.25rem',
@@ -161,7 +174,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                 ? 'Al cerrar la sala se borra el video y la sala automáticamente (ideal para videos pesados o funciones rápidas).'
                 : 'El video se conserva subido en el servidor para futuras sesiones.'}
           </p>
-        </div>
+        </div>}
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button
@@ -175,7 +188,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
           <button
             type="submit"
             className="btn btn--primary"
-            disabled={loading}
+            disabled={loading || (serverMode === 'external' && !externalAvailable)}
             style={{
               flex: 1.4,
               padding: '0.75rem 1rem',

@@ -7933,3 +7933,9 @@ a.home-faq-hl--frontend {
   width: 100%;
   margin-top: 0.5rem;
 }
+.server-selector__option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
