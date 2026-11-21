@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AudioLines, Maximize2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, Youtube } from 'lucide-react';
+import { AudioLines, Maximize2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, Youtube, Square } from 'lucide-react';
 import { YouTubePlayerView } from '../../player/YouTubePlayerView';
 
 interface QueueYouTubePlayer {
@@ -29,7 +29,7 @@ export const NowPlayingPlayer: React.FC<{
   onEnded: () => void;
   onNext: () => void;
   onStop: () => void;
-  onExpand: () => void;
+  onExpand: (currentTime: number) => void;
   showModerator: boolean;
 }> = ({ trackKey, videoId, title, subtitle, thumb, onEnded, onNext, onStop, onExpand, showModerator }) => {
   const playerRef = useRef<QueueYouTubePlayer | null>(null);
@@ -151,7 +151,7 @@ export const NowPlayingPlayer: React.FC<{
     return () => window.clearInterval(iv);
   }, [playing, trackKey]);
 
-  const progressPct = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
+
 
   return (
     <div>
@@ -161,44 +161,6 @@ export const NowPlayingPlayer: React.FC<{
         <AudioLines size={15} />
         Sonando ahora
       </span>
-      {showModerator && (
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <button
-            type="button"
-            onClick={onNext}
-            title="Pasar al siguiente tema"
-            style={{
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: 999,
-              padding: '0.28rem 0.75rem',
-              fontSize: '0.76rem',
-              fontWeight: 600,
-              color: '#e2e8f0',
-              cursor: 'pointer',
-            }}
-          >
-            Siguiente
-          </button>
-          <button
-            type="button"
-            onClick={onStop}
-            title="Detener música"
-            style={{
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: 999,
-              padding: '0.28rem 0.75rem',
-              fontSize: '0.76rem',
-              fontWeight: 600,
-              color: '#f87171',
-              cursor: 'pointer',
-            }}
-          >
-            Detener
-          </button>
-        </div>
-      )}
     </div>
 
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '0.6rem' }}>
@@ -232,14 +194,6 @@ export const NowPlayingPlayer: React.FC<{
         <p style={{ margin: '0.1rem 0 0', fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {subtitle}
         </p>
-      </div>
-      <div style={{ flexShrink: 0, width: 112 }}>
-        <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontVariantNumeric: 'tabular-nums', textAlign: 'right', marginBottom: '0.3rem' }}>
-          {formatPlayerTime(current)} / {formatPlayerTime(duration)}
-        </div>
-        <div style={{ height: 3, borderRadius: 999, background: 'rgba(255, 255, 255, 0.12)', overflow: 'hidden' }}>
-          <div style={{ width: `${progressPct}%`, height: '100%', background: '#8b5cf6', borderRadius: 999 }} />
-        </div>
       </div>
     </div>
     {/* The queue uses its own controls and keeps the iframe out of the layout. */}
@@ -384,7 +338,11 @@ export const NowPlayingPlayer: React.FC<{
       {showModerator && (
         <button
           type="button"
-          onClick={onExpand}
+          onClick={() => {
+            const position = playerRef.current?.getCurrentTime?.() ?? current;
+            playerRef.current?.pauseVideo?.();
+            onExpand(position);
+          }}
           title="Ampliar a la pantalla de la sala"
           aria-label="Ampliar a la pantalla de la sala"
           style={{
@@ -404,6 +362,7 @@ export const NowPlayingPlayer: React.FC<{
           <Maximize2 size={15} />
         </button>
       )}
+      {showModerator && <button type="button" className="music-row-options" title="Detener música" aria-label="Detener música" onClick={onStop}><Square size={14} /></button>}
     </div>
     </div>
   );

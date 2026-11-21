@@ -81,6 +81,17 @@ afterAll(async () => {
 });
 
 describe('video-ready: handshake de auto-play grupal', () => {
+  it('starts transferred music from its checkpoint instead of zero', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'Host' });
+    created.push(room.roomId);
+    await RoomService.updateRoomVideo(room.roomId, { ...VIDEO, startTime: 42 } as any);
+    const { io, roomEmits } = makeIo();
+    const leader = makeSocket('transfer-host');
+    activeUsers.set('transfer-host', { socketId: 'transfer-host', roomId: room.roomId, userName: 'Host', isLeader: true });
+    registerVideoReadyHandlers(io, leader.socket);
+    await fire(leader.handlers, 'video-ready', { roomId: room.roomId, fileName: VIDEO.fileName });
+    expect(roomEmits.find((event) => event.event === 'sync-video')?.payload).toMatchObject({ currentTime: 42, action: 'play' });
+  });
   it('al completarse todos los presentes emite play grupal con autoplay', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'Host' });
     created.push(room.roomId);

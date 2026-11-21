@@ -191,4 +191,11 @@ it('replicates music queue changes and restricts playback to the current host', 
   const playing = applyHostCommand(queued, 'host', { type: 'music-next' });
   expect(playing.musicNowPlaying?.trackId).toBe('PW6ZSzdjrlo');
   expect(playing.musicQueue).toHaveLength(0);
+  const transferred = applyHostCommand(playing, 'host', { type: 'video', transferMusic: true, video: {
+    id: 'main-video', name: 'Song', source: 'youtube', url: 'https://youtu.be/PW6ZSzdjrlo', size: 0, mime: 'video/youtube', startTime: 42,
+  } });
+  expect(transferred.musicNowPlaying).toBeNull();
+  expect(transferred.video?.startTime).toBe(42);
+  expect(applyHostCommand(transferred, 'guest', { type: 'clear-video' })).toBe(transferred);
+  expect(applyHostCommand(transferred, 'host', { type: 'clear-video' }).video).toBeNull();
 });

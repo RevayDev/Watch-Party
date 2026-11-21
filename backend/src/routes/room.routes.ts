@@ -14,6 +14,7 @@ router.delete('/:roomId', deleteRoomLimiter, RoomController.delete);
 // `video-url` (Drive) y el proxy quedan intactos: la demo reproduce por enlace.
 router.post('/:roomId/video', uploadVideoLimiter, demoUploadGuard, uploadVideoMiddleware.single('video'), RoomController.uploadVideo);
 router.post('/:roomId/video-url', uploadVideoLimiter, RoomController.setVideoUrl);
+router.delete('/:roomId/video', RoomController.clearVideo);
 router.get('/:roomId/video/stream', RoomController.streamVideo);
 
 export default router;

@@ -71,6 +71,7 @@ export interface IRoomSettings {
 }
 
 export interface IVideoMetadata {
+  startTime?: number;
   originalName: string;
   fileName: string;
   mimeType: string;

@@ -756,7 +756,7 @@ export class RoomService {
   /**
    * Update or replace the video of a room.
    */
-  public static async updateRoomVideo(roomId: string, video: IVideoMetadata): Promise<IRoom | null> {
+  public static async updateRoomVideo(roomId: string, video: IVideoMetadata, transferMusic = false): Promise<IRoom | null> {
     const cleanId = cleanIdOf(roomId);
 
     const room = await roomRepository.findById(cleanId);
@@ -767,7 +767,19 @@ export class RoomService {
     }
 
     room.video = video;
+    if (transferMusic) room.musicNowPlaying = null;
     room.status = 'active';
+    room.updatedAt = new Date();
+    await roomRepository.save(room);
+    return room;
+  }
+
+  public static async clearRoomVideo(roomId: string): Promise<IRoom | null> {
+    const room = await roomRepository.findById(cleanIdOf(roomId));
+    if (!room) return null;
+    if (room.video) this.removeOldVideoFile(room.video.fileName);
+    delete room.video;
+    room.status = 'waiting';
     room.updatedAt = new Date();
     await roomRepository.save(room);
     return room;

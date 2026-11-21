@@ -48,7 +48,7 @@ interface RoomDrawerProps {
   onMusicNext?: () => void;
   onMusicAutoNext?: () => void;
   onMusicStop?: () => void;
-  onExpandToMain?: (url: string, title: string) => void;
+  onExpandToMain?: (url: string, title: string, currentTime?: number) => void;
 }
 
 export const RoomDrawer: React.FC<RoomDrawerProps> = ({

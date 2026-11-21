@@ -38,6 +38,7 @@ interface VideoPlayerProps {
   video: IVideoMetadata | null | undefined;
   isLeader: boolean;
   onUploadVideo: (file: File) => Promise<void>;
+  onClearVideo?: () => void;
   onSetVideoUrl?: (url: string, title?: string) => Promise<void>;
   uploadProgress: number | null;
   isVideoLoading?: boolean;
@@ -77,6 +78,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   isLeader,
   onUploadVideo,
   onSetVideoUrl,
+  onClearVideo,
   uploadProgress,
   isVideoLoading = false,
   onSyncAction,
@@ -257,27 +259,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Position heartbeat (2.5 s normal, 15 s en mala señal): lets the server
   // resolve the consensus time a (re)joining member should adopt. Skipped
   // without video or on error.
+  const heartbeatCallback = useRef(onPlaybackHeartbeat);
+  heartbeatCallback.current = onPlaybackHeartbeat;
+  const heartbeatVideoKey = video?.fileName || video?.directUrl;
+  const heartbeatSourceType = video?.sourceType;
+  const hasHeartbeat = !!onPlaybackHeartbeat;
   useEffect(() => {
-    if (!video || playbackError || !onPlaybackHeartbeat) return;
+    if (!heartbeatVideoKey || playbackError || !hasHeartbeat) return;
     const report = () => {
-      if (videoSourceType === 'youtube' && ytPlayerRef.current) {
+      if (heartbeatSourceType === 'youtube' && ytPlayerRef.current) {
         try {
           const yt = ytPlayerRef.current;
           const cur = typeof yt.getCurrentTime === 'function' ? yt.getCurrentTime() : 0;
           const state = typeof yt.getPlayerState === 'function' ? yt.getPlayerState() : -1;
           const isPlaying = state === 1;
-          if (Number.isFinite(cur)) onPlaybackHeartbeat(cur, isPlaying);
+          if (Number.isFinite(cur)) heartbeatCallback.current?.(cur, isPlaying);
         } catch {}
         return;
       }
       const vid = videoRef.current;
       if (!vid || !Number.isFinite(vid.currentTime)) return;
-      onPlaybackHeartbeat(vid.currentTime, !vid.paused && !vid.ended);
+      heartbeatCallback.current?.(vid.currentTime, !vid.paused && !vid.ended);
     };
     report();
     const iv = window.setInterval(report, heartbeatIntervalMs);
     return () => window.clearInterval(iv);
-  }, [video, playbackError, onPlaybackHeartbeat, roomId, heartbeatIntervalMs]);
+  }, [heartbeatVideoKey, heartbeatSourceType, playbackError, hasHeartbeat, roomId, heartbeatIntervalMs]);
 
   // Auto-hide overlay top bar (filename + "Cambiar") after mouse idle — always, not just fullscreen
   const resetHideTimer = useCallback(() => {
@@ -899,7 +906,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </span>
           )}
 
-          {isLeader && (
+          {isLeader && (<>
             <button
               onClick={() => openChangePanel()}
               className="player-change-btn"
@@ -909,7 +916,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <RefreshCw size={13} className="player-change-btn__icon" />
               <span>Cambiar</span>
             </button>
-          )}
+            {onClearVideo && <button type="button" className="player-change-btn" onClick={onClearVideo} title="Quitar video"><span>Quitar</span></button>}
+          </>)}
         </div>
       </div>
 
@@ -1063,6 +1071,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               className="player-container__video"
               onReady={(player) => {
                 ytPlayerRef.current = player;
+                if (video.startTime) player.seekTo?.(video.startTime, true);
+                if (directPlayback && video.startTime !== undefined) player.playVideo?.();
                 if (onVideoReady && video.fileName && videoReadySentForRef.current !== video.fileName) {
                   videoReadySentForRef.current = video.fileName;
                   onVideoReady(video.fileName);

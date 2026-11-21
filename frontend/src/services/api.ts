@@ -365,10 +365,16 @@ export class ApiService {
    * Set video from direct URL, Google Drive or .m3u8 HLS playlist
    * (o enlace de Spotify: el backend lo detecta y lo guarda como `spotify`).
    */
+  static async clearVideo(roomId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/rooms/${roomId}/video`, { method: 'DELETE', headers: buildRestAuthHeaders(roomId) });
+    if (!response.ok) throw new Error('No se pudo quitar el video.');
+  }
+
   static async setVideoUrl(
     roomId: string,
     url: string,
-    title?: string
+    title?: string,
+    options?: { startTime?: number; transferMusic?: boolean }
   ): Promise<{ message: string; video: IVideoMetadata; status: string }> {
     const response = await fetch(`${API_BASE_URL}/rooms/${roomId}/video-url`, {
       method: 'POST',
@@ -376,7 +382,7 @@ export class ApiService {
         'Content-Type': 'application/json',
         ...buildRestAuthHeaders(roomId),
       },
-      body: JSON.stringify({ url, title }),
+      body: JSON.stringify({ url, title, ...options }),
     });
 
     if (!response.ok) {

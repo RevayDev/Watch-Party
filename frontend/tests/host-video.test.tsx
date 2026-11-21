@@ -50,6 +50,15 @@ it('keeps ordinary HTTPS videos direct in browser-hosted rooms', () => {
   expect(container.querySelector('video')?.getAttribute('src')).toBe('https://example.com/video.mp4');
 });
 
+it('does not publish an immediate heartbeat again when the parent recreates callbacks or metadata', () => {
+  const report = vi.fn();
+  const metadata = { ...video, sourceType: 'url' as const, directUrl: 'https://example.com/video.mp4' };
+  const view = render(<VideoPlayer {...props} directPlayback video={metadata} onPlaybackHeartbeat={report} remoteAction={null} />);
+  expect(report).toHaveBeenCalledTimes(1);
+  view.rerender(<VideoPlayer {...props} directPlayback video={{ ...metadata }} onPlaybackHeartbeat={(...args) => report(...args)} remoteAction={null} />);
+  expect(report).toHaveBeenCalledTimes(1);
+});
+
 it('applies a remote YouTube checkpoint without an HTML video element', () => {
   render(<VideoPlayer {...props} directPlayback
     video={{ ...video, sourceType: 'youtube', directUrl: 'https://www.youtube.com/watch?v=PW6ZSzdjrlo' }}

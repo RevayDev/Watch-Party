@@ -273,8 +273,24 @@ describe('MusicPanel (YouTube, sin banner, audible)', () => {
     });
     expect(onExpandToMain).toHaveBeenCalledWith(
       'https://www.youtube.com/watch?v=PW6ZSzdjrlo',
-      'Bohemian Rhapsody'
+      'Bohemian Rhapsody',
+      0
     );
+  });
+
+  it('keeps one player in the footer and transfers its actual position after pausing', async () => {
+    const onExpandToMain = vi.fn();
+    ytFake.currentTime = 42;
+    const { container } = render(<MusicPanel {...baseProps({ nowPlaying: TRACK as never, isModerator: true, onExpandToMain })} />);
+    expect(screen.queryByPlaceholderText(/título opcional/i)).toBeNull();
+    expect(container.querySelector('details.music-panel__queue')).toBeTruthy();
+    expect(container.querySelector('.music-panel__footer [data-testid="yt-miniplayer"]')).toBeTruthy();
+    expect(screen.getAllByLabelText('Adelantar o retroceder')).toHaveLength(1);
+    expect(screen.queryByTitle('Pasar al siguiente tema')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /ampliar a la pantalla/i }));
+    expect(ytFake.pauseVideo).toHaveBeenCalled();
+    expect(onExpandToMain).toHaveBeenCalledWith(TRACK.openUrl, TRACK.name, 42);
+    ytFake.currentTime = 0;
   });
 
   it('menú ⋮ de la fila en reproducción: ampliar y siguiente (moderador)', async () => {
@@ -316,7 +332,7 @@ describe('MusicPanel (YouTube, sin banner, audible)', () => {
     });
     // El menú aporta su propio "Siguiente" (el otro es la píldora del player).
     const siguientes = screen.getAllByRole('button', { name: /^siguiente$/i });
-    expect(siguientes.length).toBeGreaterThanOrEqual(2);
+    expect(siguientes).toHaveLength(1);
     await act(async () => {
       fireEvent.click(siguientes[0]);
     });

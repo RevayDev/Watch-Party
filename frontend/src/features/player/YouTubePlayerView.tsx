@@ -60,9 +60,10 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
   useEffect(() => {
     let active = true;
     const elemId = `yt-player-${Math.random().toString(36).slice(2, 9)}`;
-    if (containerRef.current) {
-      containerRef.current.id = elemId;
-    }
+    const container = containerRef.current;
+    const target = document.createElement('div');
+    target.id = elemId;
+    container?.appendChild(target);
 
     loadYouTubeIframeApi().then(() => {
       if (!active || !containerRef.current || !window.YT) return;
@@ -101,6 +102,7 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
       } catch {
         /* noop */
       }
+      container?.replaceChildren();
     };
   }, [videoId]);
 

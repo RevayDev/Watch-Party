@@ -22,7 +22,7 @@ export interface MusicPanelProps {
   onAutoNext: () => void;
   onStop: () => void;
   /** Muestra el tema actual en la pantalla principal de la sala (moderador). */
-  onExpandToMain?: (url: string, title: string) => void;
+  onExpandToMain?: (url: string, title: string, currentTime?: number) => void;
 }
 
 /**
@@ -61,7 +61,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   const [ytInput, setYtInput] = useState('');
   const [addingYt, setAddingYt] = useState(false);
   const [inputError, setInputError] = useState('');
-  const [customTitle, setCustomTitle] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const musicEnabled = settings.musicEnabled !== false;
@@ -82,9 +81,9 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
     setAddingYt(true);
     try {
       if (onAddUrl) {
-        await onAddUrl(raw);
+        if (!await onAddUrl(raw)) return;
       } else {
-        const title = customTitle.trim() || `YouTube Music (${ytRef.videoId})`;
+        const title = `YouTube Music (${ytRef.videoId})`;
         onAdd({
           id: ytRef.videoId,
           name: title,
@@ -95,7 +94,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         });
       }
       setYtInput('');
-      setCustomTitle('');
     } catch (err: any) {
       setInputError(err?.message || 'Error al agregar a la cola');
     } finally {
@@ -131,10 +129,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   const pending = queue.filter((e) => e.status === 'pending');
   const active = queue.filter((e) => e.status !== 'pending');
   const nowVideoId = resolveNowPlayingVideoId(nowPlaying);
-  const matchedPlaying = nowPlaying
-    ? active.find((e) => e.trackId && e.trackId === nowPlaying.trackId)
-    : undefined;
-
   const menuItemStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -244,11 +238,11 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   };
 
   return (
-    <div className="drawer-chat__messages" aria-label="Música y Karaoke de YouTube" style={{ padding: '0.85rem' }}>
+    <div className="music-panel" aria-label="Música y Karaoke de YouTube"><div className="music-panel__content">
       {allowAdd && <YouTubeSearch onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
       {/* Formulario para agregar canciones/karaokes de YouTube */}
       {allowAdd ? (
-        <form onSubmit={handlePasteSubmit} className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
+        <form onSubmit={handlePasteSubmit} className="room-settings__box music-panel__link-form" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
           <div className="room-settings__box-head" style={{ marginBottom: '0.55rem' }}>
             <span className="room-settings__box-title" style={{ fontSize: '0.85rem' }}>
               <Plus size={15} style={{ color: '#ef4444' }} />
@@ -270,14 +264,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             />
             
             <div style={{ display: 'flex', gap: '0.45rem' }}>
-              <input
-                type="text"
-                className="room-settings__input"
-                placeholder="Título opcional (ej: Bohemian Rhapsody)"
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-                style={{ flex: 1, fontSize: '0.82rem', padding: '0.5rem 0.7rem' }}
-              />
               <button
                 type="submit"
                 className="btn btn--primary"
@@ -315,7 +301,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       {!nowPlaying && active.length > 0 && (
         <button
           type="button"
-          className="btn btn--primary"
+          className="btn btn--primary music-panel__start"
           onClick={onNext}
           title="Empezar a reproducir la cola"
           style={{
@@ -323,9 +309,9 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             gap: '0.45rem',
-            width: '100%',
-            marginBottom: '1rem',
-            padding: '0.6rem',
+            width: 'auto',
+            marginBottom: '0.5rem',
+            padding: '0.35rem 0.7rem',
           }}
         >
           <Play size={16} />
@@ -402,8 +388,8 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       )}
 
       {/* Tarjeta de la cola musical (diseño mockup) */}
-      <div className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.6rem' }}>
+      <details className="room-settings__box music-panel__queue" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
+        <summary style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', cursor: 'pointer' }}>
           <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#f1f5f9' }}>
             Cola de reproducción
           </span>
@@ -411,7 +397,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             {active.length} vídeo{active.length === 1 ? '' : 's'}
             <ListMusic size={14} />
           </span>
-        </div>
+        </summary>
 
         {active.length === 0 ? (
           <div className="drawer-chat__empty" style={{ padding: '1.5rem 1rem' }}>
@@ -422,81 +408,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
             {/* Tema sonando fuera de la cola: fila compacta estilo mockup */}
-            {nowPlaying && !matchedPlaying && nowVideoId ? (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.6rem',
-                  padding: '0.6rem 0.75rem 0.6rem 0.9rem',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(139, 92, 246, 0.45)',
-                  borderRadius: '10px',
-                  position: 'relative',
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 8,
-                    bottom: 8,
-                    width: 3,
-                    borderRadius: 999,
-                    background: '#8b5cf6',
-                  }}
-                />
-                <span role="img" aria-label="Sonando ahora" style={{ color: '#60a5fa', display: 'flex', flexShrink: 0 }}>
-                  <Pause size={13} />
-                </span>
-                <img
-                  src={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
-                  alt=""
-                  style={{ width: '42px', height: '32px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {nowPlaying.name}
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {nowPlaying.artists || 'YouTube Music'} · propuesto por {nowPlaying.proposedBy}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  aria-label={`Opciones de ${nowPlaying.name}`}
-                  title="Opciones"
-                  onClick={() => setOpenMenuId((v) => (v === `now-${nowPlaying.entryId}` ? null : `now-${nowPlaying.entryId}`))}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: 'transparent',
-                    color: '#94a3b8',
-                    border: 'none',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  <MoreVertical size={15} />
-                </button>
-                {openMenuId === `now-${nowPlaying.entryId}` && (
-                  <PlayingMenu
-                    rowId={`now-${nowPlaying.entryId}`}
-                    url={nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`}
-                    title={nowPlaying.name}
-                    openUrl={nowPlaying.openUrl}
-                    entryId={nowPlaying.entryId}
-                    canDelete={isModerator || (settings.musicCanRemove !== 'moderator' && nowPlaying.proposedBy === myName)}
-                    isCurrentlyPlaying
-                  />
-                )}
-              </div>
-            ) : null}
             {active.map((e, i) => {
               const ytRef = parseYouTubeUrl(e.trackId || e.uri || e.openUrl);
               const thumb = e.albumArt || (ytRef ? `https://img.youtube.com/vi/${ytRef.videoId}/hqdefault.jpg` : undefined);
@@ -669,12 +580,13 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             })}
           </div>
         )}
+      </details>
       </div>
 
       {/* Reproductor "Sonando ahora" debajo de la tarjeta (diseño mockup) */}
       {nowPlaying && nowVideoId ? (
         <div
-          className="room-settings__box"
+          className="room-settings__box music-panel__footer"
           style={{
             marginBottom: '1rem',
             padding: '0.85rem',
@@ -691,18 +603,15 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             onEnded={onAutoNext}
             onNext={onNext}
             onStop={onStop}
-            onExpand={() => {
+            onExpand={(currentTime) => {
               const url = nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`;
-              if (url) onExpandToMain(url, nowPlaying.name);
+              if (url) onExpandToMain(url, nowPlaying.name, currentTime);
             }}
             showModerator={isModerator}
           />
         </div>
       ) : null}
 
-      <p className="room-settings__box-desc" style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.74rem' }}>
-        🎵 La cola reproduce canciones de YouTube en grupo. Disfruta con letras sincronizadas y sin límites.
-      </p>
     </div>
   );
 };

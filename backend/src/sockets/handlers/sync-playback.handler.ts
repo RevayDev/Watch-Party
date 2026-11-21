@@ -137,7 +137,7 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
     resetVideoReady(cleanRoomId);
 
     console.log(`🎬 Nuevo video cargado en sala [${cleanRoomId}]: ${video.originalName}`);
-    io.to(cleanRoomId).emit('video-changed', { video });
+    io.to(cleanRoomId).emit('video-changed', { video, musicQueue: room.musicQueue ?? [], musicNowPlaying: room.musicNowPlaying ?? null });
   });
 
   // 6.1 Upload Progress broadcast (anfitrión o co-anfitrión suben videos)

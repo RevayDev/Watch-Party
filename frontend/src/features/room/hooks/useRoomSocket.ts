@@ -920,6 +920,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     socket.on('room-closed', handleRoomClosed);
     socket.on('user-joined', handleUserJoined);
     socket.on('user-left', handleUserLeft);
+    const handleVideoCleared = () => { setRoomData((previous) => previous ? { ...previous, video: null, status: 'waiting' } : null); setRemoteAction(null); };
+    socket.on('video-cleared', handleVideoCleared);
     socket.on('video-changed', handleVideoChanged);
     socket.on('sync-video', handleSyncVideo);
     socket.on('upload-progress', handleUploadProgressEvent);
@@ -973,6 +975,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       socket.off('room-closed', handleRoomClosed);
       socket.off('user-joined', handleUserJoined);
       socket.off('user-left', handleUserLeft);
+      socket.off('video-cleared', handleVideoCleared);
       socket.off('video-changed', handleVideoChanged);
       socket.off('sync-video', handleSyncVideo);
       socket.off('upload-progress', handleUploadProgressEvent);
@@ -1189,17 +1192,23 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
 
   const [isVideoLoading, setIsVideoLoading] = useState(false);
 
-  const handleSetVideoUrl = async (url: string, title?: string) => {
+  const handleSetVideoUrl = async (url: string, title?: string, options?: { startTime?: number; transferMusic?: boolean }) => {
     try {
       setIsVideoLoading(true);
-      const res = await ApiService.setVideoUrl(roomId, url, title);
-      setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active' } : null));
+      const res = await ApiService.setVideoUrl(roomId, url, title, options);
+      setRoomData((prev) => (prev ? { ...prev, video: res.video, status: 'active', ...(options?.transferMusic ? { musicNowPlaying: null } : {}) } : null));
+      if (options?.transferMusic) setMusicNowPlaying(null);
       socket.emit('video-changed', { roomId, video: res.video, ...buildSocketAuth(roomId, myName) });
     } catch (err: any) {
       notify('error', err.message || 'Error al cargar el enlace de video', 'Error al cargar video');
     } finally {
       setIsVideoLoading(false);
     }
+  };
+
+  const handleClearVideo = async () => {
+    try { await ApiService.clearVideo(roomId); setRoomData((previous) => previous ? { ...previous, video: null, status: 'waiting' } : null); setRemoteAction(null); }
+    catch { notify('error', 'No se pudo quitar el video.', 'Video'); }
   };
 
   const handleSyncAction = useCallback(
@@ -1431,6 +1440,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     handleDeleteRoomForAll,
     handleUploadVideo,
     handleSetVideoUrl,
+    handleClearVideo,
     isVideoLoading,
     handleSyncAction,
     handlePlaybackHeartbeat,

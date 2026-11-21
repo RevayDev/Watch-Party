@@ -12,6 +12,7 @@ const roomSettingsSchema = z.object({
 });
 export const memberSchema = z.object({ id, name, joinedAt: z.number().finite() });
 export const videoSchema = z.object({
+  startTime: z.number().finite().nonnegative().optional(),
   id, name: z.string().min(1).max(200), source: z.enum(['file', 'youtube', 'url']),
   url: z.string().max(2048).optional(), size: z.number().int().min(0).max(MAX_VIDEO_BYTES), mime: z.string().max(100),
 });
@@ -49,7 +50,8 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('room-settings'), settings: roomSettingsSchema }),
   z.object({ type: z.literal('chat'), text: z.string().trim().min(1).max(2000), id, replyTo: id.optional() }),
   z.object({ type: z.literal('edit-chat'), text: z.string().trim().min(1).max(2000), id }),
-  z.object({ type: z.literal('video'), video: videoSchema }),
+  z.object({ type: z.literal('video'), video: videoSchema, transferMusic: z.boolean().optional() }),
+  z.object({ type: z.literal('clear-video') }),
   z.object({ type: z.literal('playback'), action: z.enum(['play', 'pause', 'seek']), currentTime: z.number().finite().nonnegative() }),
   z.object({ type: z.literal('settings'), automaticMigration: z.boolean(), replicateVideo: z.boolean() }),
   z.object({ type: z.literal('music-add'), track: musicTrackSchema }),
@@ -121,8 +123,10 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
       if (!state.messages.some((message) => message.id === command.id && message.authorId === senderId)) return state;
       return { ...state, revision: state.revision + 1, messages: state.messages.map((message) =>
         message.id === command.id ? { ...message, text: command.text, edited: true } : message) };
+    case 'clear-video':
+      return { ...state, revision: state.revision + 1, video: null, playback: null };
     case 'video':
-      return { ...state, revision: state.revision + 1, video: command.video, playback: null };
+      return { ...state, revision: state.revision + 1, video: command.video, playback: null, ...(command.transferMusic ? { musicNowPlaying: null } : {}) };
     case 'settings':
       return { ...state, revision: state.revision + 1, automaticMigration: command.automaticMigration, replicateVideo: command.replicateVideo };
     case 'playback':

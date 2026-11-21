@@ -23,6 +23,7 @@ const VIDEO_READY_DEDUP_MS = 500;
 
 interface ReadyState {
   videoKey: string;
+  startTime?: number;
   ready: Set<string>;
   timer: ReturnType<typeof setTimeout> | null;
 }
@@ -51,7 +52,7 @@ function finishVideoReady(io: Server, roomId: string): void {
   if (!state) return;
   clearTimer(state);
   readyByRoom.delete(roomId);
-  const payload = SyncPlaybackUseCase.execute({ roomId, action: 'play', currentTime: 0 });
+  const payload = SyncPlaybackUseCase.execute({ roomId, action: 'play', currentTime: state.startTime ?? 0 });
   if (!payload) return;
   io.to(roomId).emit('sync-video', {
     action: payload.action,
@@ -134,7 +135,7 @@ export function registerVideoReadyHandlers(io: Server, socket: Socket): void {
     let state = readyByRoom.get(cleanRoomId);
     if (!state || state.videoKey !== expectedKey) {
       if (state) clearTimer(state);
-      const fresh: ReadyState = { videoKey: expectedKey, ready: new Set(), timer: null };
+      const fresh: ReadyState = { videoKey: expectedKey, startTime: room.video?.startTime ?? 0, ready: new Set(), timer: null };
       readyByRoom.set(cleanRoomId, fresh);
       state = fresh;
       const timer = setTimeout(() => {

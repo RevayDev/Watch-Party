@@ -1,3 +1,5 @@
+import { clearVideoReady } from '../sockets/handlers/video-ready.handler.js';
+import { roomPlayback, roomPositions } from '../domain/playback-policy.js';
 import { Request, Response, NextFunction } from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -385,7 +387,10 @@ export class RoomController {
   public static async setVideoUrl(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { roomId } = req.params;
-      const { url, title } = req.body;
+      const { url, title, startTime = 0, transferMusic = false } = req.body;
+      if (typeof startTime !== 'number' || !Number.isFinite(startTime) || startTime < 0 || typeof transferMusic !== 'boolean') {
+        res.status(400).json({ error: 'Posición de reproducción inválida' }); return;
+      }
 
       if (!url || typeof url !== 'string' || url.trim().length === 0) {
         res.status(400).json({ error: 'url is required' });
@@ -440,6 +445,7 @@ export class RoomController {
         title?.trim() || (youtube ? `YouTube Karaoke (${youtube.videoId})` : await resolveFallbackVideoName(cleanUrl, isHls, driveFileId));
 
       const videoMetadata: IVideoMetadata = {
+        startTime,
         originalName,
         fileName: cleanUrl,
         mimeType: isYouTube ? 'video/youtube' : isHls ? 'application/x-mpegURL' : 'video/mp4',
@@ -449,8 +455,11 @@ export class RoomController {
         directUrl: youtube?.embedUrl ?? cleanUrl,
       };
 
-      const updatedRoom = await RoomService.updateRoomVideo(roomId, videoMetadata);
+      const updatedRoom = await RoomService.updateRoomVideo(roomId, videoMetadata, transferMusic);
 
+      if (transferMusic) req.app.get('io')?.to(roomId.toUpperCase().trim()).emit('music-queue-updated', {
+        queue: updatedRoom?.musicQueue ?? [], nowPlaying: null,
+      });
       console.log(`🔗 Video enlace configurado en sala [${roomId}]: ${originalName} (${videoMetadata.sourceType})`);
 
       res.json({
@@ -464,9 +473,23 @@ export class RoomController {
   }
 
   /**
-   * Delete room and cleanup all associated files on disk.
-   * Solo el leader (secreto válido o rol leader del servidor).
+   * Remove the current video while keeping the room and its participants.
    */
+  public static async clearVideo(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const room = await RoomService.getRoomById(req.params.roomId);
+      if (!room) { res.status(404).json({ error: 'Room not found' }); return; }
+      if (!requireModerator(room, claimFromHeaders(req))) { res.status(403).json({ error: 'Solo un anfitrión puede quitar el video.' }); return; }
+      await RoomService.clearRoomVideo(req.params.roomId);
+      clearVideoReady(room.roomId);
+      roomPlayback.delete(room.roomId);
+      roomPositions.delete(room.roomId);
+      req.app.get('io')?.to(room.roomId).emit('video-cleared');
+      res.json({ message: 'Video quitado' });
+    } catch (error) { next(error); }
+  }
+
+  /** Delete the room and clean up its files (leader only). */
   public static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { roomId } = req.params;

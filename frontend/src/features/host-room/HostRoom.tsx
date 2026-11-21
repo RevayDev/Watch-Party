@@ -148,6 +148,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
     video = {
       fileName: selected.id, originalName: selected.name, sizeBytes: selected.size, mimeType: selected.mime,
       sourceType: selected.source === 'youtube' ? 'youtube' : 'url',
+      startTime: selected.startTime,
       directUrl: selected.source === 'file' ? view.fileUrl! : selected.url,
     };
   }
@@ -159,13 +160,14 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
     }
   };
 
-  const setVideoUrl = async (input: string, title?: string) => {
+  const setVideoUrl = async (input: string, title?: string, currentTime?: number) => {
     setError('');
     try {
       const parsed = new URL(input);
       if (parsed.protocol !== 'https:') throw new Error('Usa un enlace HTTPS de video.');
       const youtube = parseYouTubeUrl(input);
-      session?.command({ type: 'video', video: {
+      session?.command({ type: 'video', transferMusic: currentTime !== undefined, video: {
+        ...(currentTime !== undefined ? { startTime: currentTime } : {}),
         id: crypto.randomUUID(), name: title?.trim() || (youtube ? 'YouTube' : parsed.hostname === 'drive.google.com' ? 'Video de Google Drive' : parsed.pathname.split('/').pop() || 'Video'),
         source: youtube ? 'youtube' : 'url', url: youtube?.cleanUrl ?? parsed.href, size: 0, mime: 'video/mp4',
       } });
@@ -215,7 +217,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
           </div></div>
         ) : (
           <VideoPlayer directPlayback roomId={options.roomId} video={video} isLeader={isHost}
-            onUploadVideo={selectFile} onSetVideoUrl={setVideoUrl} uploadProgress={null}
+            onUploadVideo={selectFile} onSetVideoUrl={setVideoUrl} onClearVideo={() => session.command({ type: 'clear-video' })} uploadProgress={null}
             reactions={reactions} isMicOn={media.isMicOn}
             heartbeatIntervalMs={state.roomSettings?.dataSaver ? 15000 : 2500}
             fullscreenToastsEnabled={state.roomSettings?.fullscreenToasts}
@@ -246,7 +248,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         onMusicNext={() => session.command({ type: 'music-next' })}
         onMusicAutoNext={() => { if (isHost) session.command({ type: 'music-next' }); }}
         onMusicStop={() => session.command({ type: 'music-stop' })}
-        onExpandToMain={(link, title) => { void setVideoUrl(link, title); }} />}
+        onExpandToMain={(link, title, currentTime = 0) => { void setVideoUrl(link, title, currentTime); }} />}
       controls={<RoomControls roomId={options.roomId} layout={barPrefs.layout} showLabels={barPrefs.showLabels}
         isMicOn={media.isMicOn} isCameraOn={media.isCameraOn} toggleMic={media.toggleMic} toggleCamera={media.toggleCamera}
         showEmojiPicker={showEmojiPicker} setShowEmojiPicker={setShowEmojiPicker} emojiPresence={emojiPresence}

@@ -29,6 +29,31 @@ function mockRes() {
 
 const next = vi.fn();
 
+it('transfers music to the main video at a checkpoint and only permits moderators to clear it', async () => {
+  const { room, leaderSecret } = await RoomService.createRoom({ leaderName: 'Host' });
+  created.push(room.roomId);
+  await RoomService.addMusicEntry(room.roomId, { trackId: 'PW6ZSzdjrlo', name: 'Song', artists: 'Artist', proposedBy: 'Host' });
+  await RoomService.advanceMusicQueue(room.roomId);
+  const emit = vi.fn();
+  const req: any = {
+    params: { roomId: room.roomId }, headers: { 'x-leader-secret': leaderSecret },
+    body: { url: 'https://youtu.be/PW6ZSzdjrlo', startTime: 42, transferMusic: true },
+    app: { get: () => ({ to: () => ({ emit }) }) },
+  };
+  const response = mockRes();
+  await RoomController.setVideoUrl(req, response, next);
+  expect(response.body.video.startTime).toBe(42);
+  expect((await RoomService.getRoomById(room.roomId))?.musicNowPlaying).toBeNull();
+  expect(emit).toHaveBeenCalledWith('music-queue-updated', expect.objectContaining({ nowPlaying: null }));
+  const denied = mockRes();
+  await RoomController.clearVideo({ ...req, headers: {} }, denied, next);
+  expect(denied.statusCode).toBe(403);
+  await RoomController.clearVideo(req, mockRes(), next);
+  const cleared = await RoomService.getRoomById(room.roomId);
+  expect(cleared?.video).toBeUndefined();
+  expect(cleared?.status).toBe('waiting');
+});
+
 beforeAll(() => {
   backupRoomsFile();
 });
