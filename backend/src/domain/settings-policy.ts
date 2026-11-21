@@ -22,6 +22,7 @@ const ALLOWED_KEYS = new Set<string>([
   'duckingEnabled',
   'duckingLevel',
   'hostOnlySync',
+  'youtubeProvider',
   'musicEnabled',
   'musicAllowSearch',
   'musicCanAdd',
@@ -109,6 +110,11 @@ export function sanitizeRoomSettings(input: unknown, opts: SanitizeOptions = {})
     } else {
       (out as Record<string, unknown>)[key] = value;
     }
+  }
+
+  if ('youtubeProvider' in input) {
+    if (typeof input.youtubeProvider !== 'string' || (input.youtubeProvider !== '' && !/^[a-f0-9]{64}$/.test(input.youtubeProvider))) errors.push('Proveedor de YouTube inválido.');
+    else out.youtubeProvider = input.youtubeProvider;
   }
 
   for (const key of ['name', 'description'] as const) {

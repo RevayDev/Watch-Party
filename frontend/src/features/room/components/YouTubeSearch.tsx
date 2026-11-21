@@ -5,11 +5,12 @@ import type { IMusicTrack } from '../../../types/room';
 import './YouTubeSearch.css';
 
 interface Props {
+  provider?: string;
   onAdd: (track: IMusicTrack) => void;
   onPlay?: (url: string, title: string) => void;
 }
 
-export function YouTubeSearch({ onAdd, onPlay }: Props) {
+export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
   const [query, setQuery] = useState('');
   const [tracks, setTracks] = useState<IMusicTrack[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,7 @@ export function YouTubeSearch({ onAdd, onPlay }: Props) {
     setError('');
     setLoading(true);
     try {
-      setTracks(await ApiService.youtubeSearch(term, controller.signal));
+      setTracks(await (provider ? ApiService.youtubeSearch(term, controller.signal, provider) : ApiService.youtubeSearch(term, controller.signal)));
     } catch (err) {
       if (!controller.signal.aborted) {
         setError(err instanceof Error ? err.message : 'No se pudo buscar en YouTube.');

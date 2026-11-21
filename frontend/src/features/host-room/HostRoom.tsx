@@ -184,7 +184,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       role: member.id === state.hostId ? 'leader' : 'member', joinedAt: new Date(member.joinedAt).toISOString(),
     })),
     settings: { muteOnEntry: false, cameraOffOnEntry: false, allowMicReactivation: true, allowCamReactivation: true,
-      hostOnlySync: true, musicEnabled: true, musicCanAdd: 'anyone', musicAllowReorder: true, musicCanRemove: 'proposer' },
+      youtubeProvider: state.roomSettings?.youtubeProvider, hostOnlySync: true, musicEnabled: true, musicCanAdd: 'anyone', musicAllowReorder: true, musicCanRemove: 'proposer' },
     musicQueue: state.musicQueue, musicNowPlaying: state.musicNowPlaying,
   } : null;
 
@@ -265,6 +265,8 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       {media.mediaConnectionFailed && <div className="meet-error-banner"><button type="button" className="btn btn--primary" onClick={media.retryMediaConnection}>Reconectar micrófonos y cámaras</button></div>}
       <MemberExitModal isOpen={showExit} onClose={() => setShowExit(false)} onConfirmLeave={onLeave} />
       <RoomSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} browserHosted
+        youtubeProvider={state.roomSettings?.youtubeProvider}
+        onYouTubeProviderChange={(youtubeProvider) => session.command({ type: 'room-settings', settings: { youtubeProvider } })}
         localStream={media.localStream} onRetryMedia={media.retryMediaConnection}
         isTemporary onToggleTemporary={() => {}} roomName={state.roomSettings?.name ?? ''}
         roomDescription={state.roomSettings?.description ?? ''} canEdit={isHost}
@@ -280,23 +282,17 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
           if (patch.layout !== undefined) barPrefs.setLayout(patch.layout);
         }}
         serverContent={<section className="host-server-settings">
-        <h3>Servidor de la sala</h3>
-        <p>{view.status}. {state?.members.length ?? 0} {state?.members.length === 1 ? 'participante' : 'participantes'}, hasta 8 por sala.</p>
-        {state && !isHost && <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => session?.requestTakeover()}>Solicitar relevo del servidor</button>}
-        <p>La señalización de PeerJS permite encontrar los equipos. Video, chat y llamadas se intercambian entre navegadores. Mantén la pestaña abierta.</p>
-        <p>Los participantes conservan los últimos 300 mensajes de chat mientras la sala sigue abierta.</p>
-        <label className="host-room__setting"><input type="checkbox" checked={state?.automaticMigration ?? true} disabled={!isHost} onChange={(event) =>
-          session?.command({ type: 'settings', automaticMigration: event.target.checked, replicateVideo: state?.replicateVideo ?? true })
-        } /> Relevo automático del servidor</label>
-        <label className="host-room__setting"><input type="checkbox" checked={state?.replicateVideo ?? true} disabled={!isHost} onChange={(event) => {
-          session?.command({ type: 'settings', automaticMigration: state?.automaticMigration ?? true, replicateVideo: event.target.checked });
-          if (event.target.checked) session?.retryVideo();
-        }} /> Copiar automáticamente el archivo de video a los participantes</label>
-        <p>Si desactivas la copia automática, cada invitado puede solicitar el archivo con «Reintentar copia» para reproducirlo.</p>
-        <p>Los archivos de hasta 256 MB se reciben completos y usan memoria y ancho de banda de cada equipo. Las copias completas permiten continuar si sale quien tenía el archivo original.</p>
-        <p role="status">{selected?.source === 'file' ? `Copias confirmadas en otros equipos: ${view.replicas}` : 'Los enlaces se reproducen desde el proveedor en cada navegador.'}</p>
-        {selected?.source === 'file' && <button type="button" className="btn btn--primary" onClick={() => session?.retryVideo()}>Reintentar copias</button>}
-        <p>Si todos salen, se pierde la sala. Una caída de la señalización o una red que requiera TURN puede impedir nuevas conexiones. El relevo puede tardar varios segundos.</p>
+        <div className="settings-section-heading"><h4>Servidor de la sala</h4><p>Tu navegador coordina la sesión. El relevo permite continuar con otro participante si sales.</p></div>
+        <div className="settings-summary-grid"><div><small>Conexión</small><strong>{view.status}</strong></div><div><small>Participantes</small><strong>{state.members.length} de 8</strong></div></div>
+        {!isHost && <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => session.requestTakeover()}>Solicitar relevo del servidor</button>}
+        <label className="settings-toggle-row"><span><strong>Relevo automático del servidor</strong><small>Otro participante asume la coordinación cuando el anfitrión se desconecta</small></span><input type="checkbox" checked={state.automaticMigration} disabled={!isHost} onChange={(event) => session.command({ type: 'settings', automaticMigration: event.target.checked, replicateVideo: state.replicateVideo })} /></label>
+        <label className="settings-toggle-row"><span><strong>Copiar el video a los participantes</strong><small>Las copias completas permiten continuar aunque salga el equipo original</small></span><input type="checkbox" checked={state.replicateVideo} disabled={!isHost} onChange={(event) => {
+          session.command({ type: 'settings', automaticMigration: state.automaticMigration, replicateVideo: event.target.checked });
+          if (event.target.checked) session.retryVideo();
+        }} /></label>
+        <p className="room-settings__box-desc" role="status">{selected?.source === 'file' ? `Copias confirmadas: ${view.replicas}` : 'Los enlaces se reproducen desde su proveedor; Google Drive utiliza el proxy de video.'}</p>
+        {selected?.source === 'file' && <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => session.retryVideo()}>Reintentar copias</button>}
+        <details className="settings-details"><summary>Límites de las salas del navegador</summary><p>Hasta 8 participantes, archivos de 256 MB y los últimos 300 mensajes. Las copias usan memoria y ancho de banda de cada equipo. Mantén la pestaña abierta.</p><p>Si todos salen, la sala termina. El relevo puede tardar unos segundos y algunas redes necesitan un servidor TURN para conectar.</p></details>
       </section>} />
     </RoomLayout>
   );

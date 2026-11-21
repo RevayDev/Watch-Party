@@ -311,6 +311,8 @@ onVideoReady={r.handleVideoReady}
 
       {/* ⚙ Room settings: name, info, save-mode (temporary/stored), approval and auto-close timer */}
       <RoomSettingsModal
+        youtubeProvider={r.roomData.settings?.youtubeProvider}
+        onYouTubeProviderChange={(youtubeProvider) => r.handleUpdatePerfSettings({ youtubeProvider })}
         localStream={r.localStream}
         onRetryMedia={r.retryMediaConnection}
         isOpen={r.showRoomSettings}

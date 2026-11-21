@@ -239,7 +239,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
 
   return (
     <div className="music-panel" aria-label="Música y Karaoke de YouTube"><div className="music-panel__content">
-      {allowAdd && <YouTubeSearch onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
+      {allowAdd && <YouTubeSearch provider={settings.youtubeProvider} onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
       {/* Formulario para agregar canciones/karaokes de YouTube */}
       {allowAdd ? (
         <form onSubmit={handlePasteSubmit} className="room-settings__box music-panel__link-form" style={{ padding: '0.85rem', marginBottom: '1rem' }}>

@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
+import { YouTubeSettingsSection } from './YouTubeSettingsSection';
 import { MediaSettingsSection } from './MediaSettings';
 import { notify } from "../services/notifications";
 import { BottomSheet } from "../shared/components/BottomSheet";
 import { isDemoMode } from "../shared/demo";
 import type { IRoomSettings } from "../types/room";
 import { DUCK_DEFAULT_PCT, DUCK_MAX_PCT, DUCK_MIN_PCT, clampDuckPct } from "../shared/perf";
+import './RoomSettingsModal.css';
 
 interface RoomSettingsModalProps {
+  youtubeProvider?: string;
+  onYouTubeProviderChange?: (provider: string) => void;
   serverContent?: React.ReactNode;
   browserHosted?: boolean;
   localStream?: MediaStream | null;
@@ -71,6 +75,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   barShowLabels = true,
   barLayout = 'spread',
   onBarPrefsChange,
+  youtubeProvider,
+  onYouTubeProviderChange,
   serverContent,
   browserHosted = false,
   localStream = null,
@@ -81,12 +87,12 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   const [choice, setChoice] = useState<number | null>(timerMinutes);
   // Organización por pestañas: General, Barra (local) y Rendimiento.
   // Mismo contenido y handlers, solo agrupado.
-  const [tab, setTab] = useState<'general' | 'barra' | 'rendimiento' | 'media' | 'server'>('general');
+  const [tab, setTab] = useState<'general' | 'barra' | 'rendimiento' | 'media' | 'server' | 'youtube'>('general');
 
   // Demo: la persistencia y el cierre automático configurable quedan
   // deshabilitados solo visualmente (el timer lo pone el servidor).
   // El código original queda intacto tras el flag.
-  const demo = isDemoMode();
+  const demo = !browserHosted && isDemoMode();
 
   // Re-sync from props every time the modal opens
   useEffect(() => {
@@ -130,20 +136,22 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
       open={isOpen}
       onClose={onClose}
       label="Configuración de la sala"
-      className="modal-card--settings"
+      className="modal-card--settings room-settings-shell"
     >
         <div className="modal-card__header">
           <h3 className="leader-exit-modal__title">Configuración de la sala</h3>
         </div>
 
+        <div className="room-settings__workspace">
         <div className="room-settings__tabs" role="tablist" aria-label="Secciones de configuración">
           {(
             [
               ['general', 'General'],
-              ['barra', 'Barra'],
+              ['barra', 'Apariencia'],
               ['rendimiento', 'Rendimiento'],
               ['media', 'Micrófono y cámara'],
               ['server', 'Servidor'],
+              ['youtube', 'YouTube'],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -159,6 +167,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
           ))}
         </div>
 
+        <section className="room-settings__page" role="tabpanel" aria-label={tab === 'barra' ? 'Apariencia' : tab === 'media' ? 'Micrófono y cámara' : tab === 'youtube' ? 'YouTube' : tab === 'server' ? 'Servidor' : tab === 'general' ? 'General' : 'Rendimiento'}>
+        {tab === 'youtube' && <YouTubeSettingsSection provider={youtubeProvider} onChange={onYouTubeProviderChange} canEdit={canEdit} />}
         {tab === 'media' && onRetryMedia && <MediaSettingsSection localStream={localStream} onRetry={onRetryMedia} />}
         {tab === 'server' && (serverContent ?? <section className="room-settings__box">
           <h4>Servidor externo</h4>
@@ -173,9 +183,10 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
           <div className="room-settings__column">
             {/* Nombre */}
             <div className="room-settings__group">
-              <label className="room-settings__label">Nombre de la sala</label>
+              <label className="room-settings__label" htmlFor="room-settings-name">Nombre de la sala</label>
 
               <input
+                id="room-settings-name"
                 type="text"
                 className="room-settings__input"
                 maxLength={60}
@@ -188,11 +199,11 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
 
             {/* Información */}
             <div className="room-settings__group">
-              <label className="room-settings__label">
+              <label className="room-settings__label" htmlFor="room-settings-description">
                 Información de la sala
               </label>
 
-              <textarea
+              <textarea id="room-settings-description"
                 className="room-settings__textarea"
                 maxLength={240}
                 rows={3}
@@ -514,6 +525,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
         </div>
         )}
 
+        </section>
+        </div>
         {/* Actions */}
         <div className="room-settings__actions">
           <button

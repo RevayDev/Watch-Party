@@ -27,6 +27,7 @@ export interface IKickedParticipant {
 }
 
 export interface IRoomSettings {
+  youtubeProvider?: string;
   muteOnEntry: boolean;
   cameraOffOnEntry: boolean;
   allowMicReactivation: boolean;

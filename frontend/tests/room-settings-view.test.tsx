@@ -52,14 +52,14 @@ it('includes devices and external server as sections of the shared settings', ()
 describe('RoomSettingsModal (Tu vista de la barra)', () => {
   it('muestra las pestañas y la sección personal tras pulsar Barra', async () => {
     render(<RoomSettingsModal {...modalProps()} />);
-    for (const t of ['General', 'Barra', 'Rendimiento']) {
+    for (const t of ['General', 'Apariencia', 'Rendimiento']) {
       expect(screen.getByRole('tab', { name: t })).toBeDefined();
     }
     expect(screen.queryByRole('tab', { name: 'Música' })).toBeNull();
     // La barra no se ve hasta pulsar su pestaña.
     expect(screen.queryByText(/tu vista de la barra/i)).toBeNull();
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Barra' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'Apariencia' }));
     });
     expect(screen.getByText(/tu vista de la barra/i)).toBeDefined();
     expect(screen.getByText(/textos bajo los iconos/i)).toBeDefined();
@@ -71,7 +71,7 @@ describe('RoomSettingsModal (Tu vista de la barra)', () => {
     const onUpdatePerf = vi.fn();
     render(<RoomSettingsModal {...modalProps({ onBarPrefsChange, onUpdatePerf })} />);
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Barra' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'Apariencia' }));
     });
     const checkbox = screen.getByTitle(/muestra u oculta los textos/i) as HTMLInputElement;
     expect(checkbox.checked).toBe(true);
@@ -87,7 +87,7 @@ describe('RoomSettingsModal (Tu vista de la barra)', () => {
     const onUpdatePerf = vi.fn();
     render(<RoomSettingsModal {...modalProps({ onBarPrefsChange, onUpdatePerf })} />);
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Barra' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'Apariencia' }));
     });
     const checkbox = screen.getByTitle(/reparte izquierda\/centro\/derecha/i) as HTMLInputElement;
     expect(checkbox.checked).toBe(true);
@@ -118,7 +118,7 @@ describe('RoomSettingsModal (sin pestaña de Música)', () => {
 
   it('solo ofrece General, Barra y Rendimiento', () => {
     render(<RoomSettingsModal {...baseProps()} />);
-    for (const t of ['General', 'Barra', 'Rendimiento']) {
+    for (const t of ['General', 'Apariencia', 'Rendimiento']) {
       expect(screen.getByRole('tab', { name: t })).toBeDefined();
     }
     expect(screen.queryByRole('tab', { name: 'Música' })).toBeNull();

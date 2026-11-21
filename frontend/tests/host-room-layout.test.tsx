@@ -64,7 +64,7 @@ it('uses the Render layout with a lateral camera strip and the standard bottom c
   expect(container.querySelector('.meet-stage__cams-strip')).toBeNull();
   fireEvent.click(screen.getByTitle('Configuración de la sala'));
   fireEvent.click(screen.getByRole('tab', { name: 'Servidor' }));
-  expect(screen.getByLabelText('Relevo automático del servidor')).toBeTruthy();
+  expect(screen.getByRole('checkbox', { name: /Relevo automático del servidor/ })).toBeTruthy();
   fireEvent.click(screen.getByRole('tab', { name: 'Micrófono y cámara' }));
   expect(screen.getByRole('region', { name: 'Prueba de micrófono' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Configurar micrófono y cámara' })).toBeNull();

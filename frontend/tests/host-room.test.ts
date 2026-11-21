@@ -100,7 +100,7 @@ it('keeps chat and playback after a host leaves and admits another guest through
   await vi.advanceTimersByTimeAsync(1);
   const guest = start('Beto');
   await settleUntil(() => guest.snapshot?.members.length === 2);
-  host.command({ type: 'room-settings', settings: { name: 'Noche de cine', duckingLevel: 20 } });
+  host.command({ type: 'room-settings', settings: { name: 'Noche de cine', duckingLevel: 20, youtubeProvider: 'a'.repeat(64) } });
   guest.command({ type: 'chat', id: 'first', text: 'Antes del relevo' });
   host.command({ type: 'playback', action: 'pause', currentTime: 42 });
   await vi.advanceTimersByTimeAsync(10000);
@@ -127,7 +127,7 @@ it('keeps chat and playback after a host leaves and admits another guest through
   const newcomer = start('Carla');
   await settleUntil(() => newcomer.snapshot?.hostId === guest.id);
   expect(newcomer.snapshot?.messages[0].text).toBe('Antes del relevo');
-  expect(newcomer.snapshot?.roomSettings).toEqual({ name: 'Noche de cine', duckingLevel: 20 });
+  expect(newcomer.snapshot?.roomSettings).toEqual({ name: 'Noche de cine', duckingLevel: 20, youtubeProvider: 'a'.repeat(64) });
 });
 
 it('does not promote an uninvited browser or a guest when automatic migration is disabled', async () => {

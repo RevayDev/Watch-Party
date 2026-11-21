@@ -6,6 +6,7 @@ export const CHUNK_BYTES = 8 * 1024;
 const id = z.string().min(1).max(100);
 const name = z.string().trim().min(1).max(50);
 const roomSettingsSchema = z.object({
+  youtubeProvider: z.string().regex(/^(?:[a-f0-9]{64})?$/).optional(),
   name: z.string().max(60).optional(), description: z.string().max(240).optional(),
   dataSaver: z.boolean().optional(), fullscreenToasts: z.boolean().optional(), reactionsEnabled: z.boolean().optional(),
   visualEffects: z.boolean().optional(), duckingEnabled: z.boolean().optional(), duckingLevel: z.number().min(10).max(60).optional(),
