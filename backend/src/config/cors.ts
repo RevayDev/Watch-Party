@@ -41,6 +41,8 @@ export function getExplicitOrigins(): string[] {
 
 /** Puertos loopback de desarrollo del proyecto (Vite dev 5173, preview 4173). */
 const DEV_LOOPBACK_PORTS = ['5173', '4173'];
+// Vite can move to the next port when an existing development instance is open.
+const VITE_FALLBACK_PORTS = Array.from({ length: 10 }, (_, index) => String(5174 + index));
 
 /** ¿Está habilitada la red local como flujo de dev (móvil por IP)? */
 export function isLanDevEnabled(): boolean {
@@ -128,7 +130,8 @@ export function isOriginAllowed(origin: string | undefined): boolean {
       }
     })();
     const isLoopback =
-      (leader === 'localhost' || leader === '127.0.0.1') && DEV_LOOPBACK_PORTS.includes(port);
+      (leader === 'localhost' || leader === '127.0.0.1') &&
+      (DEV_LOOPBACK_PORTS.includes(port) || VITE_FALLBACK_PORTS.includes(port));
     if (isLoopback) return true;
     if (
       isLanDevEnabled() &&

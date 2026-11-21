@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { Server as SocketIOServer } from 'socket.io';
 import { createApp } from './app.js';
@@ -7,7 +8,7 @@ import { isOriginAllowed } from './config/cors.js';
 import { readStartupEnv } from './config/env.js';
 import { setupSocketHandlers } from './sockets/room.socket.js';
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 async function startServer() {
   const { port, mongoUri } = readStartupEnv(process.env);

@@ -16,6 +16,17 @@ afterEach(() => {
 });
 
 describe('CORS: allowlist (CLIENT_URL + locales de desarrollo)', () => {
+  it('allows Vite fallback ports only on loopback in development', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.CLIENT_URL = 'http://localhost:5173';
+    expect(isOriginAllowed('http://localhost:5178')).toBe(true);
+    expect(isOriginAllowed('http://127.0.0.1:5183')).toBe(true);
+    expect(isOriginAllowed('http://localhost:9000')).toBe(false);
+    expect(isOriginAllowed('http://localhost.evil.com:5178')).toBe(false);
+    process.env.NODE_ENV = 'production';
+    process.env.CLIENT_URL = 'https://watchparty.example.com';
+    expect(isOriginAllowed('http://localhost:5178')).toBe(false);
+  });
   it('en producción con CLIENT_URL usa allowlist estricta', () => {
     process.env.NODE_ENV = 'production';
     process.env.CLIENT_URL = 'https://mi-watch-party.vercel.app';
