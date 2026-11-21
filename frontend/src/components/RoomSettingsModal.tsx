@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { MediaSettingsSection } from './MediaSettings';
 import { notify } from "../services/notifications";
 import { BottomSheet } from "../shared/components/BottomSheet";
 import { isDemoMode } from "../shared/demo";
@@ -6,6 +7,10 @@ import type { IRoomSettings } from "../types/room";
 import { DUCK_DEFAULT_PCT, DUCK_MAX_PCT, DUCK_MIN_PCT, clampDuckPct } from "../shared/perf";
 
 interface RoomSettingsModalProps {
+  serverContent?: React.ReactNode;
+  browserHosted?: boolean;
+  localStream?: MediaStream | null;
+  onRetryMedia?: () => void;
   isOpen: boolean;
   onClose: () => void;
   isTemporary: boolean;
@@ -66,13 +71,17 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   barShowLabels = true,
   barLayout = 'spread',
   onBarPrefsChange,
+  serverContent,
+  browserHosted = false,
+  localStream = null,
+  onRetryMedia,
 }) => {
   const [name, setName] = useState(roomName);
   const [description, setDescription] = useState(roomDescription);
   const [choice, setChoice] = useState<number | null>(timerMinutes);
   // Organización por pestañas: General, Barra (local) y Rendimiento.
   // Mismo contenido y handlers, solo agrupado.
-  const [tab, setTab] = useState<'general' | 'barra' | 'rendimiento'>('general');
+  const [tab, setTab] = useState<'general' | 'barra' | 'rendimiento' | 'media' | 'server'>('general');
 
   // Demo: la persistencia y el cierre automático configurable quedan
   // deshabilitados solo visualmente (el timer lo pone el servidor).
@@ -133,6 +142,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               ['general', 'General'],
               ['barra', 'Barra'],
               ['rendimiento', 'Rendimiento'],
+              ['media', 'Micrófono y cámara'],
+              ['server', 'Servidor'],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -148,7 +159,15 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
           ))}
         </div>
 
+        {tab === 'media' && onRetryMedia && <MediaSettingsSection localStream={localStream} onRetry={onRetryMedia} />}
+        {tab === 'server' && (serverContent ?? <section className="room-settings__box">
+          <h4>Servidor externo</h4>
+          <p className="room-settings__box-desc">El backend administra la sala, los archivos y el proxy de video. El modo de servidor se elige al crear la sala.</p>
+        </section>)}
+
         {tab === 'general' && (
+        <>
+        {browserHosted && <p className="room-settings__box-desc">Las salas del navegador son temporales. El temporizador y la aprobación de entrada requieren el servidor externo.</p>}
         <div className="room-settings__columns">
           {/* COLUMNA 1 — Información */}
           <div className="room-settings__column">
@@ -162,6 +181,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 maxLength={60}
                 placeholder="Ej: Noche de viernes con amigos"
                 value={name}
+                disabled={!canEdit}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
@@ -178,6 +198,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 rows={3}
                 placeholder="Ej: Cada viernes compartimos videos. Respeto y buen ambiente."
                 value={description}
+                disabled={!canEdit}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
@@ -226,7 +247,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                       choice === min ? "room-settings__timer-chip--active" : ""
                     }`}
                     onClick={() => handleSetTimer(min)}
-                    disabled={demo}
+                    disabled={demo || browserHosted || !canEdit}
                     title={demo ? 'En la demo el temporizador lo configura el servidor' : undefined}
                   >
                     {min >= 60 ? `${min / 60} h` : `${min} min`}
@@ -259,7 +280,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                     type="checkbox"
                     checked={demo ? true : isTemporary}
                     onChange={() => onToggleTemporary()}
-                    disabled={demo}
+                    disabled={demo || browserHosted || !canEdit}
                     title={demo ? 'En la demo todas las salas son temporales' : undefined}
                   />
                   <span className="part-slider" />
@@ -286,6 +307,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                   <input
                     type="checkbox"
                     checked={requireApproval}
+                    disabled={!canEdit || !onToggleRequireApproval}
                     onChange={() => onToggleRequireApproval?.()}
                   />
                   <span className="part-slider" />
@@ -309,7 +331,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                     type="checkbox"
                     checked={hostOnlySync}
                     onChange={() => onToggleHostOnlySync?.()}
-                    disabled={!canEdit}
+                    disabled={!canEdit || !onToggleHostOnlySync}
                   />
                   <span className="part-slider" />
                 </label>
@@ -321,6 +343,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             </div>
           </div>
         </div>
+        </>
         )}
 
         {/* Rendimiento (rol B): ancho completo en PC */}
@@ -498,16 +521,16 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             className="leader-exit-modal__cancel-btn"
             onClick={onClose}
           >
-            Cancelar
+            {tab === 'general' && canEdit ? 'Cancelar' : 'Cerrar'}
           </button>
 
-          <button
+          {tab === 'general' && canEdit && <button
             type="button"
             className="btn btn--primary"
             onClick={handleSave}
           >
             Guardar
-          </button>
+          </button>}
         </div>
     </BottomSheet>
   );

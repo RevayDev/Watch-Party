@@ -7965,3 +7965,11 @@ a.home-faq-hl--frontend {
 @media (max-width: 560px) {
   .create-room-modal .server-selector { grid-template-columns: 1fr; }
 }
+
+.room-settings__tabs { flex-wrap: wrap; overflow-x: visible; }
+.media-settings__tests { display: grid; gap: 16px; margin: 16px 0; }
+.media-settings__tests h4 { margin: 0 0 8px; }
+.media-settings__tests .btn { margin-top: 12px; }
+
+.host-server-settings .host-room__setting { padding: 16px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(255,255,255,.03); font-size: .875rem; }
+.host-room__setting input { width: 18px; height: 18px; accent-color: #818cf8; flex-shrink: 0; }

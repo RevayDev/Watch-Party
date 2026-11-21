@@ -100,6 +100,8 @@ function DeviceTest({ kind, localStream }: { kind: 'audio' | 'video'; localStrea
 
   return (
     <section className="room-settings__box" aria-label={`Prueba de ${label}`}>
+      <h4>{microphone ? 'Micrófono' : 'Cámara'}</h4>
+      <p className="room-settings__box-desc">{microphone ? 'Comprueba el nivel de entrada antes de hablar en la sala.' : 'Revisa tu imagen sin compartirla con los participantes.'}</p>
       <button type="button" className="btn btn--primary" onClick={() => void toggleTest()} disabled={pending}>
         {pending ? 'Esperando permiso…' : stream ? `Detener prueba de ${label}` : `Probar ${label}`}
       </button>
@@ -116,25 +118,26 @@ function DeviceTest({ kind, localStream }: { kind: 'audio' | 'video'; localStrea
   );
 }
 
-export function MediaSettings({ localStream, onClose, onRetry }: {
+export function MediaSettingsSection({ localStream, onRetry }: {
   localStream: MediaStream | null;
-  onClose: () => void;
   onRetry: () => void;
 }) {
-  return (
-    <BottomSheet open onClose={onClose} label="Micrófono y cámara" className="modal-card--settings">
-      <div className="modal-card__header">
-        <h3 className="leader-exit-modal__title">Micrófono y cámara</h3>
-      </div>
-      <p className="room-settings__box-desc">Las pruebas son locales y no cambian lo que compartes en la sala.</p>
-      <div className="media-settings__tests">
-        <DeviceTest kind="audio" localStream={localStream} />
-        <DeviceTest kind="video" localStream={localStream} />
-      </div>
-      <div className="room-settings__actions">
-        <button type="button" className="leader-exit-modal__cancel-btn" onClick={onRetry}>Reconectar audio y cámara</button>
-        <button type="button" className="btn btn--primary" onClick={onClose}>Cerrar</button>
-      </div>
-    </BottomSheet>
-  );
+  return <>
+    <p className="room-settings__box-desc">Las pruebas son locales y no cambian lo que compartes en la sala.</p>
+    <div className="media-settings__tests">
+      <DeviceTest kind="audio" localStream={localStream} />
+      <DeviceTest kind="video" localStream={localStream} />
+    </div>
+    <button type="button" className="leader-exit-modal__cancel-btn" onClick={onRetry}>Reconectar audio y cámara</button>
+  </>;
+}
+
+export function MediaSettings({ localStream, onClose, onRetry }: {
+  localStream: MediaStream | null; onClose: () => void; onRetry: () => void;
+}) {
+  return <BottomSheet open onClose={onClose} label="Micrófono y cámara" className="modal-card--settings">
+    <h3 className="leader-exit-modal__title">Micrófono y cámara</h3>
+    <MediaSettingsSection localStream={localStream} onRetry={onRetry} />
+    <button type="button" className="btn btn--primary" onClick={onClose}>Cerrar</button>
+  </BottomSheet>;
 }

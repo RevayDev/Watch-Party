@@ -5,6 +5,11 @@ export const MAX_HOST_MEMBERS = 8;
 export const CHUNK_BYTES = 8 * 1024;
 const id = z.string().min(1).max(100);
 const name = z.string().trim().min(1).max(50);
+const roomSettingsSchema = z.object({
+  name: z.string().max(60).optional(), description: z.string().max(240).optional(),
+  dataSaver: z.boolean().optional(), fullscreenToasts: z.boolean().optional(), reactionsEnabled: z.boolean().optional(),
+  visualEffects: z.boolean().optional(), duckingEnabled: z.boolean().optional(), duckingLevel: z.number().min(10).max(60).optional(),
+});
 export const memberSchema = z.object({ id, name, joinedAt: z.number().finite() });
 export const videoSchema = z.object({
   id, name: z.string().min(1).max(200), source: z.enum(['file', 'youtube', 'url']),
@@ -36,10 +41,12 @@ export const snapshotSchema = z.object({
     sentAt: z.number().finite(), timestamp: z.number().finite(),
   }).nullable(),
   automaticMigration: z.boolean(), replicateVideo: z.boolean(),
+  roomSettings: roomSettingsSchema.optional(),
   musicQueue: z.array(musicEntrySchema).max(40).default([]),
   musicNowPlaying: musicPlayingSchema.nullable().default(null),
 });
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('room-settings'), settings: roomSettingsSchema }),
   z.object({ type: z.literal('chat'), text: z.string().trim().min(1).max(2000), id, replyTo: id.optional() }),
   z.object({ type: z.literal('edit-chat'), text: z.string().trim().min(1).max(2000), id }),
   z.object({ type: z.literal('video'), video: videoSchema }),
@@ -99,6 +106,8 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
   const memberAction = command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
   if (!member || (!memberAction && senderId !== state.hostId)) return state;
   switch (command.type) {
+    case 'room-settings':
+      return { ...state, revision: state.revision + 1, roomSettings: { ...state.roomSettings, ...command.settings } };
     case 'chat': {
       if (state.messages.some((message) => message.id === command.id)) return state;
       const reply = state.messages.find((message) => message.id === command.replyTo);

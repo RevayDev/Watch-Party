@@ -18,8 +18,8 @@ afterEach(() => vi.unstubAllGlobals());
 
 it('muestra configuración de dispositivos a un participante común', () => {
   const open = vi.fn();
-  render(<RoomHeader roomId="ABC123" participantCount={2} isLeader={false} onOpenMediaSettings={open} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Configurar micrófono y cámara' }));
+  render(<RoomHeader roomId="ABC123" participantCount={2} isLeader={false} showSettings onOpenSettings={open} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Configuración de la sala' }));
   expect(open).toHaveBeenCalledOnce();
 });
 

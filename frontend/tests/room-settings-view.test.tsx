@@ -40,6 +40,15 @@ function modalProps(overrides: Partial<Record<string, any>> = {}) {
   };
 }
 
+it('includes devices and external server as sections of the shared settings', () => {
+  render(<RoomSettingsModal {...modalProps()} localStream={null} onRetryMedia={vi.fn()} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Servidor' }));
+  expect(screen.getByText('Servidor externo')).toBeTruthy();
+  fireEvent.click(screen.getByRole('tab', { name: 'Micrófono y cámara' }));
+  expect(screen.getByRole('region', { name: 'Prueba de cámara' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Probar micrófono' })).toBeTruthy();
+});
+
 describe('RoomSettingsModal (Tu vista de la barra)', () => {
   it('muestra las pestañas y la sección personal tras pulsar Barra', async () => {
     render(<RoomSettingsModal {...modalProps()} />);

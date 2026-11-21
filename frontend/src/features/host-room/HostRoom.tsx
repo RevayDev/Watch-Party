@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { VideoPlayer } from '../player/VideoPlayer';
 import { CameraGrid } from '../../components/CameraGrid';
 import { RemoteAudio } from '../../components/RemoteAudio';
-import { MediaSettings } from '../../components/MediaSettings';
+import { RoomSettingsModal } from '../../components/RoomSettingsModal';
 import { RoomHeader } from '../../components/RoomHeader';
 import { MemberExitModal } from '../../components/MemberExitModal';
 import { RoomLayout } from '../room/components/RoomLayout';
@@ -12,7 +12,6 @@ import { RoomDrawer } from '../room/components/RoomDrawer';
 import { useBarPrefs } from '../room/hooks/useBarPrefs';
 import { usePresence } from '../../hooks/usePresence';
 import { useSwipeDown } from '../../shared/hooks/useSheetDrag';
-import { BottomSheet } from '../../shared/components/BottomSheet';
 import { useWebRTC } from '../../hooks/useWebRTC';
 import { parseYouTubeUrl } from '../../shared/youtube';
 import { HostSession, type HostSessionView } from './HostSession';
@@ -69,9 +68,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const optionsRef = useRef(options);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [devicesOpen, setDevicesOpen] = useState(false);
   const [error, setError] = useState('');
-  const [url, setUrl] = useState('');
   const [activeSideTab, setActiveSideTab] = useState<'chat' | 'participants' | 'music' | null>(null);
   const [sideTabView, setSideTabView] = useState<'chat' | 'participants' | 'music'>('chat');
   const [camerasCollapsed, setCamerasCollapsed] = useState(false);
@@ -172,7 +169,6 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         id: crypto.randomUUID(), name: title?.trim() || (youtube ? 'YouTube' : parsed.hostname === 'drive.google.com' ? 'Video de Google Drive' : parsed.pathname.split('/').pop() || 'Video'),
         source: youtube ? 'youtube' : 'url', url: youtube?.cleanUrl ?? parsed.href, size: 0, mime: 'video/mp4',
       } });
-      setUrl('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Enlace inválido.');
     }
@@ -205,7 +201,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       header={<RoomHeader roomId={options.roomId} participantCount={state.members.length} capacity={8}
         inviteUrl={hostInvite(options.roomId, options.key)} isLeader={isHost} showSettings
         createdAt={createdAt.current} roomStatus={roomData.status}
-        onOpenSettings={() => setSettingsOpen(true)} onOpenMediaSettings={() => setDevicesOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
         onOpenParticipants={() => setActiveSideTab((tab) => tab === 'participants' ? null : 'participants')}
         participantsActive={activeSideTab === 'participants'} onLeaveClick={() => setShowExit(true)}
         className={!uiPinned ? 'header--hidden' : ''} />}
@@ -221,6 +217,10 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
           <VideoPlayer directPlayback roomId={options.roomId} video={video} isLeader={isHost}
             onUploadVideo={selectFile} onSetVideoUrl={setVideoUrl} uploadProgress={null}
             reactions={reactions} isMicOn={media.isMicOn}
+            heartbeatIntervalMs={state.roomSettings?.dataSaver ? 15000 : 2500}
+            fullscreenToastsEnabled={state.roomSettings?.fullscreenToasts}
+            reactionsEnabled={state.roomSettings?.reactionsEnabled} visualEffects={state.roomSettings?.visualEffects}
+            duckingEnabled={state.roomSettings?.duckingEnabled} duckingLevelPct={state.roomSettings?.duckingLevel}
             onSyncAction={(action, currentTime) => session.command({ type: 'playback', action, currentTime })}
             onPlaybackHeartbeat={isHost ? (currentTime, playing) => session.command({
               type: 'playback', action: playing ? 'play' : 'pause', currentTime,
@@ -228,7 +228,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         )}
       </>}
       cameras={<CameraGrid localStream={media.localStream} remotePeers={media.remotePeers}
-        participants={roomData.participants} currentUserName={options.name} isLeader={isHost}
+        participants={roomData.participants} currentUserName={options.name} dataSaverMode={state.roomSettings?.dataSaver} isLeader={isHost}
         isMicOn={media.isMicOn} isCameraOn={media.isCameraOn}
         peerMediaStates={media.peerMediaStates} peerSignalStates={media.peerSignalStates} />}
       drawer={<RoomDrawer activeSideTab={activeSideTab} sideTabView={sideTabView} setActiveSideTab={setActiveSideTab}
@@ -262,8 +262,22 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       {view.status.includes('relevo') && <div className="reconnect-pill" role="status">{view.status}</div>}
       {media.mediaConnectionFailed && <div className="meet-error-banner"><button type="button" className="btn btn--primary" onClick={media.retryMediaConnection}>Reconectar micrófonos y cámaras</button></div>}
       <MemberExitModal isOpen={showExit} onClose={() => setShowExit(false)} onConfirmLeave={onLeave} />
-      {devicesOpen && <MediaSettings localStream={media.localStream} onClose={() => setDevicesOpen(false)} onRetry={media.retryMediaConnection} />}
-      <BottomSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} label="Servidor de la sala" className="modal-card--settings host-server-settings">
+      <RoomSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} browserHosted
+        localStream={media.localStream} onRetryMedia={media.retryMediaConnection}
+        isTemporary onToggleTemporary={() => {}} roomName={state.roomSettings?.name ?? ''}
+        roomDescription={state.roomSettings?.description ?? ''} canEdit={isHost}
+        onSaveDetails={(name, description) => session.command({ type: 'room-settings', settings: { name, description } })}
+        onSetTimer={() => {}} hostOnlySync
+        reactionsEnabled={state.roomSettings?.reactionsEnabled} visualEffects={state.roomSettings?.visualEffects}
+        duckingEnabled={state.roomSettings?.duckingEnabled} duckingLevelPct={state.roomSettings?.duckingLevel}
+        dataSaver={state.roomSettings?.dataSaver} fullscreenToasts={state.roomSettings?.fullscreenToasts}
+        onUpdatePerf={(settings) => session.command({ type: 'room-settings', settings })}
+        barShowLabels={barPrefs.showLabels} barLayout={barPrefs.layout}
+        onBarPrefsChange={(patch) => {
+          if (patch.showLabels !== undefined) barPrefs.setShowLabels(patch.showLabels);
+          if (patch.layout !== undefined) barPrefs.setLayout(patch.layout);
+        }}
+        serverContent={<section className="host-server-settings">
         <h3>Servidor de la sala</h3>
         <p>{view.status}. {state?.members.length ?? 0} {state?.members.length === 1 ? 'participante' : 'participantes'}, hasta 8 por sala.</p>
         {state && !isHost && <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => session?.requestTakeover()}>Solicitar relevo del servidor</button>}
@@ -280,24 +294,8 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         <p>Los archivos de hasta 256 MB se reciben completos y usan memoria y ancho de banda de cada equipo. Las copias completas permiten continuar si sale quien tenía el archivo original.</p>
         <p role="status">{selected?.source === 'file' ? `Copias confirmadas en otros equipos: ${view.replicas}` : 'Los enlaces se reproducen desde el proveedor en cada navegador.'}</p>
         {selected?.source === 'file' && <button type="button" className="btn btn--primary" onClick={() => session?.retryVideo()}>Reintentar copias</button>}
-        {isHost && (
-          <section className="room-settings__box">
-            <label htmlFor="host-video-file">Compartir archivo de video</label>
-            <input id="host-video-file" type="file" accept="video/*" onChange={(event) => {
-              const file = event.target.files?.[0]; if (file) void selectFile(file);
-              event.target.value = '';
-            }} />
-            <form onSubmit={(event) => { event.preventDefault(); void setVideoUrl(url); }}>
-              <label htmlFor="host-video-url">YouTube o enlace directo HTTPS</label>
-              <input id="host-video-url" className="form-group__input" value={url} onChange={(event) => setUrl(event.target.value)} type="url" required />
-              <button type="submit" className="btn btn--primary">Usar enlace</button>
-            </form>
-            <p>Los enlaces directos deben permitir reproducción en el navegador. Algunos proveedores requieren el proxy del modo Render.</p>
-          </section>
-        )}
         <p>Si todos salen, se pierde la sala. Una caída de la señalización o una red que requiera TURN puede impedir nuevas conexiones. El relevo puede tardar varios segundos.</p>
-        <button type="button" className="btn btn--primary" onClick={() => setSettingsOpen(false)}>Cerrar</button>
-      </BottomSheet>
+      </section>} />
     </RoomLayout>
   );
 }

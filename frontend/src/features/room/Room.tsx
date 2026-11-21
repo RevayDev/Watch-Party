@@ -4,7 +4,6 @@ import { RoomHeader } from '../../components/RoomHeader';
 import { VideoPlayer } from '../player/VideoPlayer';
 import { CameraGrid } from '../../components/CameraGrid';
 import { RemoteAudio } from '../../components/RemoteAudio';
-import { MediaSettings } from '../../components/MediaSettings';
 import { LeaderExitModal } from '../../components/LeaderExitModal';
 import { MemberExitModal } from '../../components/MemberExitModal';
 import { RoomSettingsModal } from '../../components/RoomSettingsModal';
@@ -30,7 +29,6 @@ export interface RoomProps {
  * JSX movido verbatim desde pages/Room.tsx — CERO cambios visuales.
  */
 export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialIsLeader, onLeave }) => {
-  const [showMediaSettings, setShowMediaSettings] = useState(false);
   const r = useRoomSocket({ roomId, userName, initialIsLeader, onLeave });
 
   // Toggle del panel de música (YouTube)
@@ -152,7 +150,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
         timerEndsAt={r.roomData.settings?.timerEndsAt}
         roomStatus={r.roomData.status}
         onOpenSettings={() => r.setShowRoomSettings(true)}
-        onOpenMediaSettings={() => setShowMediaSettings(true)}
+        showSettings
         onOpenParticipants={() => r.setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
         participantsActive={r.sideTabView === 'participants'}
         onLeaveClick={r.handleLeaveClick}
@@ -312,13 +310,9 @@ onVideoReady={r.handleVideoReady}
       />
 
       {/* ⚙ Room settings: name, info, save-mode (temporary/stored), approval and auto-close timer */}
-      {showMediaSettings && (
-        <MediaSettings localStream={r.localStream} onClose={() => setShowMediaSettings(false)} onRetry={() => {
-          r.retryMediaConnection();
-          setShowMediaSettings(false);
-        }} />
-      )}
       <RoomSettingsModal
+        localStream={r.localStream}
+        onRetryMedia={r.retryMediaConnection}
         isOpen={r.showRoomSettings}
         onClose={() => r.setShowRoomSettings(false)}
         isTemporary={r.roomData.isTemporary !== false}

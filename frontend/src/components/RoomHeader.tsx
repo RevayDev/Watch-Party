@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Video, Hash, Link as LinkIcon, Share2, Users, Settings, Clock, Hourglass, Headphones } from 'lucide-react';
+import { Video, Hash, Link as LinkIcon, Share2, Users, Settings, Clock, Hourglass } from 'lucide-react';
 import { usePresence } from '../hooks/usePresence';
 import { useSwipeDown } from '../shared/hooks/useSheetDrag';
 import { formatRemaining } from '../shared/utils';
@@ -19,7 +19,6 @@ interface RoomHeaderProps {
   inviteUrl?: string;
   capacity?: number;
   showSettings?: boolean;
-  onOpenMediaSettings?: () => void;
   onLeaveClick?: () => void;
   /** Abre/cierra el panel de participantes (igual que el botón de abajo) */
   onOpenParticipants?: () => void;
@@ -40,7 +39,6 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   inviteUrl,
   capacity,
   showSettings = false,
-  onOpenMediaSettings,
   onOpenParticipants,
   participantsActive = false,
   className = '',
@@ -341,17 +339,6 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           )}
         </div>
 
-        {onOpenMediaSettings && (
-          <button
-            type="button"
-            onClick={onOpenMediaSettings}
-            className="header__room-pill header__settings-btn"
-            title="Configurar micrófono y cámara"
-            aria-label="Configurar micrófono y cámara"
-          >
-            <Headphones size={15} />
-          </button>
-        )}
         {/* ⚙ Room settings (leader only): name, info, save-mode, approval, timer */}
         {(isLeader || showSettings) && onOpenSettings && (
           <button
