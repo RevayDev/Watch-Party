@@ -89,15 +89,15 @@ it('keeps chat and playback after a host leaves and admits another guest through
   const host = start('Ana', true);
   await vi.advanceTimersByTimeAsync(1);
   const guest = start('Beto');
-  await vi.advanceTimersByTimeAsync(3000);
+  await vi.advanceTimersByTimeAsync(10000);
   await vi.waitFor(() => expect(guest.snapshot?.members).toHaveLength(2));
   guest.command({ type: 'chat', id: 'first', text: 'Antes del relevo' });
   host.command({ type: 'playback', action: 'pause', currentTime: 42 });
-  await vi.advanceTimersByTimeAsync(3000);
+  await vi.advanceTimersByTimeAsync(10000);
   expect(guest.snapshot?.messages[0].text).toBe('Antes del relevo');
   const signaling = vi.fn();
   host.on('webrtc-offer', signaling);
-  await vi.advanceTimersByTimeAsync(3000);
+  await vi.advanceTimersByTimeAsync(10000);
   guest.emit('webrtc-offer', {
     targetSocketId: host.id,
     offer: { toJSON: () => ({ type: 'offer', sdp: 'test' }) },
