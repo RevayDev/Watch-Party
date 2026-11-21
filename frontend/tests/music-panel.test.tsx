@@ -161,9 +161,13 @@ describe('MusicPanel (YouTube, sin banner, audible)', () => {
     expect(screen.getByRole('button', { name: /pausar/i })).toBeDefined();
   });
 
-  it('sin nada sonando no hay reproductor', () => {
-    render(<MusicPanel {...baseProps()} />);
+  it('muestra la tarjeta vacía sin montar un iframe cuando no hay música', () => {
+    const { container } = render(<MusicPanel {...baseProps()} />);
     expect(screen.queryByTestId('yt-miniplayer')).toBeNull();
+    expect(container.querySelector('.music-panel__footer')).toBeTruthy();
+    expect(screen.getByText('Sin reproducción')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reproducir cola' })).toBeDisabled();
+    expect(container.querySelector('.music-panel__start')).toBeNull();
   });
 
   it('al terminar el tema pide avanzar la cola (auto-next)', async () => {
@@ -218,7 +222,8 @@ describe('MusicPanel (YouTube, sin banner, audible)', () => {
       votes: [],
       status: 'queued',
     };
-    render(<MusicPanel {...baseProps({ queue: [item] as never, nowPlaying: null, onNext })} />);
+    const { container } = render(<MusicPanel {...baseProps({ isModerator: true, queue: [item] as never, nowPlaying: null, onNext })} />);
+    expect(container.querySelector('.music-panel__start')).toBeNull();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /reproducir/i }));
     });

@@ -7,7 +7,8 @@ import { YouTubePlayerView } from '../src/features/player/YouTubePlayerView';
 it('keeps the React container intact when YouTube replaces its target and the video is removed', async () => {
   const destroy = vi.fn();
   window.YT = { Player: class {
-    constructor(id: string) {
+    constructor(id: string, options: { width: string; height: string }) {
+      expect(options).toMatchObject({ width: '100%', height: '100%' });
       document.getElementById(id)!.replaceWith(document.createElement('iframe'));
     }
     destroy = destroy;

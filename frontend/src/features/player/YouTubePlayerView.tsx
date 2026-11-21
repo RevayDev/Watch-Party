@@ -69,6 +69,8 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
       if (!active || !containerRef.current || !window.YT) return;
       try {
         playerRef.current = new window.YT.Player(elemId, {
+          width: '100%',
+          height: '100%',
           videoId,
           playerVars: {
             autoplay: 1,

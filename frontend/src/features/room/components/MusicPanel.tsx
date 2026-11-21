@@ -297,28 +297,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
 
       {/* El reproductor "Sonando ahora" va debajo de la tarjeta de cola (diseño mockup). */}
 
-      {/* Cola con temas pero nada sonando: cualquiera puede arrancar */}
-      {!nowPlaying && active.length > 0 && (
-        <button
-          type="button"
-          className="btn btn--primary music-panel__start"
-          onClick={onNext}
-          title="Empezar a reproducir la cola"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.45rem',
-            width: 'auto',
-            marginBottom: '0.5rem',
-            padding: '0.35rem 0.7rem',
-          }}
-        >
-          <Play size={16} />
-          Reproducir ({active.length})
-        </button>
-      )}
-
       {/* Pendientes de aprobación (moderador) */}
       {isModerator && pending.length > 0 && (
         <div style={{ marginBottom: '1rem' }}>
@@ -584,7 +562,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       </div>
 
       {/* Reproductor "Sonando ahora" debajo de la tarjeta (diseño mockup) */}
-      {nowPlaying && nowVideoId ? (
         <div
           className="room-settings__box music-panel__footer"
           style={{
@@ -594,7 +571,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             background: 'rgba(15, 20, 35, 0.55)',
           }}
         >
-          <NowPlayingPlayer
+          {nowPlaying && nowVideoId ? <NowPlayingPlayer
             trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
             videoId={nowVideoId}
             title={nowPlaying.name}
@@ -608,9 +585,12 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
               if (url) onExpandToMain(url, nowPlaying.name, currentTime);
             }}
             showModerator={isModerator}
-          />
+          /> : <div className="music-player-empty">
+            <div className="music-player-empty__art" aria-hidden="true"><Disc size={28} /></div>
+            <div className="music-player-empty__info"><strong>Sin reproducción</strong><span>{active.length ? 'Elige un tema de la cola o inicia la reproducción' : 'Añade una canción para empezar'}</span></div>
+            <button type="button" className="music-player-empty__play" aria-label="Reproducir cola" title="Reproducir cola" disabled={!isModerator || active.length === 0} onClick={onNext}><Play size={20} /></button>
+          </div>}
         </div>
-      ) : null}
 
     </div>
   );
