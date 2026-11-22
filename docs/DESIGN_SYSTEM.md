@@ -63,3 +63,5 @@ Los mensajes muestran responder/reaccionar y, para el autor, más opciones al pa
 ## Sala en móviles
 Hasta 768 px, cabecera y barra inferior aprovechan el ancho con márgenes de 6 px. Los contadores de participantes y reloj se ocultan en la cabecera; Compartir conserva nombre accesible y muestra solo el icono hasta 420 px. Los menús de cabecera usan el portal anclado para no salir del viewport.
 Los paneles de Sala usan altura automática con máximo 85dvh: una lista de un participante no ocupa toda la pantalla, y Música crece con los resultados manteniendo su pie visible y el listado desplazable. En búsqueda, portada y texto comparten fila y las acciones ocupan una fila horizontal de ancho completo. Revisión local a 320 y 390 px: cabecera y barra sin overflow; Participantes con una persona mide aproximadamente 263 px de alto.
+
+En móvil, la cabecera y la barra de controles usan radio de 12 px; los botones y controles agrupados, 8 px. Los desplegables de dispositivos y reacciones comparten el fondo de la barra y bordes discretos. Conservar los colores de estado existentes y evitar cápsulas o círculos en esta navegación.

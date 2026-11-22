@@ -8200,3 +8200,17 @@ a.home-faq-hl--frontend {
 
 .drawer-chat__message-reactions { width: max-content; max-width: min(240px, calc(100vw - 56px)); left: 8px; right: auto; }
 .drawer-chat__msg--mine .drawer-chat__message-reactions { left: auto; right: 8px; }
+
+/* Mobile controls share the same rectangular geometry as fields and cards. */
+@media (max-width: 768px) {
+ .meet-layout > .header { border-radius: 12px; }
+ .meet-bottom-bar { border-radius: 12px !important; padding: 6px; border-color: var(--color-border); background: var(--color-bg-input); }
+ .meet-bottom-bar .meet-circle-btn { border-radius: 8px !important; flex-shrink: 0; }
+ .meet-bottom-bar .meet-device-control { border-radius: 8px; padding: 2px; }
+ .meet-bottom-bar .meet-device-control .meet-circle-btn { border-radius: 5px !important; }
+ .meet-bottom-bar .meet-device-arrow { border-radius: 5px; }
+ .meet-device-menu.ui-popover, .meet-emoji-popup { border-radius: 12px; border-color: var(--color-border); background: var(--color-bg-input); }
+ .meet-device-menu.ui-popover { padding: 16px; }
+ .meet-device-menu .ui-action { border-radius: 8px; }
+ .reactions-bar__btn { border-radius: 8px; }
+}
