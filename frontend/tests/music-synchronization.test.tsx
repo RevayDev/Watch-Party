@@ -28,6 +28,15 @@ it('publishes local play and seek controls to the room', () => {
  fireEvent.click(screen.getByRole('button', { name: 'Reiniciar canción' }));
  expect(onPlayback).toHaveBeenLastCalledWith(0, true);
 });
+it('activates a joining phone locally instead of pausing shared music', () => {
+  player.getPlayerState.mockReturnValue(2);
+  const onPlayback = vi.fn();
+  render(<NowPlayingPlayer {...props} playback={{ currentTime: 25, playing: true, sentAt: Date.now() }} onPlayback={onPlayback} />);
+  player.playVideo.mockClear();
+  fireEvent.click(screen.getByRole('button', { name: 'Reproducir' }));
+  expect(player.playVideo).toHaveBeenCalled();
+  expect(onPlayback).not.toHaveBeenCalled();
+});
 it('opens volume separately without moving or changing the shared music position', () => {
  const onPlayback = vi.fn();
  render(<NowPlayingPlayer {...props} onPlayback={onPlayback} />);

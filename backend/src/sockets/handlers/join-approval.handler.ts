@@ -222,6 +222,11 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         participants: room?.participants || [],
         joinRequests: room?.joinRequests || [],
         kickedUsers: room?.kickedUsers || [],
+        // La música es estado de sala igual que el video. Sin estos campos,
+        // quien entra o se reconecta queda con una cola vacía hasta que ocurra
+        // otra mutación, y nunca monta el reproductor para marcarse listo.
+        musicQueue: room?.musicQueue || [],
+        musicNowPlaying: room?.musicNowPlaying || null,
         peers: existingPeers,
         turnServer: createTurnCredentials(socket.id),
         mediaStates: existingMediaStates,

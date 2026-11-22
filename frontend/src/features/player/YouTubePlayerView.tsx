@@ -39,6 +39,7 @@ export interface YouTubePlayerViewProps {
   onReady?: (player: any) => void;
   onDispose?: (player: any) => void;
   onStateChange?: (event: { data: number }) => void;
+  onAutoplayBlocked?: () => void;
   className?: string;
 }
 
@@ -50,6 +51,7 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
   onReady,
   onDispose,
   onStateChange,
+  onAutoplayBlocked,
   className = 'player-container__video',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,8 +60,10 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
   const onDisposeRef = useRef(onDispose);
   onDisposeRef.current = onDispose;
   const onStateChangeRef = useRef(onStateChange);
+  const onAutoplayBlockedRef = useRef(onAutoplayBlocked);
   onReadyRef.current = onReady;
   onStateChangeRef.current = onStateChange;
+  onAutoplayBlockedRef.current = onAutoplayBlocked;
 
   useEffect(() => {
     let active = true;
@@ -94,6 +98,9 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
             },
             onStateChange: (event: any) => {
               if (active) onStateChangeRef.current?.(event);
+            },
+            onAutoplayBlocked: () => {
+              if (active) onAutoplayBlockedRef.current?.();
             },
           },
         });
