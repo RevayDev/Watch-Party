@@ -8187,3 +8187,16 @@ a.home-faq-hl--frontend {
 .drawer-chat__row { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: flex-start; }
 .drawer-chat__row--mine { justify-content: flex-end; }
 .drawer-chat__row:hover .drawer-chat__actions, .drawer-chat__row:focus-within .drawer-chat__actions, .drawer-chat__actions:hover { opacity: 1; pointer-events: auto; }
+
+/* Touch messages use long press; reaction chips overlap their bubble. */
+.drawer-chat__row:has(.drawer-chat__message-reactions) { margin-bottom: 14px; }
+.drawer-chat__message-reactions { position: absolute; right: 8px; bottom: -12px; margin: 0; z-index: 2; padding: 2px; gap: 2px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-input); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.drawer-chat__message-reactions .ui-action { border: 0; background: transparent; padding: 2px 5px; font-size: 11px; line-height: 1.3; border-radius: 8px; }
+@media (max-width: 768px), (hover: none) {
+ .drawer-chat__row .drawer-chat__actions { display: none; }
+ .drawer-chat__msg { max-width: 88%; touch-action: pan-y; -webkit-touch-callout: none; user-select: none; }
+ .chat-message-menu .ui-action { min-height: 40px; }
+}
+
+.drawer-chat__message-reactions { width: max-content; max-width: min(240px, calc(100vw - 56px)); left: 8px; right: auto; }
+.drawer-chat__msg--mine .drawer-chat__message-reactions { left: auto; right: 8px; }

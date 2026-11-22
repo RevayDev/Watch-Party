@@ -41,7 +41,7 @@ export const Chat: React.FC<ChatProps> = ({
   unreadCount = 0,
 }) => {
   const [input, setInput] = useState('');
-  const [messageMenu, setMessageMenu] = useState<{ id: string; kind: 'options' | 'reaction'; anchor: HTMLButtonElement } | null>(null);
+  const [messageMenu, setMessageMenu] = useState<{ id: string; kind: 'options' | 'reaction' | 'all'; anchor: HTMLElement } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isNearBottomRef = useRef(true);
@@ -52,8 +52,28 @@ export const Chat: React.FC<ChatProps> = ({
   const prevMessagesCountRef = useRef(0);
   const wasOpenRef = useRef(false);
 
+  const press = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; pointerId: number } | null>(null);
+  const cancelPress = () => { if (press.current?.timer) clearTimeout(press.current.timer); press.current = null; };
+  useEffect(() => {
+    if (!isOpen) setMessageMenu(null);
+    return cancelPress;
+  }, [isOpen]);
+  const startPress = (event: React.PointerEvent<HTMLDivElement>, message: ChatMessage) => {
+    if (message.deleted || !['touch', 'pen'].includes(event.pointerType) || (event.target as HTMLElement).closest('button, a, input')) return;
+    cancelPress();
+    const anchor = event.currentTarget;
+    press.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, timer: setTimeout(() => {
+      if (press.current) { press.current.timer = null; setMessageMenu({ id: message.id, kind: 'all', anchor }); }
+    }, 500) };
+  };
+  const movePress = (event: React.PointerEvent<HTMLDivElement>) => {
+    const current = press.current;
+    if (current && (event.pointerId !== current.pointerId || Math.hypot(event.clientX - current.x, event.clientY - current.y) > 10)) cancelPress();
+  };
+
   // Check scroll position to determine if user is reading previous messages
   const handleScroll = () => {
+    cancelPress();
     if (bodyRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = bodyRef.current;
       const near = scrollHeight - scrollTop - clientHeight <= 24;
@@ -249,6 +269,13 @@ export const Chat: React.FC<ChatProps> = ({
                 <div className={`drawer-chat__row ${isMine(m.user) ? 'drawer-chat__row--mine' : ''}`}>
                 <div
                   data-message-id={m.id}
+                  tabIndex={m.deleted ? undefined : 0}
+                  onPointerDown={event => startPress(event, m)}
+                  onPointerMove={movePress}
+                  onPointerUp={cancelPress}
+                  onPointerCancel={cancelPress}
+                  onContextMenu={event => { if (!m.deleted && window.matchMedia?.('(max-width: 768px), (pointer: coarse)').matches) { event.preventDefault(); cancelPress(); setMessageMenu({ id: m.id, kind: 'all', anchor: event.currentTarget }); } }}
+                  onKeyDown={event => { if (!m.deleted && event.target === event.currentTarget && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); setMessageMenu({ id: m.id, kind: 'all', anchor: event.currentTarget }); } }}
                   id={`msg-${m.id}`}
                   className={`drawer-chat__msg ${
                     isMine(m.user) ? 'drawer-chat__msg--mine' : ''
@@ -265,10 +292,16 @@ export const Chat: React.FC<ChatProps> = ({
                     <Button variant="unstyled" type="button" className="drawer-chat__action" title="Reaccionar al mensaje" aria-label={`Reaccionar al mensaje de ${m.user}`} onClick={event => setMessageMenu(current => current?.id === m.id && current.kind === 'reaction' ? null : { id: m.id, kind: 'reaction', anchor: event.currentTarget })}><Smile size={15} /></Button>
                     {isMine(m.user) && <Button variant="unstyled" type="button" className="drawer-chat__action" title="Más opciones del mensaje" aria-label="Más opciones del mensaje" onClick={event => setMessageMenu(current => current?.id === m.id && current.kind === 'options' ? null : { id: m.id, kind: 'options', anchor: event.currentTarget })}><MoreVertical size={15} /></Button>}
                   </span>}
-                  {!m.deleted && messageMenu?.id === m.id && <Popover anchor={messageMenu.anchor} className={`chat-message-menu ${messageMenu.kind === 'reaction' ? 'chat-message-menu--reactions' : ''}`} onDismiss={() => setMessageMenu(null)} aria-label={messageMenu.kind === 'options' ? 'Opciones del mensaje' : 'Reaccionar al mensaje'}>
-                    {messageMenu.kind === 'options' ? <>
+                  {!m.deleted && messageMenu?.id === m.id && <Popover anchor={messageMenu.anchor} className={`chat-message-menu ${messageMenu.kind === 'reaction' ? 'chat-message-menu--reactions' : ''}`} onDismiss={() => setMessageMenu(null)} aria-label={messageMenu.kind === 'reaction' ? 'Reaccionar al mensaje' : 'Opciones del mensaje'}>
+                    {messageMenu.kind !== 'reaction' ? <>
+                      {messageMenu.kind === 'all' && <>
+                        <Button variant="ghost" type="button" onClick={() => startReply(m)}><Reply size={15} />Responder</Button>
+                        <Button variant="ghost" type="button" onClick={() => setMessageMenu({ ...messageMenu, kind: 'reaction' })}><Smile size={15} />Reaccionar</Button>
+                      </>}
+                      {isMine(m.user) && <>
                       <Button variant="ghost" type="button" onClick={() => startEdit(m)}><Pencil size={15} />Editar mensaje</Button>
                       <Button variant="ghost" type="button" className="chat-message-menu__delete" onClick={() => { onDeleteMessage(m.id); setMessageMenu(null); }}><Trash2 size={15} />Eliminar mensaje</Button>
+                      </>}
                     </> : <div className="chat-message-menu__emojis">{['❤️','😂','😮','👏','😢','🔥'].map(emoji => <Button variant="ghost" key={emoji} type="button" aria-label={`Reaccionar con ${emoji}`} onClick={() => { onReactMessage(m.id, emoji); setMessageMenu(null); }}>{emoji}</Button>)}</div>}
                   </Popover>}
                   {!m.deleted && !!m.reactions?.length && <div className="drawer-chat__message-reactions">{[...new Set(m.reactions.map(reaction => reaction.emoji))].map(emoji => <Button variant="unstyled" key={emoji} type="button" title={m.reactions!.filter(reaction => reaction.emoji === emoji).map(reaction => reaction.userName).join(', ')} aria-label={`Reacción ${emoji}`} onClick={() => onReactMessage(m.id, emoji)}>{emoji} {m.reactions!.filter(reaction => reaction.emoji === emoji).length}</Button>)}</div>}
