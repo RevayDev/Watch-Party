@@ -236,3 +236,17 @@ it('notifies guests when the host explicitly closes the room', async () => {
  await vi.advanceTimersByTimeAsync(400); await closing;
  expect(guest.connected).toBe(false);
 });
+
+it('authenticates delete/reaction commands and preserves deleted reply previews', () => {
+ const base: HostSnapshot = { revision:0, hostId:'a', members:[{id:'a',name:'Ana',joinedAt:1},{id:'b',name:'Beto',joinedAt:2}], messages:[],video:null,playback:null,automaticMigration:true,replicateVideo:true,musicQueue:[],musicNowPlaying:null };
+ const sent=applyHostCommand(base,'a',{type:'chat',id:'m',text:'Hola'});
+ expect(applyHostCommand(sent,'b',{type:'chat-delete',id:'m'})).toBe(sent);
+ const reaction=applyHostCommand(sent,'b',{type:'chat-react',id:'m',emoji:'❤️'});
+ expect(reaction.messages[0].reactions?.[0]).toEqual({userId:'b',userName:'Beto',emoji:'❤️'});
+ expect(applyHostCommand(reaction,'b',{type:'chat-react',id:'m',emoji:'❤️'}).messages[0].reactions).toEqual([]);
+ const deleted=applyHostCommand(reaction,'a',{type:'chat-delete',id:'m'});
+ expect(deleted.messages[0]).toMatchObject({deleted:true,text:'',reactions:[]});
+ expect(applyHostCommand(deleted,'a',{type:'edit-chat',id:'m',text:'Restore'})).toBe(deleted);
+ const reply=applyHostCommand(deleted,'b',{type:'chat',id:'r',text:'De acuerdo',replyTo:'m'});
+ expect(reply.messages[1].replyTo?.text).toBe('Mensaje eliminado');
+});

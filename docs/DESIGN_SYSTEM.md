@@ -54,3 +54,8 @@ La distribución de escritorio fija dispositivos a la izquierda y salida a la de
 ## Chat y confirmaciones de lectura
 El envío y los botones de reacción usan controles cuadrados de esquinas suaves; el selector aparece separado de la barra. Responder permanece visible por mensaje y conserva una cita navegable. Los nuevos mensajes guardan fecha ISO desde el servidor/coordinador y se muestran en la hora local del receptor.
 Cada lector ocupa solo un avatar bajo su último mensaje visto; la interfaz informa lectura cuando al menos el 60% del mensaje entra en el historial visible y la pestaña está activa. Render autentica al lector con su sesión y limita el ritmo; el anfitrión replica las posiciones en el snapshot para conservarlas en el relevo. Es una confirmación de visibilidad, no de atención humana.
+
+## Acciones flotantes y mensajes
+Las acciones Cambiar/Quitar del video viven en PlayerActionDock: se arrastran con el asa, admiten flechas de teclado y se pliegan hacia el borde derecho. No duplicar el botón flotante móvil. Los menús anclados se dibujan en un portal sobre el contenido (incluida pantalla completa), se ajustan al viewport y no dependen del overflow de la cola o del chat. El borrado musical solo aparece en el menú.
+
+Los mensajes muestran responder/reaccionar y, para el autor, más opciones al pasar el ratón o enfocar; en pantallas táctiles quedan accesibles. Editar y eliminar están en ese menú. Las respuestas muestran el destinatario y la cita separada de la burbuja. Eliminar y reaccionar se validan en el backend/coordinador; los mensajes borrados conservan una marca para mantener citas y lecturas, y no pueden editarse después.

@@ -140,6 +140,8 @@ export interface IMusicNowPlaying {
 }
 
 export interface ChatMessage {
+  deleted?: boolean;
+  reactions?: { userId: string; userName: string; emoji: string }[];
   id: string;
   user: string;
   text: string;

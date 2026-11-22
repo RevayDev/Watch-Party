@@ -3,6 +3,8 @@ import { checkSocketRateLimit } from '../socket-limits.js';
 import {
   activeUsers,
   roomReadReceipts,
+  roomDeletedMessages,
+  roomMessageReactions,
   roomMessageAuthors,
   lastCinematicTrigger,
   roomMessageAuthor,
@@ -79,7 +81,7 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
       const qUser = typeof rq.user === 'string' ? rq.user.trim().slice(0, MAX_QUOTE_NAME_CHARS) : '';
       const qText = typeof rq.text === 'string' ? rq.text.trim().slice(0, MAX_QUOTE_TEXT_CHARS) : '';
       const qId = typeof rq.id === 'string' ? rq.id.trim().slice(0, 32) : '';
-      if (qUser && qText) replyTo = { id: qId, user: qUser, text: qText };
+      if (qUser && qText) replyTo = { id: qId, user: qUser, text: roomDeletedMessages.get(cleanRoomId)?.has(qId) ? 'Mensaje eliminado' : qText };
     }
 
     const messagePayload: {
@@ -114,6 +116,7 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
       const serverName = memberNameOf(socket.id, cleanRoomId);
       if (!serverName) return;
       const author = roomMessageAuthor(cleanRoomId, id.trim());
+      if (roomDeletedMessages.get(cleanRoomId)?.has(id.trim())) return;
       if (!author || author.toLowerCase() !== serverName.toLowerCase()) return;
       const cleanText = text.trim().slice(0, MAX_MESSAGE_CHARS);
       if (!cleanText) return;
@@ -121,6 +124,32 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
       io.to(cleanRoomId).emit('message-edited', { id: id.trim(), text: cleanText });
     }
   );
+
+  socket.on('delete-message', (data: { roomId?: unknown; id?: unknown } | undefined) => {
+    if (typeof data?.roomId !== 'string' || typeof data.id !== 'string') return;
+    const roomId = data.roomId.toUpperCase().trim(), id = data.id.trim();
+    const name = memberNameOf(socket.id, roomId);
+    if (!name || roomMessageAuthor(roomId, id)?.toLowerCase() !== name.toLowerCase() || !checkSocketRateLimit(socket.id, 'send-message', 8, 10000)) return;
+    const deleted = roomDeletedMessages.get(roomId) ?? new Set<string>();
+    if (deleted.has(id)) return;
+    deleted.add(id); roomDeletedMessages.set(roomId, deleted);
+    const reactions = roomMessageReactions.get(roomId); if (reactions) delete reactions[id];
+    io.to(roomId).emit('message-deleted', { id });
+  });
+  socket.on('react-message', (data: { roomId?: unknown; id?: unknown; emoji?: unknown } | undefined) => {
+    if (typeof data?.roomId !== 'string' || typeof data.id !== 'string' || typeof data.emoji !== 'string' || !['❤️','😂','😮','👏','😢','🔥'].includes(data.emoji)) return;
+    const roomId = data.roomId.toUpperCase().trim(), id = data.id.trim();
+    const userName = memberNameOf(socket.id, roomId);
+    if (!userName || !roomMessageAuthor(roomId, id) || roomDeletedMessages.get(roomId)?.has(id) || !checkSocketRateLimit(socket.id, 'send-reaction', 20, 10000)) return;
+    const userId = activeUsers.get(socket.id)?.userId || socket.id;
+    const room = roomMessageReactions.get(roomId) ?? {};
+    const reactions = room[id] ?? {};
+    if (reactions[userId]?.emoji === data.emoji) delete reactions[userId];
+    else reactions[userId] = { userId, userName, emoji: data.emoji };
+    const readers = Object.keys(reactions); if (readers.length > 100) delete reactions[readers[0]];
+    room[id] = reactions; roomMessageReactions.set(roomId, room);
+    io.to(roomId).emit('message-reactions', { id, reactions: Object.values(reactions) });
+  });
 
   // 8. Reaction (Emoji float animation)
   socket.on('send-reaction', (data: { roomId: string; emoji: string; userName?: string } | undefined) => {

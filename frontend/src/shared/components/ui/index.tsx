@@ -1,4 +1,5 @@
-import React, { forwardRef, useEffect, useRef, useImperativeHandle } from 'react';
+import { createPortal } from 'react-dom';
+import React, { forwardRef, useEffect, useRef, useImperativeHandle, useLayoutEffect, useState } from 'react';
 import './ui.css';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'icon' | 'unstyled';
@@ -32,8 +33,19 @@ export const Surface = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
 export const AccordionTrigger = forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { expanded: boolean; controls: string }>(function AccordionTrigger({ expanded, controls, ...props }, ref) {
   return <Button {...props} ref={ref} type="button" variant="unstyled" aria-expanded={expanded} aria-controls={controls} />;
 });
-export const Popover = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { onDismiss?: () => void }>(function Popover({ className = '', onDismiss, children, ...props }, ref) {
+export const Popover = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { onDismiss?: () => void; anchor?: HTMLElement | null }>(function Popover({ className = '', onDismiss, anchor, children, style, ...props }, ref) {
   const root = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: 0, top: 0 });
+  useLayoutEffect(() => {
+    if (!anchor) return;
+    const place = () => {
+      const rect = anchor.getBoundingClientRect(); const panel = root.current?.getBoundingClientRect();
+      const width = panel?.width ?? 220, height = panel?.height ?? 160;
+      setPosition({ left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)), top: Math.max(8, Math.min(rect.bottom + 8 + height > window.innerHeight ? rect.top - height - 8 : rect.bottom + 8, window.innerHeight - height - 8)) });
+    };
+    place(); window.addEventListener('resize', place); window.addEventListener('scroll', place, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+  }, [anchor]);
   useImperativeHandle(ref, () => root.current as HTMLDivElement);
   const dismiss = useRef(onDismiss);
   dismiss.current = onDismiss;
@@ -46,5 +58,6 @@ export const Popover = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     document.addEventListener('pointerdown', onOutside);
     return () => { document.removeEventListener('keydown', onKey, true); document.removeEventListener('pointerdown', onOutside); };
   }, []);
-  return <div {...props} ref={root} className={'ui-popover ' + className}>{children}</div>;
+  const content = <div {...props} ref={root} style={anchor ? { ...style, position: 'fixed', left: position.left, top: position.top, right: 'auto', bottom: 'auto', zIndex: 2147483646 } : style} className={'ui-popover ' + className}>{children}</div>;
+  return anchor ? createPortal(content, document.fullscreenElement ?? document.body) : content;
 });

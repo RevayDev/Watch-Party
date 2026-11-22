@@ -433,6 +433,8 @@ export class HostSession implements WebRTCTransport {
     const serialized: unknown = JSON.parse(JSON.stringify(data));
     if (!serialized || typeof serialized !== 'object' || Array.isArray(serialized)) return;
     const payload = serialized as Record<string, unknown>;
+    if (event === 'delete-message' && typeof payload.id === 'string') { this.command({ type: 'chat-delete', id: payload.id }); return; }
+    if (event === 'react-message' && typeof payload.id === 'string' && typeof payload.emoji === 'string') { const parsed = commandSchema.safeParse({ type: 'chat-react', id: payload.id, emoji: payload.emoji }); if (parsed.success) this.command(parsed.data); return; }
     if (event === 'request-chat-reads') { this.publish('chat-read-state', this.state.readReceipts ?? {}); return; }
     if (event === 'chat-read' && typeof payload.messageId === 'string') { this.command({ type: 'chat-read', messageId: payload.messageId }); return; }
     if (event === 'reaction' && typeof payload.emoji === 'string' && payload.emoji.length <= 32) {

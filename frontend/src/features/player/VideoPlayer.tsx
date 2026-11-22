@@ -1,6 +1,7 @@
+import { PlayerActionDock } from './PlayerActionDock';
 import { Field, Button } from '../../shared/components/ui';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type Hls from 'hls.js';
 import { IVideoMetadata, ReactionItem } from '../../types/room';
 import { googleDriveDownload } from '../../shared/googleDrive';
@@ -907,34 +908,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </span>
           )}
 
-          {isLeader && (<>
-            <Button variant="unstyled"
-              onClick={() => openChangePanel()}
-              className="player-change-btn"
-              title="Cambiar video: subir archivo o pegar enlace"
-              type="button"
-            >
-              <RefreshCw size={13} className="player-change-btn__icon" />
-              <span>Cambiar</span>
-            </Button>
-            {onClearVideo && <Button variant="unstyled" type="button" className="player-change-btn" onClick={onClearVideo} title="Quitar video"><span>Quitar</span></Button>}
-          </>)}
+
         </div>
       </div>
 
+      {isLeader && <PlayerActionDock onChange={() => openChangePanel()} onClear={onClearVideo} />}
+
       {/* Mobile-only floating button: opens the "Cambiar video" panel (top bar auto-hides on touch) */}
-      {isLeader && !showChangePanel && (
-        <Button variant="unstyled"
-          onClick={() => openChangePanel()}
-          className="player-change-fab"
-          title="Cambiar video: subir archivo o pegar enlace"
-          type="button"
-          style={{ opacity: showControls ? 1 : 0, pointerEvents: showControls ? 'auto' : 'none' }}
-        >
-          <RefreshCw size={13} className="player-change-btn__icon" />
-          <span>Cambiar</span>
-        </Button>
-      )}
+
 
       {/* Playback error fallback overlay */}
       {playbackError && (

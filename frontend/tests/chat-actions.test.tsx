@@ -117,6 +117,9 @@ describe('Chat (editar mensaje propio)', () => {
       />
     );
     await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /más opciones del mensaje/i }));
+    });
+    await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /editar mensaje/i }));
     });
     expect(screen.getByText('Editando mensaje')).toBeDefined();
@@ -142,6 +145,9 @@ describe('Chat (editar mensaje propio)', () => {
         currentUserName="Ana"
       />
     );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /más opciones del mensaje/i }));
+    });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /editar mensaje/i }));
     });

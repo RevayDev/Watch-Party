@@ -35,6 +35,7 @@ export const snapshotSchema = z.object({
   members: z.array(memberSchema).max(MAX_HOST_MEMBERS),
   readReceipts: z.record(z.string(), z.object({ readerId: id, userName: name, messageId: id })).optional(),
   messages: z.array(z.object({
+    deleted: z.boolean().optional(), reactions: z.array(z.object({ userId: id, userName: name, emoji: z.string().max(20) })).max(100).optional(),
     id, authorId: id, user: name, text: z.string().max(2000), timestamp: z.string().max(30), edited: z.boolean().optional(),
     replyTo: z.object({ id, user: name, text: z.string().max(200) }).optional(),
   })).max(300),
@@ -50,6 +51,8 @@ export const snapshotSchema = z.object({
 });
 export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('room-settings'), settings: roomSettingsSchema }),
+  z.object({ type: z.literal('chat-delete'), id }),
+  z.object({ type: z.literal('chat-react'), id, emoji: z.enum(['❤️','😂','😮','👏','😢','🔥']) }),
   z.object({ type: z.literal('chat-read'), messageId: id }),
   z.object({ type: z.literal('chat'), text: z.string().trim().min(1).max(2000), id, replyTo: id.optional() }),
   z.object({ type: z.literal('edit-chat'), text: z.string().trim().min(1).max(2000), id }),
@@ -110,7 +113,7 @@ export function newHostRoom(name: string): HostRoomOptions {
 
 export function applyHostCommand(state: HostSnapshot, senderId: string, command: HostCommand): HostSnapshot {
   const member = state.members.find((candidate) => candidate.id === senderId);
-  const memberAction = command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
+  const memberAction = command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
   if (!member || (!memberAction && senderId !== state.hostId)) return state;
   switch (command.type) {
     case 'room-settings':
@@ -129,11 +132,23 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
       return { ...state, revision: state.revision + 1, messages: [...state.messages, {
         id: command.id, authorId: member.id, user: member.name, text: command.text,
         timestamp: new Date().toISOString(),
-        ...(reply ? { replyTo: { id: reply.id, user: reply.user, text: reply.text.slice(0, 200) } } : {}),
+        ...(reply ? { replyTo: { id: reply.id, user: reply.user, text: reply.deleted ? 'Mensaje eliminado' : reply.text.slice(0, 200) } } : {}),
       }].slice(-300) };
     }
+    case 'chat-delete': {
+      if (!state.messages.some(message => message.id === command.id && message.authorId === senderId && !message.deleted)) return state;
+      return { ...state, revision: state.revision + 1, messages: state.messages.map(message => message.id === command.id ? { ...message, deleted: true, text: '', reactions: [] } : message.replyTo?.id === command.id ? { ...message, replyTo: { ...message.replyTo, text: 'Mensaje eliminado' } } : message) };
+    }
+    case 'chat-react': {
+      const target = state.messages.find(message => message.id === command.id && !message.deleted);
+      if (!target) return state;
+      const previous = target.reactions?.find(reaction => reaction.userId === senderId);
+      const reactions = (target.reactions ?? []).filter(reaction => reaction.userId !== senderId);
+      if (previous?.emoji !== command.emoji) reactions.push({ userId: senderId, userName: member.name, emoji: command.emoji });
+      return { ...state, revision: state.revision + 1, messages: state.messages.map(message => message.id === target.id ? { ...message, reactions: reactions.slice(-100) } : message) };
+    }
     case 'edit-chat':
-      if (!state.messages.some((message) => message.id === command.id && message.authorId === senderId)) return state;
+      if (!state.messages.some((message) => message.id === command.id && message.authorId === senderId && !message.deleted)) return state;
       return { ...state, revision: state.revision + 1, messages: state.messages.map((message) =>
         message.id === command.id ? { ...message, text: command.text, edited: true } : message) };
     case 'clear-video':

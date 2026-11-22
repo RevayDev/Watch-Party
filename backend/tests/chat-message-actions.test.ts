@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import type { Server, Socket } from 'socket.io';
+import { registerChatReactionsHandlers } from '../src/sockets/handlers/chat-reactions.handler.js';
+import { activeUsers, trackRoomMessage, clearRoomMessageAuthors } from '../src/sockets/socket-state.js';
+import { __resetSocketLimitsForTests } from '../src/sockets/socket-limits.js';
+afterEach(() => { activeUsers.clear(); clearRoomMessageAuthors('ACTIONS'); __resetSocketLimitsForTests(); });
+it('limits deletion to the author and authenticates/toggles message reactions', () => {
+ const handlers = new Map<string,(data:unknown)=>void>(); const emit=vi.fn();
+ const socket={ id:'s',on:(event:string,fn:(data:unknown)=>void)=>handlers.set(event,fn) } as unknown as Socket;
+ registerChatReactionsHandlers({to:()=>({emit})} as unknown as Server,socket);
+ activeUsers.set('s',{socketId:'s',roomId:'ACTIONS',userName:'Beto',userId:'b',isLeader:false}); trackRoomMessage('ACTIONS','m','Ana');
+ handlers.get('delete-message')!({roomId:'ACTIONS',id:'m'}); expect(emit).not.toHaveBeenCalled();
+ handlers.get('react-message')!({roomId:'ACTIONS',id:'m',emoji:'❤️',userName:'Fake'});
+ expect(emit).toHaveBeenLastCalledWith('message-reactions',{id:'m',reactions:[{userId:'b',userName:'Beto',emoji:'❤️'}]});
+ handlers.get('react-message')!({roomId:'ACTIONS',id:'m',emoji:'❤️'}); expect(emit).toHaveBeenLastCalledWith('message-reactions',{id:'m',reactions:[]});
+ activeUsers.set('s',{socketId:'s',roomId:'ACTIONS',userName:'Ana',isLeader:false});
+ handlers.get('delete-message')!({roomId:'ACTIONS',id:'m'}); expect(emit).toHaveBeenLastCalledWith('message-deleted',{id:'m'});
+ emit.mockClear(); handlers.get('edit-message')!({roomId:'ACTIONS',id:'m',text:'Restore'}); expect(emit).not.toHaveBeenCalled();
+ handlers.get('react-message')!({roomId:'ACTIONS',id:'m',emoji:'🔥'}); expect(emit).not.toHaveBeenCalled();
+});

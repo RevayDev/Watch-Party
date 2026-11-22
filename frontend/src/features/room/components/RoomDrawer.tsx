@@ -141,6 +141,8 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onReadMessage={(messageId) => socket.emit('chat-read', { roomId, messageId })}
             onSendMessage={handleSendMessage}
             onEditMessage={handleEditMessage}
+            onDeleteMessage={(id) => socket.emit('delete-message', { roomId, id })}
+            onReactMessage={(id, emoji) => socket.emit('react-message', { roomId, id, emoji })}
             currentUserName={myName}
             typingUsers={typingUsers}
             onTyping={onTyping}

@@ -38,6 +38,8 @@ const MAX_AUTHORS_PER_ROOM = 200;
  * Efímero (sin persistencia): solo sirve para que únicamente el autor pueda
  * editar sus mensajes. Se poda FIFO y se limpia al cerrar la sala.
  */
+export const roomDeletedMessages = new Map<string, Set<string>>();
+export const roomMessageReactions = new Map<string, Record<string, Record<string, { userId: string; userName: string; emoji: string }>>>();
 export const roomReadReceipts = new Map<string, Record<string, { readerId: string; userName: string; messageId: string }>>();
 export const roomMessageAuthors = new Map<string, Map<string, string>>();
 
@@ -56,6 +58,8 @@ export function trackRoomMessage(roomId: string, messageId: string, userName: st
     const oldest = authors.keys().next().value;
     if (oldest === undefined) break;
     authors.delete(oldest);
+    roomDeletedMessages.get(key)?.delete(oldest);
+    const reactions = roomMessageReactions.get(key); if (reactions) delete reactions[oldest];
   }
 }
 
@@ -70,4 +74,6 @@ export function clearRoomMessageAuthors(roomId: string): void {
   if (typeof roomId !== 'string' || !roomId.trim()) return;
   roomMessageAuthors.delete(roomId.toUpperCase().trim());
   roomReadReceipts.delete(roomId.toUpperCase().trim());
+  roomDeletedMessages.delete(roomId.toUpperCase().trim());
+  roomMessageReactions.delete(roomId.toUpperCase().trim());
 }

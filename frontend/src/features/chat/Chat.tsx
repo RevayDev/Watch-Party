@@ -1,6 +1,6 @@
-import { Button, Field } from '../../shared/components/ui';
+import { Button, Field, Popover } from '../../shared/components/ui';
 import React, { useState, useLayoutEffect, useRef, useEffect } from 'react';
-import { Send, X, ArrowDown, Pencil, Reply } from 'lucide-react';
+import { Send, X, ArrowDown, Pencil, Reply, Smile, MoreVertical, Trash2 } from 'lucide-react';
 import { ChatMessage } from '../../types/room';
 import { getAvatarColor, getInitials } from '../../shared/utils';
 
@@ -10,6 +10,8 @@ export function formatChatTime(timestamp: string): string {
   return date && Number.isFinite(date.getTime()) ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : timestamp;
 }
 interface ChatProps {
+  onDeleteMessage?: (id: string) => void;
+  onReactMessage?: (id: string, emoji: string) => void;
   readReceipts?: ChatReadReceipt[];
   currentUserId?: string;
   onReadMessage?: (id: string) => void;
@@ -27,6 +29,7 @@ interface ChatProps {
 }
 
 export const Chat: React.FC<ChatProps> = ({
+  onDeleteMessage = () => undefined, onReactMessage = () => undefined,
   readReceipts = [], currentUserId, onReadMessage,
   isOpen = true,
   messages,
@@ -38,6 +41,7 @@ export const Chat: React.FC<ChatProps> = ({
   unreadCount = 0,
 }) => {
   const [input, setInput] = useState('');
+  const [messageMenu, setMessageMenu] = useState<{ id: string; kind: 'options' | 'reaction'; anchor: HTMLButtonElement } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isNearBottomRef = useRef(true);
@@ -170,6 +174,7 @@ export const Chat: React.FC<ChatProps> = ({
     !!currentUserName && user.trim().toLowerCase() === currentUserName.trim().toLowerCase();
 
   const startEdit = (m: ChatMessage) => {
+    setMessageMenu(null);
     setReplyTo(null);
     setEditingId(m.id);
     setInput(m.text);
@@ -182,6 +187,7 @@ export const Chat: React.FC<ChatProps> = ({
   };
 
   const startReply = (m: ChatMessage) => {
+    setMessageMenu(null);
     setEditingId(null);
     setReplyTo({ id: m.id, user: m.user, text: m.text });
     inputRef.current?.focus();
@@ -226,13 +232,7 @@ export const Chat: React.FC<ChatProps> = ({
               }
               return (
                 <React.Fragment key={m.id}>
-                <div
-                  data-message-id={m.id}
-                  id={`msg-${m.id}`}
-                  className={`drawer-chat__msg ${
-                    isMine(m.user) ? 'drawer-chat__msg--mine' : ''
-                  }`}
-                >
+                {m.replyTo && <div className={`drawer-chat__reply-preview ${isMine(m.user) ? 'drawer-chat__reply-preview--mine' : ''}`}><span>{isMine(m.user) ? 'Respondiste' : m.user + ' respondió'} a {m.replyTo.user}</span>
                   {m.replyTo && (
                     <Button variant="unstyled"
                       type="button"
@@ -244,34 +244,34 @@ export const Chat: React.FC<ChatProps> = ({
                       <span className="drawer-chat__quote-text">{m.replyTo.text}</span>
                     </Button>
                   )}
+                </div>}
+
+                <div
+                  data-message-id={m.id}
+                  id={`msg-${m.id}`}
+                  className={`drawer-chat__msg ${
+                    isMine(m.user) ? 'drawer-chat__msg--mine' : ''
+                  }`}
+                >
                   <span className="drawer-chat__author">{m.user}</span>
                   <span className="drawer-chat__text">
-                    {m.text}
+                    {m.deleted ? <em className="drawer-chat__deleted">Mensaje eliminado</em> : m.text}
                     {m.edited && <em className="drawer-chat__edited"> · editado</em>}
                   </span>
                   <time className="drawer-chat__time" dateTime={m.timestamp.includes('T') ? m.timestamp : undefined} title={m.timestamp.includes('T') ? new Date(m.timestamp).toLocaleString() : m.timestamp}>{formatChatTime(m.timestamp)}</time>
-                  <span className="drawer-chat__actions">
-                    <Button variant="unstyled"
-                      type="button"
-                      className="drawer-chat__action"
-                      title={`Responder a ${m.user}`}
-                      aria-label={`Responder a ${m.user}`}
-                      onClick={() => startReply(m)}
-                    >
-                      <Reply size={13} />
-                    </Button>
-                    {isMine(m.user) && (
-                      <Button variant="unstyled"
-                        type="button"
-                        className="drawer-chat__action"
-                        title="Editar mensaje"
-                        aria-label="Editar mensaje"
-                        onClick={() => startEdit(m)}
-                      >
-                        <Pencil size={13} />
-                      </Button>
-                    )}
-                  </span>
+                  {!m.deleted && <span className="drawer-chat__actions">
+                    <Button variant="unstyled" type="button" className="drawer-chat__action" title={`Responder a ${m.user}`} aria-label={`Responder a ${m.user}`} onClick={() => startReply(m)}><Reply size={15} /></Button>
+                    <Button variant="unstyled" type="button" className="drawer-chat__action" title="Reaccionar al mensaje" aria-label={`Reaccionar al mensaje de ${m.user}`} onClick={event => setMessageMenu(current => current?.id === m.id && current.kind === 'reaction' ? null : { id: m.id, kind: 'reaction', anchor: event.currentTarget })}><Smile size={15} /></Button>
+                    {isMine(m.user) && <Button variant="unstyled" type="button" className="drawer-chat__action" title="Más opciones del mensaje" aria-label="Más opciones del mensaje" onClick={event => setMessageMenu(current => current?.id === m.id && current.kind === 'options' ? null : { id: m.id, kind: 'options', anchor: event.currentTarget })}><MoreVertical size={15} /></Button>}
+                  </span>}
+                  {!m.deleted && messageMenu?.id === m.id && <Popover anchor={messageMenu.anchor} className={`chat-message-menu ${messageMenu.kind === 'reaction' ? 'chat-message-menu--reactions' : ''}`} onDismiss={() => setMessageMenu(null)} aria-label={messageMenu.kind === 'options' ? 'Opciones del mensaje' : 'Reaccionar al mensaje'}>
+                    {messageMenu.kind === 'options' ? <>
+                      <Button variant="ghost" type="button" onClick={() => startEdit(m)}><Pencil size={15} />Editar mensaje</Button>
+                      <Button variant="ghost" type="button" className="chat-message-menu__delete" onClick={() => { onDeleteMessage(m.id); setMessageMenu(null); }}><Trash2 size={15} />Eliminar mensaje</Button>
+                    </> : <div className="chat-message-menu__emojis">{['❤️','😂','😮','👏','😢','🔥'].map(emoji => <Button variant="ghost" key={emoji} type="button" aria-label={`Reaccionar con ${emoji}`} onClick={() => { onReactMessage(m.id, emoji); setMessageMenu(null); }}>{emoji}</Button>)}</div>}
+                  </Popover>}
+                  {!m.deleted && !!m.reactions?.length && <div className="drawer-chat__message-reactions">{[...new Set(m.reactions.map(reaction => reaction.emoji))].map(emoji => <Button variant="unstyled" key={emoji} type="button" title={m.reactions!.filter(reaction => reaction.emoji === emoji).map(reaction => reaction.userName).join(', ')} aria-label={`Reacción ${emoji}`} onClick={() => onReactMessage(m.id, emoji)}>{emoji} {m.reactions!.filter(reaction => reaction.emoji === emoji).length}</Button>)}</div>}
+
                 </div>
                 {readReceipts.some(receipt => receipt.messageId === m.id && receipt.readerId !== currentUserId && receipt.userName !== currentUserName) && <div className={`drawer-chat__seen ${isMine(m.user) ? 'drawer-chat__seen--mine' : ''}`} aria-label="Visto por">
                   {readReceipts.filter(receipt => receipt.messageId === m.id && receipt.readerId !== currentUserId && receipt.userName !== currentUserName).map(receipt => <span key={receipt.readerId} className="drawer-chat__seen-avatar" role="img" aria-label={`Visto por ${receipt.userName}`} title={receipt.userName} style={{ background: getAvatarColor(receipt.userName) }}>{getInitials(receipt.userName)}</span>)}

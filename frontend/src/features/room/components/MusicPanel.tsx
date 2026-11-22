@@ -1,5 +1,5 @@
 import { Button, Field, Surface, Popover, AccordionTrigger } from '../../../shared/components/ui';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Youtube, Plus, Trash2, ArrowUp, ArrowDown, Check, Disc, Play, Pause, SkipForward, Maximize2, ListMusic, MoreVertical, ExternalLink, Square, ChevronDown } from 'lucide-react';
 import type { IMusicNowPlaying, IMusicQueueEntry, IMusicTrack, IRoomSettings } from '../../../types/room';
 import { parseYouTubeUrl } from '../../../shared/youtube';
@@ -62,6 +62,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   const [ytInput, setYtInput] = useState('');
   const [addingYt, setAddingYt] = useState(false);
   const [inputError, setInputError] = useState('');
+  const menuAnchor = useRef<HTMLButtonElement | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [queueCollapsed, setQueueCollapsed] = useState(false);
 
@@ -165,7 +166,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   }> = ({ rowId, url, title: menuTitle, openUrl, entryId, canDelete, isCurrentlyPlaying }) => {
     void rowId;
     return (
-      <Popover className="music-queue__menu" onDismiss={() => setOpenMenuId(null)} aria-label="Opciones de la canción">
+      <Popover anchor={menuAnchor.current} className="music-queue__menu" onDismiss={() => setOpenMenuId(null)} aria-label="Opciones de la canción">
         {isModerator && (
           <>
             {url && <Button variant="unstyled"
@@ -329,7 +330,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                   className="music-row-options"
                   aria-label={`Opciones de ${e.name}`}
                   aria-expanded={openMenuId === e.id}
-                  onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
+                  onClick={(event) => { menuAnchor.current = event.currentTarget; setOpenMenuId((v) => (v === e.id ? null : e.id)); }}
                 >
                   <MoreVertical size={15} />
                 </Button>
@@ -411,7 +412,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                       type="button"
                       aria-label={`Opciones de ${nowPlaying.name}`}
                       title="Opciones"
-                      onClick={() => setOpenMenuId((v) => (v === `now-${nowPlaying.entryId}` ? null : `now-${nowPlaying.entryId}`))}
+                      onClick={(event) => { menuAnchor.current = event.currentTarget; setOpenMenuId((v) => (v === `now-${nowPlaying.entryId}` ? null : `now-${nowPlaying.entryId}`)); }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -526,24 +527,11 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                           {rowDuration}
                         </span>
                       )}
-
-                      {!isPlayingNow && canRemove(e) && (
-                        <Button variant="secondary"
-                          type="button"
-                          className="leader-exit-modal__cancel-btn"
-                          style={{ width: 'auto', margin: 0, padding: '0.28rem 0.5rem', color: '#f87171' }}
-                          aria-label={`Eliminar ${e.name}`}
-                          onClick={() => onRemove(e.id)}
-                          title="Eliminar de la cola"
-                        >
-                          <Trash2 size={13} />
-                        </Button>
-                      )}
                       <Button variant="unstyled"
                         type="button"
                         aria-label={`Opciones de ${e.name}`}
                         title="Opciones"
-                        onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
+                        onClick={(event) => { menuAnchor.current = event.currentTarget; setOpenMenuId((v) => (v === e.id ? null : e.id)); }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',

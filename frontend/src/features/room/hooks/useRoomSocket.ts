@@ -611,6 +611,14 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       );
     };
 
+    const handleMessageDeleted = (data: { id?: string }) => {
+      if (!data?.id) return;
+      setMessages(previous => previous.map(message => message.id === data.id ? { ...message, deleted: true, text: '', reactions: [] } : message.replyTo && message.replyTo.id === data.id ? { ...message, replyTo: { ...message.replyTo, text: 'Mensaje eliminado' } } : message));
+    };
+    const handleMessageReactions = (data: { id?: string; reactions?: ChatMessage['reactions'] }) => {
+      if (!data?.id || !Array.isArray(data.reactions)) return;
+      setMessages(previous => previous.map(message => message.id === data.id && !message.deleted ? { ...message, reactions: data.reactions } : message));
+    };
     const handleReactionEvent = (reaction: ReactionItem) => {
       setReactions((prev) => [...prev, reaction]);
       // Limpieza tras la animación de globo de helio (máx 5.5 s + margen)
@@ -928,6 +936,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     socket.on('video-changed', handleVideoChanged);
     socket.on('sync-video', handleSyncVideo);
     socket.on('upload-progress', handleUploadProgressEvent);
+    socket.on('message-deleted', handleMessageDeleted);
+    socket.on('message-reactions', handleMessageReactions);
     socket.on('chat-message', handleChatMessage);
     socket.on('message-edited', handleMessageEdited);
     socket.on('reaction', handleReactionEvent);
@@ -982,6 +992,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       socket.off('video-changed', handleVideoChanged);
       socket.off('sync-video', handleSyncVideo);
       socket.off('upload-progress', handleUploadProgressEvent);
+      socket.off('message-deleted', handleMessageDeleted);
+      socket.off('message-reactions', handleMessageReactions);
       socket.off('chat-message', handleChatMessage);
       socket.off('message-edited', handleMessageEdited);
       socket.off('reaction', handleReactionEvent);
