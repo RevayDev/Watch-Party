@@ -221,7 +221,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                   <span className="header-share-menu__label">
                     <Hash size={12} /> Código de la sala
                   </span>
-                  <span className="header-share-menu__value">{roomId}</span>
+                  <span className="header-share-menu__value header-share-menu__value--code">{roomId.toUpperCase()}</span>
                 </div>
                 <Button variant="unstyled"
                   type="button"

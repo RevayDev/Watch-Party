@@ -148,6 +148,10 @@
   letter-spacing: 0.06em;
   font-size: 0.82rem;
 }
+.header-share-menu__value--code {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
 .header__room-pill-btn {
   display: inline-flex;
   align-items: center;
