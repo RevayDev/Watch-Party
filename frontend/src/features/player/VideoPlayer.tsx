@@ -145,14 +145,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
     if (directPlayback || !configured) { setBackendAvailable(false); return; }
+    let active = true;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 2000);
     fetch(`${configured}/api/health`, { signal: controller.signal, cache: 'no-store' })
       .then(response => response.ok)
       .catch(() => false)
-      .then(available => { if (!controller.signal.aborted) setBackendAvailable(available); })
+      .then(available => { if (active) setBackendAvailable(available); })
       .finally(() => window.clearTimeout(timeout));
-    return () => { controller.abort(); window.clearTimeout(timeout); };
+    return () => { active = false; controller.abort(); window.clearTimeout(timeout); };
   }, [directPlayback]);
 
   // Global player keyboard shortcuts (Space, F, M, Arrows) with input protection
@@ -360,11 +361,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const backendBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
+    if (!directPlayback && backendBase && backendAvailable === null) return;
     const isExternal = (videoSourceType === 'url' || videoSourceType === 'hls') && !!videoDirectUrl;
     // External URLs go through the backend CORS proxy so hls.js/XHR are not blocked
     const driveDownload = videoDirectUrl ? googleDriveDownload(videoDirectUrl) : null;
-    const videoSrc = directPlayback || backendAvailable === false
-      ? (driveDownload ?? videoDirectUrl ?? `${backendBase}/api/rooms/${roomId}/video/stream`)
+    const videoSrc = driveDownload && (directPlayback || backendAvailable === false)
+      ? `/api/proxy?url=${encodeURIComponent(driveDownload)}`
+      : directPlayback || backendAvailable === false
+      ? (videoDirectUrl ?? `${backendBase}/api/rooms/${roomId}/video/stream`)
       : isExternal
       ? `${backendBase}/api/proxy?url=${encodeURIComponent(driveDownload ?? videoDirectUrl!)}`
       : `${backendBase}/api/rooms/${roomId}/video/stream`;
@@ -704,8 +708,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleVideoElementError = () => {
     if (playbackError) return;
-    if (backendAvailable === false && video?.directUrl && googleDriveDownload(video.directUrl)) {
-      setPlaybackError('El servidor externo no está disponible y Google Drive no permite reproducir este enlace directamente. Usa un enlace directo HTTPS o comparte el archivo desde tu PC.');
+    if (!directPlayback && backendAvailable === true && video?.directUrl) {
+      // Render may have stopped after the initial health check.
+      setBackendAvailable(false);
       return;
     }
     const kind = describeVideoSource();

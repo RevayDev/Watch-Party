@@ -1,8 +1,11 @@
 {
   "framework": "vite",
+  "functions": {
+    "api/proxy.mjs": { "maxDuration": 30 }
+  },
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],

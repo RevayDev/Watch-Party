@@ -13,7 +13,9 @@ export { BACKEND_BASE };
 export class ApiService {
   static async youtubeSearch(query: string, signal: AbortSignal, provider?: string): Promise<IMusicTrack[]> {
     const params = new URLSearchParams({ q: query });
-    const response = await fetch(`${API_BASE_URL}/youtube/search?${params}`, { signal, ...(provider ? { headers: { Authorization: `Bearer ${provider}` } } : {}) });
+    // Platform helpers live beside the frontend on Vercel, independent of Render.
+    const base = provider ? API_BASE_URL : '/api';
+    const response = await fetch(`${base}/youtube/search?${params}`, { signal, ...(provider ? { headers: { Authorization: `Bearer ${provider}` } } : {}) });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       throw new Error(body.error || 'No se pudo buscar en YouTube');

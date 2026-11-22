@@ -10,7 +10,7 @@ export function YouTubeSettingsSection({ provider = '', onChange, canEdit }: {
   const [status, setStatus] = useState('Comprobando servicio…');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const base = BACKEND_BASE.replace(/\/$/, '');
+  const base = provider ? BACKEND_BASE.replace(/\/$/, '') : '';
   const editable = canEdit && !!onChange;
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function YouTubeSettingsSection({ provider = '', onChange, canEdit }: {
         } catch { /* The server also expires registrations automatically. */ }
         setMessage('La sala usará el servicio de la plataforma'); return;
       }
-      const response = await fetch(`${base}/api/youtube/providers`, {
+      const response = await fetch(`${BACKEND_BASE.replace(/\/$/, '')}/api/youtube/providers`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'google', apiKey }),
       });
