@@ -135,7 +135,7 @@ export class RoomService {
   /**
    * Generates a readable 6-character room code.
    */
-  private static generateRoomCode(length = 6): string {
+  private static generateRoomCode(length = 8): string {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     const bytes = crypto.randomBytes(length);
     let result = '';
@@ -152,7 +152,7 @@ export class RoomService {
     let roomId = '';
     let exists = true;
     while (exists) {
-      roomId = this.generateRoomCode(6);
+      roomId = this.generateRoomCode(8);
       exists = await roomRepository.exists(roomId);
     }
     return roomId;

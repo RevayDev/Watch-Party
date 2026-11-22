@@ -94,14 +94,14 @@ export function readHostInvite(url: string): { roomId: string; key: string } | n
     const parsed = new URL(url);
     const roomId = parsed.searchParams.get('hostRoom');
     const key = new URLSearchParams(parsed.hash.slice(1)).get('key');
-    return roomId && /^[a-f0-9]{24}$/.test(roomId) && key && /^[a-f0-9]{64}$/.test(key) ? { roomId, key } : null;
+    return roomId && /^[a-f0-9]{8}$/.test(roomId) && key && /^[a-f0-9]{64}$/.test(key) ? { roomId, key } : null;
   } catch { return null; }
 }
 
 export function newHostRoom(name: string): HostRoomOptions {
   const random = (length: number) => [...crypto.getRandomValues(new Uint8Array(length))]
     .map((byte) => byte.toString(16).padStart(2, '0')).join('');
-  return { roomId: random(12), key: random(32), name, create: true };
+  return { roomId: random(4), key: random(32), name, create: true };
 }
 
 export function applyHostCommand(state: HostSnapshot, senderId: string, command: HostCommand): HostSnapshot {
@@ -160,3 +160,4 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
       return { ...state, revision: state.revision + 1, musicNowPlaying: null };
   }
 }
+

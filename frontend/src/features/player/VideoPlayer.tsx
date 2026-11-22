@@ -681,7 +681,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleVideoElementError = () => {
     if (playbackError) return;
     if (directPlayback && video?.directUrl && googleDriveDownload(video.directUrl)) {
-      setPlaybackError('No se pudo reproducir Google Drive mediante el proxy de video. Comprueba que el backend esté disponible y el archivo sea público. Para reproducir sin backend, descarga el archivo y compártelo desde tu PC.');
+      setPlaybackError('No se pudo reproducir Google Drive. En salas host (sin backend) descarga el archivo y compartelo desde tu PC. En salas normales, comprueba que VITE_API_URL apunte al backend HTTPS y el archivo sea publico.');
       return;
     }
     const kind = describeVideoSource();
@@ -1154,3 +1154,4 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 };
 
 export default VideoPlayer;
+
