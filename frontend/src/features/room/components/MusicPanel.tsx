@@ -412,114 +412,27 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         {!queueCollapsed && (
           <div style={{ display: active.length === 0 ? 'flex' : 'block' }}>
             {active.length === 0 ? (
-          <div className="drawer-chat__empty" style={{ padding: '1.5rem 1rem' }}>
-            <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.84rem' }}>
-              La cola está vacía. ¡Pega el primer enlace de YouTube arriba!
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-            {/* Tema sonando fuera de la cola: fila compacta estilo mockup */}
-            {nowPlaying && !matchedPlaying && nowVideoId ? (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.6rem',
-                  padding: '0.6rem 0.75rem 0.6rem 0.9rem',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(139, 92, 246, 0.45)',
-                  borderRadius: '10px',
-                  position: 'relative',
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 8,
-                    bottom: 8,
-                    width: 3,
-                    borderRadius: 999,
-                    background: '#8b5cf6',
-                  }}
-                />
-                <span role="img" aria-label="Sonando ahora" style={{ color: '#60a5fa', display: 'flex', flexShrink: 0 }}>
-                  <Pause size={13} />
-                </span>
-                <img
-                  src={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
-                  alt=""
-                  style={{ width: '42px', height: '32px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {nowPlaying.name}
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {nowPlaying.artists || 'YouTube Music'} · propuesto por {nowPlaying.proposedBy}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  aria-label={`Opciones de ${nowPlaying.name}`}
-                  title="Opciones"
-                  onClick={() => setOpenMenuId((v) => (v === `now-${nowPlaying.entryId}` ? null : `now-${nowPlaying.entryId}`))}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: 'transparent',
-                    color: '#94a3b8',
-                    border: 'none',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  <MoreVertical size={15} />
-                </button>
-                {openMenuId === `now-${nowPlaying.entryId}` && (
-                  <PlayingMenu
-                    rowId={`now-${nowPlaying.entryId}`}
-                    url={nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`}
-                    title={nowPlaying.name}
-                    openUrl={nowPlaying.openUrl}
-                    entryId={nowPlaying.entryId}
-                    canDelete={isModerator || (settings.musicCanRemove !== 'moderator' && nowPlaying.proposedBy === myName)}
-                    isCurrentlyPlaying
-                  />
-                )}
+              <div className="drawer-chat__empty" style={{ padding: '1.5rem 1rem' }}>
+                <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.84rem' }}>
+                  La cola está vacía. ¡Pega el primer enlace de YouTube arriba!
+                </p>
               </div>
-            ) : null}
-            {active.map((e, i) => {
-              const ytRef = parseYouTubeUrl(e.trackId || e.uri || e.openUrl);
-              const thumb = e.albumArt || (ytRef ? `https://img.youtube.com/vi/${ytRef.videoId}/hqdefault.jpg` : undefined);
-              const isPlayingNow = !!nowPlaying && nowPlaying.trackId === e.trackId;
-              const rowDuration = typeof e.durationMs === 'number' && e.durationMs > 0
-                ? formatPlayerTime(e.durationMs / 1000)
-                : null;
-
-              return (
-                <div
-                  key={e.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.6rem',
-                    padding: '0.6rem 0.75rem 0.6rem 0.9rem',
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.07)',
-                    borderRadius: '10px',
-                    transition: 'border-color 0.15s ease',
-                    position: 'relative',
-                    borderColor: isPlayingNow ? 'rgba(139, 92, 246, 0.45)' : 'rgba(255, 255, 255, 0.07)',
-                  }}
-                >
-                  {isPlayingNow && (
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                {/* Tema sonando fuera de la cola: fila compacta estilo mockup */}
+                {nowPlaying && !matchedPlaying && nowVideoId ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      padding: '0.6rem 0.75rem 0.6rem 0.9rem',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(139, 92, 246, 0.45)',
+                      borderRadius: '10px',
+                      position: 'relative',
+                    }}
+                  >
                     <span
                       aria-hidden="true"
                       style={{
@@ -532,143 +445,230 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                         background: '#8b5cf6',
                       }}
                     />
-                  )}
-                  {isPlayingNow && (
-                    <span
-                      role="img"
-                      aria-label="Sonando ahora"
-                      style={{ color: '#60a5fa', display: 'flex', flexShrink: 0 }}
-                    >
+                    <span role="img" aria-label="Sonando ahora" style={{ color: '#60a5fa', display: 'flex', flexShrink: 0 }}>
                       <Pause size={13} />
                     </span>
-                  )}
-                  {thumb ? (
                     <img
-                      src={thumb}
+                      src={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
                       alt=""
                       style={{ width: '42px', height: '32px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }}
                     />
-                  ) : (
-                    <div
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {nowPlaying.name}
+                      </p>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {nowPlaying.artists || 'YouTube Music'} · propuesto por {nowPlaying.proposedBy}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={`Opciones de ${nowPlaying.name}`}
+                      title="Opciones"
+                      onClick={() => setOpenMenuId((v) => (v === `now-${nowPlaying.entryId}` ? null : `now-${nowPlaying.entryId}`))}
                       style={{
-                        width: '42px',
-                        height: '32px',
-                        borderRadius: '5px',
-                        background: 'rgba(239, 68, 68, 0.15)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#ef4444',
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        background: 'transparent',
+                        color: '#94a3b8',
+                        border: 'none',
+                        cursor: 'pointer',
                         flexShrink: 0,
                       }}
                     >
-                      <Youtube size={18} />
-                    </div>
-                  )}
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {e.name}
-                    </p>
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {e.artists || 'YouTube Music'} · propuesto por {e.proposedBy}
-                    </p>
-                  </div>
-
-                  {rowDuration && (
-                    <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                      {rowDuration}
-                    </span>
-                  )}
-
-                  {!isPlayingNow && canRemove(e) && (
-                    <button
-                      type="button"
-                      className="leader-exit-modal__cancel-btn"
-                      style={{ width: 'auto', margin: 0, padding: '0.28rem 0.5rem', color: '#f87171' }}
-                      aria-label={`Eliminar ${e.name}`}
-                      onClick={() => onRemove(e.id)}
-                      title="Eliminar de la cola"
-                    >
-                      <Trash2 size={13} />
+                      <MoreVertical size={15} />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    aria-label={`Opciones de ${e.name}`}
-                    title="Opciones"
-                    onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      background: 'transparent',
-                      color: '#94a3b8',
-                      border: 'none',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <MoreVertical size={15} />
-                  </button>
-                  {openMenuId === e.id && (
-                    <PlayingMenu
-                      rowId={e.id}
-                      url={e.openUrl || e.uri || (ytRef ? `https://www.youtube.com/watch?v=${ytRef.videoId}` : '')}
-                      title={e.name}
-                      openUrl={e.openUrl}
-                      entryId={e.id}
-                      canDelete={canRemove(e)}
-                      isCurrentlyPlaying={isPlayingNow}
-                    />
-                  )}
+                    {openMenuId === `now-${nowPlaying.entryId}` && (
+                      <PlayingMenu
+                        rowId={`now-${nowPlaying.entryId}`}
+                        url={nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`}
+                        title={nowPlaying.name}
+                        openUrl={nowPlaying.openUrl}
+                        entryId={nowPlaying.entryId}
+                        canDelete={isModerator || (settings.musicCanRemove !== 'moderator' && nowPlaying.proposedBy === myName)}
+                        isCurrentlyPlaying
+                      />
+                    )}
+                  </div>
+                ) : null}
+                {active.map((e, i) => {
+                  const ytRef = parseYouTubeUrl(e.trackId || e.uri || e.openUrl);
+                  const thumb = e.albumArt || (ytRef ? `https://img.youtube.com/vi/${ytRef.videoId}/hqdefault.jpg` : undefined);
+                  const isPlayingNow = !!nowPlaying && nowPlaying.trackId === e.trackId;
+                  const rowDuration = typeof e.durationMs === 'number' && e.durationMs > 0
+                    ? formatPlayerTime(e.durationMs / 1000)
+                    : null;
 
-                  {!isPlayingNow && isModerator && settings.musicAllowReorder === true && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  return (
+                    <div
+                      key={e.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        padding: '0.6rem 0.75rem 0.6rem 0.9rem',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.07)',
+                        borderRadius: '10px',
+                        transition: 'border-color 0.15s ease',
+                        position: 'relative',
+                        borderColor: isPlayingNow ? 'rgba(139, 92, 246, 0.45)' : 'rgba(255, 255, 255, 0.07)',
+                      }}
+                    >
+                      {isPlayingNow && (
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 8,
+                            bottom: 8,
+                            width: 3,
+                            borderRadius: 999,
+                            background: '#8b5cf6',
+                          }}
+                        />
+                      )}
+                      {isPlayingNow && (
+                        <span
+                          role="img"
+                          aria-label="Sonando ahora"
+                          style={{ color: '#60a5fa', display: 'flex', flexShrink: 0 }}
+                        >
+                          <Pause size={13} />
+                        </span>
+                      )}
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt=""
+                          style={{ width: '42px', height: '32px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '42px',
+                            height: '32px',
+                            borderRadius: '5px',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ef4444',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Youtube size={18} />
+                        </div>
+                      )}
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {e.name}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {e.artists || 'YouTube Music'} · propuesto por {e.proposedBy}
+                        </p>
+                      </div>
+
+                      {rowDuration && (
+                        <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                          {rowDuration}
+                        </span>
+                      )}
+
+                      {!isPlayingNow && canRemove(e) && (
+                        <button
+                          type="button"
+                          className="leader-exit-modal__cancel-btn"
+                          style={{ width: 'auto', margin: 0, padding: '0.28rem 0.5rem', color: '#f87171' }}
+                          aria-label={`Eliminar ${e.name}`}
+                          onClick={() => onRemove(e.id)}
+                          title="Eliminar de la cola"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                       <button
                         type="button"
+                        aria-label={`Opciones de ${e.name}`}
+                        title="Opciones"
+                        onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
                         style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: i === 0 ? '#475569' : '#94a3b8',
-                          cursor: i === 0 ? 'default' : 'pointer',
-                          padding: '1px',
                           display: 'flex',
-                        }}
-                        disabled={i === 0}
-                        onClick={() => moveEntry(queue.indexOf(e), -1)}
-                        title="Subir posición"
-                      >
-                        <ArrowUp size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        style={{
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
                           background: 'transparent',
+                          color: '#94a3b8',
                           border: 'none',
-                          color: i === active.length - 1 ? '#475569' : '#94a3b8',
-                          cursor: i === active.length - 1 ? 'default' : 'pointer',
-                          padding: '1px',
-                          display: 'flex',
+                          cursor: 'pointer',
+                          flexShrink: 0,
                         }}
-                        disabled={i === active.length - 1}
-                        onClick={() => moveEntry(queue.indexOf(e), 1)}
-                        title="Bajar posición"
                       >
-                        <ArrowDown size={12} />
+                        <MoreVertical size={15} />
                       </button>
+                      {openMenuId === e.id && (
+                        <PlayingMenu
+                          rowId={e.id}
+                          url={e.openUrl || e.uri || (ytRef ? `https://www.youtube.com/watch?v=${ytRef.videoId}` : '')}
+                          title={e.name}
+                          openUrl={e.openUrl}
+                          entryId={e.id}
+                          canDelete={canRemove(e)}
+                          isCurrentlyPlaying={isPlayingNow}
+                        />
+                      )}
+
+                      {!isPlayingNow && isModerator && settings.musicAllowReorder === true && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <button
+                            type="button"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: i === 0 ? '#475569' : '#94a3b8',
+                              cursor: i === 0 ? 'default' : 'pointer',
+                              padding: '1px',
+                              display: 'flex',
+                            }}
+                            disabled={i === 0}
+                            onClick={() => moveEntry(queue.indexOf(e), -1)}
+                            title="Subir posición"
+                          >
+                            <ArrowUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: i === active.length - 1 ? '#475569' : '#94a3b8',
+                              cursor: i === active.length - 1 ? 'default' : 'pointer',
+                              padding: '1px',
+                              display: 'flex',
+                            }}
+                            disabled={i === active.length - 1}
+                            onClick={() => moveEntry(queue.indexOf(e), 1)}
+                            title="Bajar posición"
+                          >
+                            <ArrowDown size={12} />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
-        </div>
-      )})
       </div>
 
       {/* Reproductor "Sonando ahora" (fijo en footer) */}
