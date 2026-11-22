@@ -26,7 +26,7 @@ function graphFor(video: HTMLVideoElement): AudioGraph {
   return graph;
  } catch (error) { void context.close().catch(() => {}); throw error; }
 }
-export function VideoAudioBoost({ videoRef }: { videoRef: RefObject<HTMLVideoElement> }) {
+export function VideoAudioBoost({ videoRef, inline = false }: { videoRef: RefObject<HTMLVideoElement>; inline?: boolean }) {
  const [collapsed, setCollapsed] = useState(false);
  const [error, setError] = useState('');
  useEffect(() => {
@@ -84,8 +84,8 @@ export function VideoAudioBoost({ videoRef }: { videoRef: RefObject<HTMLVideoEle
   try { graph.source.disconnect(); graph.source.connect(graph.context.destination); await graph.context.resume(); setError(''); }
   catch { setError('El navegador bloqueó el audio. Recarga la sala para restablecerlo.'); }
  }
- return <div className={`video-audio-boost ${collapsed ? 'video-audio-boost--collapsed' : ''}`}>
+ return <div className={`video-audio-boost ${collapsed ? 'video-audio-boost--collapsed' : ''}${inline ? ' video-audio-boost--inline' : ''}`}>
   {!collapsed && <details><summary><Volume2 size={14} /> Sonido</summary><div className="video-audio-boost__panel"><SoundSettingsSection />{error && <><p role="status">{error}</p><Button variant="secondary" onClick={() => { void recover(); }}>Recuperar audio</Button></>}</div></details>}
-  <Button variant="unstyled" className="video-audio-boost__fold" aria-label={collapsed ? 'Mostrar sonido' : 'Ocultar sonido'} onClick={() => setCollapsed(value => !value)}>{collapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}</Button>
+  {!inline && <Button variant="unstyled" className="video-audio-boost__fold" aria-label={collapsed ? 'Mostrar sonido' : 'Ocultar sonido'} onClick={() => setCollapsed(value => !value)}>{collapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}</Button>}
  </div>;
 }

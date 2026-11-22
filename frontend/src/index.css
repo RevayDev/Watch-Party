@@ -8230,3 +8230,8 @@ a.home-faq-hl--frontend {
 .sound-settings__fields { display: grid; gap: 20px; margin: 20px 0; }
 .sound-settings__fields label { display: grid; gap: 10px; font-size: 13px; color: var(--color-text-main); }
 .sound-settings__fields input { width: 100%; }
+.player-action-dock__audio[hidden] { display: none; }
+.video-audio-boost--inline { position: static; display: block; }
+.video-audio-boost--inline summary { border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; }
+.video-audio-boost--inline summary:hover { background: var(--color-bg-hover); }
+.video-audio-boost--inline .video-audio-boost__panel { position: absolute; right: 0; top: calc(100% + 4px); box-sizing: border-box; z-index: 1; }

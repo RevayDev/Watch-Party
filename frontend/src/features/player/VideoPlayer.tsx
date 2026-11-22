@@ -915,9 +915,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       </div>
 
-      {isLeader && <PlayerActionDock onChange={() => openChangePanel()} onClear={onClearVideo} />}
-
-      {video.sourceType !== 'youtube' && <VideoAudioBoost key={video.fileName || video.directUrl} videoRef={videoRef} />}
+      <PlayerActionDock onChange={isLeader ? () => openChangePanel() : undefined} onClear={isLeader ? onClearVideo : undefined}>
+        <VideoAudioBoost key={video.fileName || video.directUrl} videoRef={videoRef} inline />
+      </PlayerActionDock>
 
       {/* Mobile-only floating button: opens the "Cambiar video" panel (top bar auto-hides on touch) */}
 
