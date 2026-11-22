@@ -230,7 +230,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         participantsActive={activeSideTab === 'participants'} onLeaveClick={() => setShowExit(true)}
         className={!uiPinned ? 'header--hidden' : ''} />}
       player={<>
-<ScreenSharingStage localScreenStream={media.localScreenStream} isScreenSharing={media.isScreenSharing} remotePeers={media.remotePeers} peerMediaStates={media.peerMediaStates} />
+<ScreenSharingStage localScreenStream={media.localScreenStream} isScreenSharing={media.isScreenSharing} remotePeers={media.remotePeers} peerMediaStates={media.peerMediaStates} onStopSharing={() => { void media.toggleScreenShare(); }} />
         <RemoteAudio peers={media.remotePeers} />
         {selected?.source === 'file' && !view.fileUrl ? (
           <div className="player-container"><div className="player-container__placeholder" role="status">

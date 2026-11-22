@@ -163,7 +163,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
       <main className={`meet-stage ${r.isRightPanelCollapsed ? 'meet-stage--cams-collapsed' : ''}`}>
         {/* Cinematic Video Card */}
         <section className="meet-stage__video-wrapper">
-<ScreenSharingStage localScreenStream={r.localScreenStream} isScreenSharing={r.isScreenSharing} remotePeers={r.remotePeers} peerMediaStates={r.peerMediaStates} />
+<ScreenSharingStage localScreenStream={r.localScreenStream} isScreenSharing={r.isScreenSharing} remotePeers={r.remotePeers} peerMediaStates={r.peerMediaStates} onStopSharing={() => { void r.toggleScreenShare(); }} />
           <RemoteAudio peers={r.remotePeers} />
           <VideoPlayer
             roomId={roomId}

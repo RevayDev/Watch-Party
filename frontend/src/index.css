@@ -8062,6 +8062,13 @@ a.home-faq-hl--frontend {
 .screen-sharing-stage header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 16px; color: var(--color-text-main); background: var(--color-bg-input); }
 .screen-sharing-stage header span { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .screen-sharing-stage video { width: 100%; flex: 1; min-height: 0; object-fit: contain; }
+.screen-sharing-stage--local { display: grid; place-items: center; }
+.screen-sharing-stage__local-notice { width: min(520px, calc(100% - 32px)); display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid rgba(255,255,255,.13); border-radius: 16px; background: rgba(15,23,42,.88); box-sizing: border-box; }
+.screen-sharing-stage__local-icon { display: grid; place-items: center; flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; color: #c7d2fe; background: rgba(99,102,241,.18); }
+.screen-sharing-stage__local-notice strong { display: block; color: var(--color-text-main); }
+.screen-sharing-stage__local-notice p { margin: 4px 0 0; color: var(--color-muted-light); font-size: .875rem; line-height: 1.4; }
+.screen-sharing-stage__local-notice .ui-action { margin-left: auto; flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 600px) { .screen-sharing-stage__local-notice { flex-wrap: wrap; gap: 12px; } .screen-sharing-stage__local-notice .ui-action { width: 100%; margin-left: 0; } }
 @media (max-width: 600px) {
   .meet-bar-group--visibility, .meet-bar-group--end { display: none; }
   .meet-bottom-bar { gap: 8px; padding: 8px; max-width: calc(100vw - 16px); }
