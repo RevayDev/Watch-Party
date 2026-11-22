@@ -276,7 +276,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         onMusicAutoNext={() => { if (isHost) session.command({ type: 'music-next' }); }}
         onMusicStop={() => session.command({ type: 'music-stop' })}
         onExpandToMain={(link, title, currentTime = 0) => { void setVideoUrl(link, title, currentTime); }} />}
-      controls={<RoomControls localStream={media.localStream} onRetryMedia={media.retryMediaConnection} isScreenSharing={media.isScreenSharing} onToggleScreenShare={media.toggleScreenShare} roomId={options.roomId} layout={barPrefs.layout} showLabels={barPrefs.showLabels}
+      controls={<RoomControls localStream={media.localStream} onRetryMedia={media.retryMediaConnection} isScreenSharing={media.isScreenSharing} onToggleScreenShare={media.toggleScreenShare} roomId={options.roomId} layout={barPrefs.layout} shape={barPrefs.shape} showLabels={barPrefs.showLabels}
         isMicOn={media.isMicOn} isCameraOn={media.isCameraOn} toggleMic={media.toggleMic} toggleCamera={media.toggleCamera}
         showEmojiPicker={showEmojiPicker} setShowEmojiPicker={setShowEmojiPicker} emojiPresence={emojiPresence}
         emojiSheetRef={emojiSheetRef} handleReaction={(emoji) => session.emit('reaction', { emoji })}
@@ -309,9 +309,11 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         dataSaver={state.roomSettings?.dataSaver} fullscreenToasts={state.roomSettings?.fullscreenToasts}
         onUpdatePerf={(settings) => session.command({ type: 'room-settings', settings })}
         barShowLabels={barPrefs.showLabels} barLayout={barPrefs.layout}
+        barShape={barPrefs.shape}
         onBarPrefsChange={(patch) => {
           if (patch.showLabels !== undefined) barPrefs.setShowLabels(patch.showLabels);
           if (patch.layout !== undefined) barPrefs.setLayout(patch.layout);
+          if (patch.shape !== undefined) barPrefs.setShape(patch.shape);
         }}
         serverContent={<section className="host-server-settings">
         <div className="settings-section-heading"><h4>Servidor de la sala</h4><p>Tu navegador coordina la sesión. El relevo permite continuar con otro participante si sales.</p></div>

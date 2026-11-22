@@ -50,6 +50,15 @@ it('includes devices and external server as sections of the shared settings', ()
 });
 
 describe('RoomSettingsModal (Tu vista de la barra)', () => {
+  it('changes the personal button shape without changing room settings', () => {
+    const onBarPrefsChange = vi.fn(), onUpdatePerf = vi.fn();
+    render(<RoomSettingsModal {...modalProps({ onBarPrefsChange, onUpdatePerf, canEdit: false })} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Apariencia' }));
+    expect(screen.getByRole('radio', { name: 'Cuadrados' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Redondeados' }));
+    expect(onBarPrefsChange).toHaveBeenCalledWith({ shape: 'rounded' });
+    expect(onUpdatePerf).not.toHaveBeenCalled();
+  });
   it('muestra las pestañas y la sección personal tras pulsar Barra', async () => {
     render(<RoomSettingsModal {...modalProps()} />);
     for (const t of ['General', 'Apariencia', 'Rendimiento']) {

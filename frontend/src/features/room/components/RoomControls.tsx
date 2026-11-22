@@ -43,6 +43,7 @@ interface RoomControlsProps {
   onToggleMusic?: () => void;
   /** Distribución en PC: repartida o píldora centrada (gusto personal). */
   layout?: 'spread' | 'centered';
+  shape?: 'square' | 'rounded';
   /** Etiquetas bajo los iconos (gusto personal). */
   showLabels?: boolean;
 }
@@ -95,6 +96,7 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   musicOpen = false,
   onToggleMusic = () => undefined,
   layout = 'spread',
+  shape = 'square',
   showLabels = true,
 }) => {
   const [deviceMenu, setDeviceMenu] = useState<'audio' | 'video' | null>(null);
@@ -113,6 +115,7 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
 
   const footerClass = [
     'meet-bottom-bar',
+    `meet-bottom-bar--${shape}`,
     !isBarVisible ? 'meet-bottom-bar--hidden' : '',
     layout === 'spread' ? 'meet-bottom-bar--spread' : '',
     showLabels ? '' : 'meet-bottom-bar--no-labels',

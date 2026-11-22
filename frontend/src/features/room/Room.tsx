@@ -269,6 +269,7 @@ onVideoReady={r.handleVideoReady}
         musicOpen={r.activeSideTab === 'music'}
         onToggleMusic={toggleMusicPanel}
         layout={barPrefs.layout}
+        shape={barPrefs.shape}
         showLabels={barPrefs.showLabels}
         isMicOn={r.isMicOn}
         isCameraOn={r.isCameraOn}
@@ -354,9 +355,11 @@ onVideoReady={r.handleVideoReady}
         onUpdatePerf={r.handleUpdatePerfSettings}
         barShowLabels={barPrefs.showLabels}
         barLayout={barPrefs.layout}
+        barShape={barPrefs.shape}
         onBarPrefsChange={(patch) => {
           if (patch.showLabels !== undefined) barPrefs.setShowLabels(patch.showLabels);
           if (patch.layout !== undefined) barPrefs.setLayout(patch.layout);
+          if (patch.shape !== undefined) barPrefs.setShape(patch.shape);
         }}
       />
     </div>

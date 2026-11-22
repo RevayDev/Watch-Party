@@ -8256,3 +8256,16 @@ a.home-faq-hl--frontend {
 .music-volume-popup .music-volume-popup__range { writing-mode: vertical-lr; direction: rtl; width: 4px; height: 100px; min-height: 100px; margin: 0; background: linear-gradient(to top, var(--color-primary) var(--range-progress, 0%), #3a4254 var(--range-progress, 0%)); }
 .media-connection-notice { position: fixed; z-index: 80; right: 12px; bottom: 104px; display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 24px); padding: 8px 10px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 12px; color: var(--color-muted-light); background: var(--color-bg-input); font-size: 12px; }
 .player-ready-status { position: absolute; z-index: 35; left: 50%; top: 64px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg-input); color: var(--color-text-main); font-size: 12px; text-align: center; pointer-events: none; }
+.meet-bottom-bar.meet-bottom-bar--square { border-radius: 12px !important; }
+.meet-bottom-bar.meet-bottom-bar--rounded { border-radius: 999px !important; }
+.meet-bottom-bar.meet-bottom-bar--square .meet-circle-btn, .meet-bottom-bar.meet-bottom-bar--square .meet-device-control { border-radius: 8px !important; }
+.meet-bottom-bar.meet-bottom-bar--square .meet-device-control .meet-circle-btn, .meet-bottom-bar.meet-bottom-bar--square .meet-device-arrow { border-radius: 5px !important; }
+.meet-bottom-bar.meet-bottom-bar--rounded .meet-circle-btn, .meet-bottom-bar.meet-bottom-bar--rounded .meet-device-control, .meet-bottom-bar.meet-bottom-bar--rounded .meet-device-arrow { border-radius: 999px !important; }
+.settings-button-shape { display: flex; flex-wrap: wrap; gap: 12px; border: 0; padding: 0; margin: 24px 0 12px; }
+.settings-button-shape legend { margin-bottom: 12px; color: var(--color-text-main); font-weight: 600; font-size: 14px; }
+.settings-button-shape label { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; background: var(--color-bg-input); }
+.settings-button-shape label:has(input:checked) { border-color: var(--color-primary-light); }
+.settings-button-shape input { accent-color: var(--color-primary); }
+.settings-button-shape__sample { width: 28px; height: 28px; border: 1px solid var(--color-primary-light); background: var(--color-bg-hover); }
+.settings-button-shape__sample--square { border-radius: 6px; }
+.settings-button-shape__sample--rounded { border-radius: 50%; }

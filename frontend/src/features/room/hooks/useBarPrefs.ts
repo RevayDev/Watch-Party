@@ -8,6 +8,11 @@ import { STORAGE_KEYS } from '../../../shared/constants';
  * distribuida en PC o píldora centrada).
  */
 export type BarLayout = 'spread' | 'centered';
+export type BarShape = 'square' | 'rounded';
+function readShape(): BarShape {
+  try { return localStorage.getItem(STORAGE_KEYS.BAR_SHAPE) === 'rounded' ? 'rounded' : 'square'; }
+  catch { return 'square'; }
+}
 
 function readBool(key: string, fallback: boolean): boolean {
   try {
@@ -42,6 +47,10 @@ export function useBarPrefs() {
     readBool(STORAGE_KEYS.BAR_LABELS, true)
   );
   const [layout, setLayoutState] = useState<BarLayout>(readLayout);
+  const [shape, setShapeState] = useState<BarShape>(readShape);
+  const setShape = useCallback((value: BarShape) => {
+    setShapeState(value); write(STORAGE_KEYS.BAR_SHAPE, value);
+  }, []);
 
   const setShowLabels = useCallback((value: boolean) => {
     setShowLabelsState(value);
@@ -53,7 +62,7 @@ export function useBarPrefs() {
     write(STORAGE_KEYS.BAR_LAYOUT, value);
   }, []);
 
-  return { showLabels, layout, setShowLabels, setLayout };
+  return { showLabels, layout, shape, setShape, setShowLabels, setLayout };
 }
 
 export type BarPrefs = ReturnType<typeof useBarPrefs>;

@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
   BAR_LABELS: 'watchparty_bar_labels',
   /** Barra inferior: distribución ('spread' | 'centered', personal, local). */
   BAR_LAYOUT: 'watchparty_bar_layout',
+  BAR_SHAPE: 'watchparty_bar_shape',
 } as const;
 
 /** NOTA (bloque 5): eventos socket intencionalmente NO centralizados. */

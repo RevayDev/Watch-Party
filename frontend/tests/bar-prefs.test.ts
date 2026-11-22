@@ -16,6 +16,7 @@ describe('useBarPrefs', () => {
     const { result } = renderHook(() => useBarPrefs());
     expect(result.current.showLabels).toBe(true);
     expect(result.current.layout).toBe('spread');
+    expect(result.current.shape).toBe('square');
   });
 
   it('apagar etiquetas persiste en localStorage', () => {
@@ -42,5 +43,13 @@ describe('useBarPrefs', () => {
     localStorage.setItem(STORAGE_KEYS.BAR_LAYOUT, 'raro');
     const { result } = renderHook(() => useBarPrefs());
     expect(result.current.layout).toBe('spread');
+  });
+  it('saves the button shape and restores it after returning to the room', () => {
+    const first = renderHook(() => useBarPrefs());
+    act(() => first.result.current.setShape('rounded'));
+    expect(localStorage.getItem(STORAGE_KEYS.BAR_SHAPE)).toBe('rounded');
+    first.unmount();
+    const second = renderHook(() => useBarPrefs());
+    expect(second.result.current.shape).toBe('rounded');
   });
 });

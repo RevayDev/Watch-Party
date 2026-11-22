@@ -46,7 +46,8 @@ interface RoomSettingsModalProps {
   /** Tu vista de la barra (personal, local: jamás se emite a la sala). */
   barShowLabels?: boolean;
   barLayout?: 'spread' | 'centered';
-  onBarPrefsChange?: (patch: { showLabels?: boolean; layout?: 'spread' | 'centered' }) => void;
+  barShape?: 'square' | 'rounded';
+  onBarPrefsChange?: (patch: { showLabels?: boolean; layout?: 'spread' | 'centered'; shape?: 'square' | 'rounded' }) => void;
 }
 
 const TIMER_OPTIONS = [15, 30, 45, 60, 120, 180];
@@ -76,6 +77,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   onUpdatePerf,
   barShowLabels = true,
   barLayout = 'spread',
+  barShape = 'square',
   onBarPrefsChange,
   youtubeProvider,
   onYouTubeProviderChange,
@@ -494,6 +496,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             <p className="room-settings__box-desc">
               Solo para ti, en este navegador. No afecta a los demás.
             </p>
+
+            <fieldset className="settings-button-shape">
+              <legend>Forma de los botones</legend>
+              <label><Field type="radio" name="bar-shape" value="square" checked={barShape === 'square'} onChange={() => onBarPrefsChange?.({ shape: 'square' })} /><span className="settings-button-shape__sample settings-button-shape__sample--square" aria-hidden="true" /><span>Cuadrados</span></label>
+              <label><Field type="radio" name="bar-shape" value="rounded" checked={barShape === 'rounded'} onChange={() => onBarPrefsChange?.({ shape: 'rounded' })} /><span className="settings-button-shape__sample settings-button-shape__sample--rounded" aria-hidden="true" /><span>Redondeados</span></label>
+            </fieldset>
+            <p className="room-settings__box-desc">El mismo estilo de controles en PC y teléfono.</p>
 
             <div className="room-settings__box-head">
               <span className="room-settings__box-title">Textos bajo los iconos</span>
