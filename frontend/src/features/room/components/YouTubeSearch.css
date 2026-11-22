@@ -86,3 +86,9 @@
  .youtube-search__actions { grid-column: 1 / -1; display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; }
  .youtube-search__actions .ui-action { min-height: 32px; padding: 6px 10px; font-size: 12px; flex: 0 1 auto; }
 }
+.youtube-search__offline {
+  margin: 0 0 12px;
+  color: var(--color-muted-light);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}

@@ -1,7 +1,7 @@
 import { Field, Button } from '../../../shared/components/ui';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Plus, Search } from 'lucide-react';
-import { ApiService } from '../../../services/api';
+import { ApiService, BACKEND_BASE } from '../../../services/api';
 import type { IMusicTrack } from '../../../types/room';
 import './YouTubeSearch.css';
 
@@ -16,7 +16,20 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
   const [tracks, setTracks] = useState<IMusicTrack[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [backendAvailable, setBackendAvailable] = useState(Boolean(BACKEND_BASE));
   const request = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!BACKEND_BASE) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 2000);
+    fetch(`${BACKEND_BASE.replace(/\/$/, '')}/api/health`, { signal: controller.signal, cache: 'no-store' })
+      .then(response => response.ok)
+      .catch(() => false)
+      .then(available => { if (!controller.signal.aborted) setBackendAvailable(available); })
+      .finally(() => window.clearTimeout(timeout));
+    return () => { controller.abort(); window.clearTimeout(timeout); };
+  }, []);
 
   useEffect(() => () => request.current?.abort(), []);
 
@@ -32,7 +45,7 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const term = query.trim();
-    if (term.length < 2 || request.current) return;
+    if (term.length < 2 || request.current || !backendAvailable) return;
 
     const controller = new AbortController();
     request.current = controller;
@@ -54,7 +67,8 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
 
   return (
     <section className="room-settings__box youtube-search" aria-label="Buscar videos en YouTube">
-      <form className="youtube-search__form" onSubmit={search}>
+      {!backendAvailable && <p role="status" className="youtube-search__offline">La búsqueda no está disponible porque el servidor externo está apagado. Puedes pegar directamente un enlace de YouTube.</p>}
+      <form className="youtube-search__form" onSubmit={search} aria-disabled={!backendAvailable}>
         <Field
           type="search"
           className="room-settings__input"
@@ -64,7 +78,7 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
           value={query}
           onChange={(event) => event.target.value ? setQuery(event.target.value) : resetSearch()}
         />
-        <Button variant="primary" type="submit" className="btn btn--primary" disabled={loading || query.trim().length < 2}>
+        <Button variant="primary" type="submit" className="btn btn--primary" disabled={!backendAvailable || loading || query.trim().length < 2}>
           <Search size={16} aria-hidden="true" /> Buscar
         </Button>
       </form>
