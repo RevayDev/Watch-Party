@@ -7,6 +7,7 @@ import { formatPlayerTime, NowPlayingPlayer } from './NowPlayingPlayer';
 import { YouTubeSearch } from './YouTubeSearch';
 
 export interface MusicPanelProps {
+  onReadyToPlay?: (entryId: string) => void;
   sharedSearch?: MusicSearchState;
   onShareSearch?: (search: MusicSearchState) => void;
   onPlayback?: (entryId: string, currentTime: number, playing: boolean) => void;
@@ -47,6 +48,7 @@ export function resolveNowPlayingVideoId(
 }
 
 export const MusicPanel: React.FC<MusicPanelProps> = ({
+  onReadyToPlay,
   sharedSearch, onShareSearch,
   onPlayback,
   queue,
@@ -613,6 +615,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       </div>
       <Surface className="room-settings__box music-panel__footer">
         {nowPlaying && nowVideoId ? <NowPlayingPlayer
+          onReadyToPlay={() => onReadyToPlay?.(nowPlaying.entryId)}
           playback={nowPlaying.playback} startedAt={nowPlaying.startedAt}
           onPlayback={(currentTime, playing) => onPlayback?.(nowPlaying.entryId, currentTime, playing)}
           trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}

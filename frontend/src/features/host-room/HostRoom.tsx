@@ -1,4 +1,5 @@
 import { ScreenSharingStage } from '../../components/ScreenSharingStage';
+import { checkInterstellarCombo, pickAmbientQuotes, type InterstellarEvent } from '../player/interstellar';
 import { MediaConnectionNotice } from '../../components/MediaConnectionNotice';
 import { ConnectionCard } from '../../shared/components/ConnectionCard';
 import { ActionLink, Button, Field } from '../../shared/components/ui';
@@ -87,6 +88,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState('');
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
+  const interstellarHistory = useRef<InterstellarEvent[]>([]);
   const emojiPresence = usePresence(showEmojiPicker, 160);
   const morePresence = usePresence(showMoreMenu, 160);
   const emojiSheetRef = useSwipeDown<HTMLDivElement>(() => setShowEmojiPicker(false), showEmojiPicker);
@@ -147,6 +149,11 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       if (typeof packet.emoji !== 'string' || packet.emoji.length > 32) return;
       const reaction = { id: packet.id, emoji: packet.emoji, user: packet.userName, xOffset: Math.random() * 80 + 10 };
       setReactions((previous) => [...previous.slice(-39), reaction]);
+      const incoming = { emoji: packet.emoji, user: packet.userName, at: Date.now() };
+      if (checkInterstellarCombo(interstellarHistory.current, incoming, session.snapshot?.roomSettings?.visualEffects !== false)) {
+        interstellarHistory.current = [];
+        session.command({ type: 'cinematic', id: crypto.randomUUID(), quotes: pickAmbientQuotes() });
+      } else interstellarHistory.current = [...interstellarHistory.current.filter(item => Date.now() - item.at <= 5000), incoming];
       const timer = setTimeout(() => {
         setReactions((previous) => previous.filter((entry) => entry.id !== reaction.id));
         timers.delete(timer);
@@ -240,9 +247,13 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
             reactionsEnabled={state.roomSettings?.reactionsEnabled} visualEffects={state.roomSettings?.visualEffects}
             duckingEnabled={state.roomSettings?.duckingEnabled} duckingLevelPct={state.roomSettings?.duckingLevel}
             onSyncAction={(action, currentTime) => session.command({ type: 'playback', action, currentTime })}
-            onPlaybackHeartbeat={isHost ? (currentTime, playing) => session.command({
+            onVideoReady={(videoId) => session.command({ type: 'video-ready', videoId })}
+            cinematicKey={state.cinematic && !state.cinematic.skipped ? 1 : 0}
+            cinematicQuotes={state.cinematic?.quotes}
+            onCinematicDone={() => { if (state.cinematic) session.command({ type: 'cinematic-skip', id: state.cinematic.id }); }}
+            onPlaybackHeartbeat={isHost ? (currentTime, playing) => { if (state.playback?.awaitingReady || (state.playback?.sentAt ?? 0) > Date.now()) return; session.command({
               type: 'playback', action: playing ? 'play' : 'pause', currentTime,
-            }) : undefined} remoteAction={state.playback} />
+            }); } : undefined} remoteAction={state.playback} />
         )}
       </>}
       cameras={<CameraGrid localStream={media.localStream} remotePeers={media.remotePeers}

@@ -28,11 +28,14 @@ const musicEntrySchema = musicTrackSchema.omit({ id: true }).extend({
 });
 const musicSearchSchema = z.object({ id, query: z.string().max(100), tracks: z.array(musicTrackSchema).max(12).nullable() });
 const musicPlayingSchema = musicTrackSchema.omit({ id: true, durationMs: true }).extend({
-  playback: z.object({ currentTime: z.number().finite().nonnegative(), playing: z.boolean(), sentAt: z.number().finite() }).optional(),
+  playback: z.object({ currentTime: z.number().finite().nonnegative(), playing: z.boolean(), sentAt: z.number().finite(), awaitingReady: z.boolean().optional() }).optional(),
+  readyMembers: z.array(id).optional(),
   entryId: id, trackId: id, proposedBy: name.optional(), proposedByUserId: id.optional(),
   startedAt: z.string(), startedBy: name,
 });
 export const snapshotSchema = z.object({
+  videoReady: z.array(id).optional(),
+  cinematic: z.object({ id, quotes: z.tuple([z.string(), z.string(), z.string()]), skipped: z.boolean().optional() }).optional(),
   musicSearch: musicSearchSchema.optional(),
   revision: z.number().int().nonnegative(), hostId: id,
   members: z.array(memberSchema).max(MAX_HOST_MEMBERS),
@@ -44,6 +47,7 @@ export const snapshotSchema = z.object({
   })).max(300),
   video: videoSchema.nullable(),
   playback: z.object({
+    awaitingReady: z.boolean().optional(),
     isPlaying: z.boolean().optional(),
     action: z.enum(['play', 'pause', 'seek']), currentTime: z.number().finite().nonnegative(),
     sentAt: z.number().finite(), timestamp: z.number().finite(),
@@ -54,6 +58,10 @@ export const snapshotSchema = z.object({
   musicNowPlaying: musicPlayingSchema.nullable().default(null),
 });
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('video-ready'), videoId: id }),
+  z.object({ type: z.literal('music-ready'), entryId: id }),
+  z.object({ type: z.literal('cinematic'), id, quotes: z.tuple([z.string().max(200), z.string().max(200), z.string().max(200)]) }),
+  z.object({ type: z.literal('cinematic-skip'), id }),
   z.object({ type: z.literal('music-search'), search: musicSearchSchema }),
   z.object({ type: z.literal('music-playback'), entryId: id, currentTime: z.number().finite().nonnegative(), playing: z.boolean() }),
   z.object({ type: z.literal('room-settings'), settings: roomSettingsSchema }),
@@ -73,6 +81,8 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('music-stop') }),
 ]);
 export const envelopeSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('clock-ping'), sent: z.number().finite() }),
+  z.object({ type: z.literal('clock-pong'), sent: z.number().finite(), server: z.number().finite() }),
   z.object({ type: z.literal('handoff'), targetId: id }),
   z.object({ type: z.literal('room-closed') }),
   z.object({ type: z.literal('hello'), proof: z.string().regex(/^[a-f0-9]{64}$/), member: memberSchema }),
@@ -119,13 +129,36 @@ export function newHostRoom(name: string): HostRoomOptions {
 
 export function applyHostCommand(state: HostSnapshot, senderId: string, command: HostCommand): HostSnapshot {
   const member = state.members.find((candidate) => candidate.id === senderId);
-  const memberAction = command.type === 'music-search' || command.type === 'playback' || command.type === 'music-playback' || command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
+  const memberAction = ['video-ready', 'music-ready', 'cinematic', 'cinematic-skip'].includes(command.type) || command.type === 'music-search' || command.type === 'playback' || command.type === 'music-playback' || command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
   if (!member || (!memberAction && senderId !== state.hostId)) return state;
   switch (command.type) {
+    case 'cinematic':
+      if (state.cinematic && !state.cinematic.skipped) return state;
+      return { ...state, revision: state.revision + 1, cinematic: { id: command.id, quotes: command.quotes } };
+    case 'cinematic-skip':
+      if (state.cinematic?.id !== command.id) return state;
+      return { ...state, revision: state.revision + 1, cinematic: { ...state.cinematic, skipped: true } };
+    case 'video-ready': {
+      if (state.video?.id !== command.videoId || !state.playback?.awaitingReady) return state;
+      const ready = [...new Set([...(state.videoReady ?? []), senderId])];
+      const all = state.members.every(member => ready.includes(member.id));
+      return { ...state, revision: state.revision + 1, videoReady: ready, playback: all
+        ? { action: 'play', isPlaying: true, currentTime: state.video.startTime ?? 0, sentAt: Date.now() + 1200, timestamp: Math.max(Date.now(), state.playback.timestamp + 1) }
+        : state.playback };
+    }
+    case 'music-ready': {
+      const music = state.musicNowPlaying;
+      if (music?.entryId !== command.entryId || !music.playback?.awaitingReady) return state;
+      const ready = [...new Set([...(music.readyMembers ?? []), senderId])];
+      const all = state.members.every(member => ready.includes(member.id));
+      return { ...state, revision: state.revision + 1, musicNowPlaying: { ...music, readyMembers: ready,
+        playback: all ? { currentTime: 0, playing: true, sentAt: Date.now() + 1200 } : music.playback } };
+    }
     case 'music-search':
       return { ...state, revision: state.revision + 1, musicSearch: command.search };
     case 'music-playback':
       if (state.musicNowPlaying?.entryId !== command.entryId) return state;
+      if (state.musicNowPlaying.playback?.awaitingReady) return state;
       return { ...state, revision: state.revision + 1, musicNowPlaying: { ...state.musicNowPlaying, playback: { currentTime: command.currentTime, playing: command.playing, sentAt: Date.now() } } };
     case 'room-settings':
       return { ...state, revision: state.revision + 1, roomSettings: { ...state.roomSettings, ...command.settings } };
@@ -165,10 +198,11 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
     case 'clear-video':
       return { ...state, revision: state.revision + 1, video: null, playback: null };
     case 'video':
-      return { ...state, revision: state.revision + 1, video: command.video, playback: null, ...(command.transferMusic ? { musicNowPlaying: null } : {}) };
+      return { ...state, revision: state.revision + 1, video: command.video, videoReady: [], playback: { action: 'pause', isPlaying: false, awaitingReady: true, currentTime: command.video.startTime ?? 0, sentAt: Date.now(), timestamp: Date.now() }, ...(command.transferMusic ? { musicNowPlaying: null } : {}) };
     case 'settings':
       return { ...state, revision: state.revision + 1, automaticMigration: command.automaticMigration, replicateVideo: command.replicateVideo };
     case 'playback':
+      if (state.playback?.awaitingReady) return state;
       return { ...state, revision: state.revision + 1, playback: { action: command.action, isPlaying: command.action === 'seek' ? (state.playback?.isPlaying ?? state.playback?.action === 'play') : command.action === 'play', currentTime: command.currentTime, sentAt: Date.now(), timestamp: Math.max(Date.now(), (state.playback?.timestamp ?? 0) + 1) } };
     case 'music-add': {
       if (state.musicQueue.length >= 40 || state.musicQueue.some((entry) => entry.trackId === command.track.id)) return state;
@@ -192,6 +226,7 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
       const [next, ...queue] = state.musicQueue;
       return { ...state, revision: state.revision + 1, musicQueue: queue, musicNowPlaying: next ? {
         ...next, entryId: next.id, startedAt: new Date().toISOString(), startedBy: member.name,
+        playback: { currentTime: 0, playing: false, sentAt: Date.now(), awaitingReady: true }, readyMembers: [],
       } : null };
     }
     case 'music-stop':

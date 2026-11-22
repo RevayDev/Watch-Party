@@ -71,6 +71,21 @@ afterEach(async () => {
 });
 
 describe('music-queue.handler', () => {
+  it('keeps music paused at zero until all present players report ready', async () => {
+    const { io, emitted } = makeIo();
+    const first = new Map<string, (data: unknown) => void>(), second = new Map<string, (data: unknown) => void>();
+    registerMusicQueueHandlers(io, { id: 'ready-one', on: (event: string, cb: (data: unknown) => void) => first.set(event, cb), emit: () => {} } as unknown as Socket);
+    registerMusicQueueHandlers(io, { id: 'ready-two', on: (event: string, cb: (data: unknown) => void) => second.set(event, cb), emit: () => {} } as unknown as Socket);
+    admit('ready-one', roomId, 'Ana'); admit('ready-two', roomId, 'Beto');
+    await first.get('music-add')?.({ roomId, track: TRACK });
+    const entryId = (await RoomService.getRoomById(roomId))!.musicNowPlaying!.entryId;
+    await first.get('music-ready')?.({ roomId, entryId });
+    expect((await RoomService.getRoomById(roomId))?.musicNowPlaying?.playback).toMatchObject({ currentTime: 0, playing: false, awaitingReady: true });
+    await second.get('music-ready')?.({ roomId, entryId });
+    const playback = (await RoomService.getRoomById(roomId))?.musicNowPlaying?.playback;
+    expect(playback?.playing).toBe(true); expect(playback?.sentAt).toBeGreaterThan(Date.now());
+    expect(emitted.at(-1)?.payload).toMatchObject({ nowPlaying: { playback: { currentTime: 0, playing: true } } });
+  });
   it('shares searches with members and rejects updates from outside the room', async () => {
     const registered = new Map<string, (data: unknown) => void>();
     const socket = { id: 'search-member', on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb), emit: () => {} } as unknown as Socket;
@@ -93,6 +108,7 @@ describe('music-queue.handler', () => {
     await registered.get('music-add')?.({ roomId, track: TRACK });
     const room = await RoomService.getRoomById(roomId);
     const entryId = room!.musicNowPlaying!.entryId;
+    await registered.get('music-ready')?.({ roomId, entryId });
     emitted.length = 0;
     await registered.get('music-playback')?.({ roomId, entryId, currentTime: 42, playing: false });
     expect(emitted.at(-1)?.payload).toMatchObject({ nowPlaying: { playback: { currentTime: 42, playing: false } } });

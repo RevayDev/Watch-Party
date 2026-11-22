@@ -28,6 +28,7 @@ export interface UseRoomSocketArgs {
 
 /** Acción remota de playback. `autoplay` = play grupal del handshake video-ready. */
 export interface RemoteSyncAction {
+  awaitingReady?: boolean;
   action: 'play' | 'pause' | 'seek';
   currentTime: number;
   sentAt?: number;
@@ -566,7 +567,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
       ]);
     };
 
-    const handleSyncVideo = (data: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number; autoplay?: boolean }) => {
+    const handleSyncVideo = (data: { action: 'play' | 'pause' | 'seek'; currentTime: number; sentAt?: number; autoplay?: boolean; awaitingReady?: boolean }) => {
       if (data.action === 'play') {
         lastConsensusRef.current = { currentTime: data.currentTime, isPlaying: true };
       } else if (data.action === 'pause') {
@@ -586,6 +587,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
         sentAt: data.sentAt,
         timestamp: nextRemoteActionTimestamp(),
         autoplay: data.autoplay === true,
+        awaitingReady: data.awaitingReady === true,
       });
     };
 
@@ -1272,7 +1274,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
 
   // Handshake video-ready (Rol A): el player lo llama una vez por video al
   // alcanzar `loadeddata` con currentTime≈0. El servidor cuenta presentes y
-  // responde con el `play` grupal (autoplay) o el timeout de 15 s lo hace.
+  // responde con el `play` grupal cuando todos los presentes están listos.
   const handleVideoReady = useCallback(
     (fileName: string) => {
       if (!fileName) return;

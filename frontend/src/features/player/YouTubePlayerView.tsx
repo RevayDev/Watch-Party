@@ -77,7 +77,7 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
           height: '100%',
           videoId,
           playerVars: {
-            autoplay: 1,
+            autoplay: 0,
             controls: 1,
             enablejsapi: 1,
             modestbranding: 1,

@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AudioLines, Maximize2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, Youtube, Square } from 'lucide-react';
 import { YouTubePlayerView } from '../../player/YouTubePlayerView';
 import { onPageResume } from '../../../shared/pageResume';
+import { roomNow } from '../../../shared/roomClock';
 
 interface QueueYouTubePlayer {
   playVideo?: () => void;
@@ -24,7 +25,8 @@ export function formatPlayerTime(totalSeconds: number): string {
 
 /** The mini-player uses the existing iframe and advances the room queue when playback ends. */
 export const NowPlayingPlayer: React.FC<{
-  playback?: { currentTime: number; playing: boolean; sentAt: number };
+  playback?: { currentTime: number; playing: boolean; sentAt: number; awaitingReady?: boolean };
+  onReadyToPlay?: () => void;
   startedAt?: string;
   onPlayback?: (currentTime: number, playing: boolean) => void;
   trackKey: string;
@@ -37,7 +39,7 @@ export const NowPlayingPlayer: React.FC<{
   onStop: () => void;
   onExpand: (currentTime: number) => void;
   showModerator: boolean;
-}> = ({ playback, startedAt, onPlayback, trackKey, videoId, title, subtitle, thumb, onEnded, onNext, onStop, onExpand, showModerator }) => {
+}> = ({ playback, startedAt, onPlayback, onReadyToPlay, trackKey, videoId, title, subtitle, thumb, onEnded, onNext, onStop, onExpand, showModerator }) => {
   const playerRef = useRef<QueueYouTubePlayer | null>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -51,28 +53,41 @@ export const NowPlayingPlayer: React.FC<{
   const checkpoint = useRef(playback);
   const playingRef = useRef(false);
   const startedRef = useRef(startedAt);
+  const readyRef = useRef(onReadyToPlay); readyRef.current = onReadyToPlay;
   startedRef.current = startedAt;
   const synchronize = (force = false) => {
     const p = playerRef.current; if (!p) return;
     const point = checkpoint.current;
-    const shouldPlay = point?.playing ?? true;
+    const shouldPlay = (point?.playing ?? true) && (point?.sentAt ?? 0) <= roomNow();
     const sentAt = point?.sentAt ?? Date.parse(startedRef.current || new Date().toISOString());
-    const target = (point?.currentTime ?? 0) + (shouldPlay ? Math.max(0, (Date.now() - sentAt) / 1000) : 0);
+    const target = (point?.currentTime ?? 0) + (shouldPlay ? Math.max(0, (roomNow() - sentAt) / 1000) : 0);
     try {
-      if (force || Math.abs((p.getCurrentTime?.() ?? 0) - target) > 1.2) p.seekTo?.(target, true);
+      if (force || Math.abs((p.getCurrentTime?.() ?? 0) - target) > 0.5) p.seekTo?.(target, true);
       const active = p.getPlayerState ? p.getPlayerState() === 1 : playingRef.current;
       if (shouldPlay && !active) p.playVideo?.();
-      if (!shouldPlay && active) p.pauseVideo?.();
+      if (!shouldPlay) p.pauseVideo?.();
       setCurrent(target);
     } catch { /* The next ready/foreground event retries the checkpoint. */ }
   };
   const syncRef = useRef(synchronize); syncRef.current = synchronize;
+  const reportReady = () => {
+    const p = playerRef.current;
+    if (p && Math.abs(p.getCurrentTime?.() ?? Infinity) < .25 && (p.getDuration?.() ?? 0) > 0) readyRef.current?.();
+  };
+  const reportReadyRef = useRef(reportReady); reportReadyRef.current = reportReady;
   useEffect(() => {
     checkpoint.current = playback;
     syncRef.current(true);
+    if (playback?.playing && playback.sentAt > roomNow()) {
+      const timer = window.setTimeout(() => syncRef.current(true), playback.sentAt - roomNow());
+      return () => window.clearTimeout(timer);
+    }
   }, [playback?.sentAt, playback?.currentTime, playback?.playing, startedAt, trackKey]);
   useEffect(() => {
-    const timer = window.setInterval(() => syncRef.current(), 1500);
+    const timer = window.setInterval(() => {
+      syncRef.current();
+      if (checkpoint.current?.awaitingReady) reportReadyRef.current();
+    }, 1000);
     const stop = onPageResume(() => syncRef.current(true));
     return () => { window.clearInterval(timer); stop(); };
   }, [trackKey]);
@@ -95,6 +110,7 @@ export const NowPlayingPlayer: React.FC<{
   };
 
   const togglePlay = () => {
+    if (playback?.awaitingReady) { reportReady(); return; }
     try {
       const p = playerRef.current;
       if (!p) return;
@@ -114,6 +130,7 @@ export const NowPlayingPlayer: React.FC<{
   };
 
   const restart = () => {
+    if (playback?.awaitingReady) { reportReady(); return; }
     publish(0, true);
     playerRef.current?.seekTo?.(0, true);
     setCurrent(0);
@@ -125,6 +142,7 @@ export const NowPlayingPlayer: React.FC<{
   };
 
   const seekTo = (seconds: number) => {
+    if (playback?.awaitingReady) return;
     publish(seconds, playing);
     try {
       const p = playerRef.current;
@@ -209,13 +227,15 @@ export const NowPlayingPlayer: React.FC<{
         </div>}
       </div>
       <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
-        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; tryPlay(); }} onStateChange={(event) => {
+        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; tryPlay(); reportReady(); }} onStateChange={(event) => {
+          if (checkpoint.current?.awaitingReady) { playerRef.current?.pauseVideo?.(); reportReady(); }
           if (event.data === 1) { playingRef.current = true; setPlaying(true); }
           else if (event.data === 2) { playingRef.current = false; setPlaying(false); }
           else if (event.data === 0) { setPlaying(false); onEndedRef.current(); }
         }} />
       </div>
       <div className="yt-miniplayer-controls music-player__controls">
+        {playback?.awaitingReady && <span role="status">Esperando a que todos estén listos…</span>}
         <Button variant="unstyled" type="button" className="music-player__icon" title="Reiniciar canción" aria-label="Reiniciar canción" onClick={restart}><SkipBack size={18} /></Button>
         <Button variant="unstyled" type="button" className="music-player__icon music-player__play" title={playing ? 'Pausar' : 'Reproducir'} aria-label={playing ? 'Pausar' : 'Reproducir'} onClick={togglePlay}>{playing ? <Pause size={20} /> : <Play size={20} />}</Button>
         {showModerator && <Button variant="unstyled" type="button" className="music-player__icon" title="Siguiente canción" aria-label="Siguiente canción" onClick={onNext}><SkipForward size={18} /></Button>}

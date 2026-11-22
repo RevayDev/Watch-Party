@@ -1,4 +1,5 @@
 import { onPageResume } from '../../shared/pageResume';
+import { resetRoomClock, sampleRoomClock } from '../../shared/roomClock';
 import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
 import type { WebRTCTransport } from '../../hooks/useWebRTC';
 import {
@@ -112,6 +113,7 @@ export class HostSession implements WebRTCTransport {
   }
 
   start() {
+    resetRoomClock();
     const peer = new Peer(this.peerOptions);
     this.peer = peer;
     peer.on('open', (id) => {
@@ -310,6 +312,8 @@ export class HostSession implements WebRTCTransport {
       }
       if (discovery || !this.state?.members.some((member) => member.id === sender.id)) return;
       if (sender.id === this.state.hostId) this.lastHostSeen = Date.now();
+      if (message.type === 'clock-ping') { if (this.isHost) this.send(connection, { type: 'clock-pong', sent: message.sent, server: Date.now() }); return; }
+      if (message.type === 'clock-pong') { if (sender.id === this.state.hostId) sampleRoomClock(message.sent, message.server); return; }
       if (message.type === 'ping') { this.send(connection, { type: 'pong' }); return; }
       if (message.type === 'pong') return;
       if (message.type === 'command') {
@@ -365,6 +369,7 @@ export class HostSession implements WebRTCTransport {
     this.reconcile();
     this.refreshFile();
     this.flushChat();
+    this.send(this.connections.get(state.hostId), { type: 'clock-ping', sent: Date.now() });
     this.notify();
   }
 
@@ -406,7 +411,7 @@ export class HostSession implements WebRTCTransport {
       }
       const host = this.connections.get(this.state.hostId);
       if (!host?.open) {
-        if (parsed.data.type === 'playback' || parsed.data.type === 'music-playback') this.pendingPlayback.set(parsed.data.type, parsed.data);
+        if (parsed.data.type === 'playback' || parsed.data.type === 'music-playback' || parsed.data.type === 'video-ready' || parsed.data.type === 'music-ready') this.pendingPlayback.set(parsed.data.type, parsed.data);
         else if (parsed.data.type.startsWith('music-') && this.pendingMusic.length < 40) this.pendingMusic.push(parsed.data);
         this.error = 'Esperando el relevo del servidor. Los mensajes pendientes se enviarán al reconectar.';
         this.notify();
@@ -457,6 +462,10 @@ export class HostSession implements WebRTCTransport {
     const serialized: unknown = JSON.parse(JSON.stringify(data));
     if (!serialized || typeof serialized !== 'object' || Array.isArray(serialized)) return;
     const payload = serialized as Record<string, unknown>;
+    if (event === 'music-ready') {
+      const parsed = commandSchema.safeParse({ ...payload, type: 'music-ready' });
+      if (parsed.success) this.command(parsed.data); return;
+    }
     if (event === 'request-music-search') { if (this.state.musicSearch) this.publish('music-search-state', this.state.musicSearch); return; }
     if (event === 'music-search') {
       const parsed = commandSchema.safeParse({ ...payload, type: 'music-search' });
@@ -512,6 +521,12 @@ export class HostSession implements WebRTCTransport {
           ...this.state, revision: this.state.revision + 1,
           members: this.state.members.filter((member) => !removed.some((entry) => entry.id === member.id)),
         };
+      }
+      if (this.state.video && this.state.playback?.awaitingReady && this.state.members.every(member => this.state!.videoReady?.includes(member.id))) {
+        this.state = applyHostCommand(this.state, this.id, { type: 'video-ready', videoId: this.state.video.id });
+      }
+      if (this.state.musicNowPlaying?.playback?.awaitingReady && this.state.members.every(member => this.state!.musicNowPlaying?.readyMembers?.includes(member.id))) {
+        this.state = applyHostCommand(this.state, this.id, { type: 'music-ready', entryId: this.state.musicNowPlaying.entryId });
       }
       this.broadcast({ type: 'ping' });
       this.commit();

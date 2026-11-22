@@ -40,3 +40,13 @@ it('opens volume separately without moving or changing the shared music position
  fireEvent.keyDown(document, { key: 'Escape' });
  expect(screen.queryByRole('dialog')).toBeNull();
 });
+it('remains at zero before the coordinated start time and plays at the shared deadline', () => {
+ vi.useFakeTimers(); vi.setSystemTime(10000);
+ player.getPlayerState.mockReturnValue(2); player.getCurrentTime.mockReturnValue(0);
+ render(<NowPlayingPlayer {...props} playback={{ currentTime: 0, playing: true, sentAt: 11200 }} />);
+ expect(player.playVideo).not.toHaveBeenCalled();
+ act(() => { vi.advanceTimersByTime(1199); });
+ expect(player.playVideo).not.toHaveBeenCalled();
+ act(() => { vi.advanceTimersByTime(1); });
+ expect(player.playVideo).toHaveBeenCalled();
+});

@@ -273,6 +273,9 @@ it('relays guest video pause/seek and music checkpoints to the host', async () =
  host.command({ type: 'music-add', track: { id: 'abcdefghijk', name: 'Song', artists: 'Artist' } });
  host.command({ type: 'music-next' });
  await settleUntil(() => !!guest.snapshot?.musicNowPlaying);
+ host.command({ type: 'music-ready', entryId: host.snapshot!.musicNowPlaying!.entryId });
+ guest.emit('music-ready', { entryId: guest.snapshot!.musicNowPlaying!.entryId });
+ await settleUntil(() => host.snapshot?.musicNowPlaying?.playback?.playing === true);
  guest.emit('music-playback', { entryId: guest.snapshot!.musicNowPlaying!.entryId, currentTime: 18, playing: false });
  await settleUntil(() => host.snapshot?.musicNowPlaying?.playback?.currentTime === 18);
  expect(host.snapshot?.musicNowPlaying?.playback?.playing).toBe(false);
@@ -288,4 +291,27 @@ it('keeps a music addition made before the mesh opens and shares searches', asyn
  host.emit('music-search', { search: { id: 'clear', query: '', tracks: null } });
  await settleUntil(() => guest.snapshot?.musicSearch?.id === 'clear');
  expect(guest.snapshot?.musicSearch?.tracks).toBeNull();
+});
+
+it('holds a new video at zero until every member is ready, then schedules one shared start', async () => {
+ const host = start('Ana', true); await vi.advanceTimersByTimeAsync(1);
+ const guest = start('Beto'); await settleUntil(() => guest.snapshot?.members.length === 2);
+ host.command({ type: 'video', video: { id: 'video-ready-test', name: 'Film', source: 'url', url: 'https://example.com/film.mp4', size: 0, mime: 'video/mp4' } });
+ host.command({ type: 'video-ready', videoId: 'video-ready-test' });
+ await vi.advanceTimersByTimeAsync(20000);
+ expect(host.snapshot?.playback).toMatchObject({ action: 'pause', currentTime: 0, awaitingReady: true });
+ guest.command({ type: 'video-ready', videoId: 'video-ready-test' });
+ await settleUntil(() => host.snapshot?.playback?.action === 'play');
+ expect(host.snapshot?.playback?.sentAt).toBeGreaterThan(Date.now());
+ await settleUntil(() => guest.snapshot?.playback?.action === 'play');
+ expect(guest.snapshot?.playback?.sentAt).toBe(host.snapshot?.playback?.sentAt);
+});
+
+it('shares one cinematic and its dismissal across host and guest', async () => {
+ const host = start('Ana', true); await vi.advanceTimersByTimeAsync(1);
+ const guest = start('Beto'); await settleUntil(() => guest.snapshot?.members.length === 2);
+ host.command({ type: 'cinematic', id: 'easter-egg', quotes: ['Una', 'Dos', 'Tres'] });
+ await settleUntil(() => guest.snapshot?.cinematic?.id === 'easter-egg');
+ guest.command({ type: 'cinematic-skip', id: 'easter-egg' });
+ await settleUntil(() => host.snapshot?.cinematic?.skipped === true);
 });

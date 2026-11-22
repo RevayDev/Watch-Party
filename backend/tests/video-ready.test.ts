@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
 import { RoomService } from '../src/services/room.service.js';
 import { activeUsers } from '../src/sockets/socket-state.js';
 import { clearAllPendingGraces } from '../src/sockets/disconnect-grace.js';
@@ -90,7 +90,7 @@ describe('video-ready: handshake de auto-play grupal', () => {
     activeUsers.set('transfer-host', { socketId: 'transfer-host', roomId: room.roomId, userName: 'Host', isLeader: true });
     registerVideoReadyHandlers(io, leader.socket);
     await fire(leader.handlers, 'video-ready', { roomId: room.roomId, fileName: VIDEO.fileName });
-    expect(roomEmits.find((event) => event.event === 'sync-video')?.payload).toMatchObject({ currentTime: 42, action: 'play' });
+    expect(roomEmits.find((event) => event.event === 'sync-video' && (event.payload as { action: string }).action === 'play')?.payload).toMatchObject({ currentTime: 42, action: 'play' });
   });
   it('al completarse todos los presentes emite play grupal con autoplay', async () => {
     const { room } = await RoomService.createRoom({ leaderName: 'Host' });
@@ -109,14 +109,20 @@ describe('video-ready: handshake de auto-play grupal', () => {
 
     await fire(leader.handlers, 'video-ready', { roomId: room.roomId, fileName: VIDEO.fileName });
     // Solo uno reportó: aún no hay play grupal
-    expect(roomEmits.filter((e) => e.event === 'sync-video')).toHaveLength(0);
+    expect(roomEmits.filter((e) => e.event === 'sync-video' && (e.payload as { action: string }).action === 'play')).toHaveLength(0);
     expect(__videoReadyPendingForTests(room.roomId)).toBe(true);
+    vi.useFakeTimers();
+    try {
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(roomEmits.filter((e) => e.event === 'sync-video' && (e.payload as { action: string }).action === 'play')).toHaveLength(0);
+    } finally { vi.useRealTimers(); }
 
     await fire(ana.handlers, 'video-ready', { roomId: room.roomId, fileName: VIDEO.fileName });
     // Todos los presentes listos: play grupal con autoplay, y solo play
-    const plays = roomEmits.filter((e) => e.event === 'sync-video');
+    const plays = roomEmits.filter((e) => e.event === 'sync-video' && (e.payload as { action: string }).action === 'play');
     expect(plays).toHaveLength(1);
     expect(plays[0].payload).toMatchObject({ action: 'play', currentTime: 0, autoplay: true });
+    expect((plays[0].payload as { sentAt: number }).sentAt).toBeGreaterThan(Date.now());
     expect(__videoReadyPendingForTests(room.roomId)).toBe(false);
     expect(roomPlayback.get(room.roomId)).toMatchObject({ currentTime: 0, isPlaying: true });
   });

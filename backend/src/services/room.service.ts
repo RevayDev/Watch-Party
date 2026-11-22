@@ -880,6 +880,7 @@ export class RoomService {
           proposedByUserId: entry.proposedByUserId,
           startedAt: now,
           startedBy: 'sala',
+          playback: { currentTime: 0, playing: false, sentAt: Date.now(), awaitingReady: true },
         };
       }
       room.updatedAt = new Date();
@@ -1040,6 +1041,7 @@ export class RoomService {
         proposedByUserId: next.proposedByUserId,
         startedAt: new Date(),
         startedBy: 'sala',
+        playback: { currentTime: 0, playing: false, sentAt: Date.now(), awaitingReady: true },
       };
       room.updatedAt = new Date();
       await roomRepository.save(room);
@@ -1048,12 +1050,13 @@ export class RoomService {
   }
 
   /** Detiene la música: limpia nowPlaying. Nunca toca `room.video`. */
-  public static async syncMusic(roomId: string, entryId: string, currentTime: number, playing: boolean): Promise<IRoom | null> {
+  public static async syncMusic(roomId: string, entryId: string, currentTime: number, playing: boolean, startAt = Date.now(), onlyIfWaiting = false): Promise<IRoom | null> {
     const cleanId = cleanIdOf(roomId);
     return withRoomLock(cleanId, async () => {
       const room = await roomRepository.findById(cleanId);
       if (!room || room.musicNowPlaying?.entryId !== entryId) return null;
-      room.musicNowPlaying = { ...room.musicNowPlaying, playback: { currentTime, playing, sentAt: Date.now() } };
+      if (onlyIfWaiting && !room.musicNowPlaying.playback?.awaitingReady) return null;
+      room.musicNowPlaying = { ...room.musicNowPlaying, playback: { currentTime, playing, sentAt: startAt } };
       room.updatedAt = new Date();
       await roomRepository.save(room);
       return room;

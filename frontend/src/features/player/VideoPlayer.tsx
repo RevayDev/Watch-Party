@@ -1,4 +1,5 @@
 import { onPageResume } from '../../shared/pageResume';
+import { roomNow } from '../../shared/roomClock';
 import { VideoAudioBoost } from './VideoAudioBoost';
 import { PlayerActionDock } from './PlayerActionDock';
 import { Field, Button } from '../../shared/components/ui';
@@ -47,7 +48,7 @@ interface VideoPlayerProps {
   uploadProgress: number | null;
   isVideoLoading?: boolean;
   onSyncAction: (action: 'play' | 'pause' | 'seek', currentTime: number) => void;
-  remoteAction: { action: 'play' | 'pause' | 'seek'; isPlaying?: boolean; currentTime: number; sentAt?: number; timestamp: number; autoplay?: boolean } | null;
+  remoteAction: { action: 'play' | 'pause' | 'seek'; awaitingReady?: boolean; isPlaying?: boolean; currentTime: number; sentAt?: number; timestamp: number; autoplay?: boolean } | null;
   reactions: ReactionItem[];
   isMicOn?: boolean; // used for auto-duck
   /** Periodic position report so the room can resolve a consensus time for newcomers */
@@ -487,13 +488,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // supresión extendida para el play asíncrono del auto-play grupal).
   useEffect(() => {
     if (!remoteAction) return;
+    if (remoteAction.action === 'play' && remoteAction.sentAt && remoteAction.sentAt > roomNow() + 10) {
+      const timer = window.setTimeout(() => setMediaReadyEpoch(value => value + 1), remoteAction.sentAt - roomNow());
+      return () => window.clearTimeout(timer);
+    }
 
     if (videoSourceType === 'youtube' && ytPlayerRef.current) {
       const yt = ytPlayerRef.current;
       if (appliedYt.current?.player === yt && appliedYt.current?.timestamp === remoteAction.timestamp) return;
       try {
         const latencyOffset = remoteAction.sentAt
-          ? Math.max(0, (Date.now() - remoteAction.sentAt) / 1000)
+          ? Math.max(0, (roomNow() - remoteAction.sentAt) / 1000)
           : 0;
         const targetTime =
           remoteAction.action === 'play' || (remoteAction.action === 'seek' && remoteAction.isPlaying)
@@ -529,7 +534,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const latencyOffset = remoteAction.sentAt
-      ? Math.max(0, (Date.now() - remoteAction.sentAt) / 1000)
+      ? Math.max(0, (roomNow() - remoteAction.sentAt) / 1000)
       : 0;
     const targetTime =
       remoteAction.action === 'play' || (remoteAction.action === 'seek' && remoteAction.isPlaying)
@@ -618,12 +623,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     isApplyingRemote.current || cineHoldRef.current || Date.now() < suppressUntilRef.current;
 
   const handlePlay = () => {
+    if (remoteAction?.awaitingReady && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = video?.startTime ?? 0; return; }
     if (isLocalEchoSuppressed() || !videoRef.current) return;
+    liveAnchorRef.current = { timeSecs: videoRef.current.currentTime, playing: true, atMs: roomNow() };
     onSyncAction('play', videoRef.current.currentTime);
   };
 
   const handlePause = () => {
     if (isLocalEchoSuppressed() || !videoRef.current) return;
+    liveAnchorRef.current = { timeSecs: videoRef.current.currentTime, playing: false, atMs: roomNow() };
     onSyncAction('pause', videoRef.current.currentTime);
   };
 
@@ -634,8 +642,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
     expectedRemoteSeek.current = null;
     if (isLocalEchoSuppressed() || !videoRef.current) return;
+    liveAnchorRef.current = { timeSecs: videoRef.current.currentTime, playing: !videoRef.current.paused, atMs: roomNow() };
     onSyncAction('seek', videoRef.current.currentTime);
   };
+
+  useEffect(() => {
+    const correct = () => {
+      const element = videoRef.current, anchor = liveAnchorRef.current;
+      if (!element || !anchor || cineHoldRef.current || element.ended || element.readyState < 2 || element.seeking || anchor.atMs > roomNow()) return;
+      const target = resolveLiveEdge(anchor, roomNow()); if (target === null) return;
+      const delta = target - element.currentTime;
+      if (Math.abs(delta) > 1.5) {
+        expectedRemoteSeek.current = target; suppressUntilRef.current = Date.now() + 1000;
+        element.currentTime = target; element.playbackRate = 1;
+      } else element.playbackRate = anchor.playing && Math.abs(delta) > .25 ? (delta > 0 ? 1.03 : .97) : 1;
+    };
+    const timer = window.setInterval(correct, 1000); const stop = onPageResume(correct);
+    return () => { window.clearInterval(timer); stop(); };
+  }, [videoFileName, videoDirectUrl]);
 
   // YouTube's iframe API has no seek event: detect jumps against elapsed time.
   useEffect(() => {
@@ -757,10 +781,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // responde con el `play` grupal (autoplay). Nunca pausa ni recarga nada.
   const handleLoadedData = () => {
     if (!onVideoReady || !videoRef.current) return;
-    if (remoteAction?.action === 'pause' || remoteAction?.isPlaying === false) return;
     const loadKey = lastLoadKeyRef.current;
     if (!loadKey || videoReadySentForRef.current === loadKey) return;
-    const atStart = Math.abs(videoRef.current.currentTime) < 1;
+    const atStart = Math.abs(videoRef.current.currentTime - (video?.startTime ?? 0)) < 1;
     if (!atStart) return;
     videoReadySentForRef.current = loadKey;
     onVideoReady(videoFileName || videoDirectUrl || '');
@@ -974,6 +997,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       <PlayerActionDock onChange={isLeader ? () => openChangePanel() : undefined} onClear={isLeader ? onClearVideo : undefined}>
         <VideoAudioBoost key={video.fileName || video.directUrl} videoRef={videoRef} />
       </PlayerActionDock>
+      {remoteAction?.awaitingReady && <div className="player-ready-status" role="status">Esperando a que todos estén listos…</div>}
 
       {/* Mobile-only floating button: opens the "Cambiar video" panel (top bar auto-hides on touch) */}
 
@@ -1118,12 +1142,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 setMediaReadyEpoch(value => value + 1);
                 if (video.startTime) player.seekTo?.(video.startTime, true);
                 if (directPlayback && video.startTime !== undefined) player.playVideo?.();
-                if (remoteAction?.action !== 'pause' && remoteAction?.isPlaying !== false && onVideoReady && video.fileName && videoReadySentForRef.current !== video.fileName) {
+                if (onVideoReady && video.fileName && videoReadySentForRef.current !== video.fileName) {
                   videoReadySentForRef.current = video.fileName;
                   onVideoReady(video.fileName);
                 }
               }}
               onStateChange={(event) => {
+                if (remoteAction?.awaitingReady && event.data === 1) { ytPlayerRef.current?.pauseVideo?.(); ytPlayerRef.current?.seekTo?.(video.startTime ?? 0, true); return; }
                 if (isLocalEchoSuppressed()) return;
                 const yt = ytPlayerRef.current;
                 if (!yt || typeof yt.getCurrentTime !== 'function') return;

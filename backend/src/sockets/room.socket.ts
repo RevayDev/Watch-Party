@@ -17,6 +17,7 @@ export { resolveRoomTime } from '../domain/playback-policy.js';
 
 export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
+    socket.on('clock-sync', (reply: unknown) => { if (typeof reply === 'function') reply({ serverAt: Date.now() }); });
     console.log(`⚡ Socket conectado: ${socket.id}`);
 
     // Observabilidad (best-effort): totales + pico de sockets crudos. El pico

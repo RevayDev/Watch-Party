@@ -37,14 +37,14 @@ export interface LiveEdgeAnchor {
  * de red; sin él se usa `timestamp` (recepción local).
  */
 export function anchorFromRemoteAction(
-  remoteAction: { currentTime: number; sentAt?: number; timestamp: number; action: 'play' | 'pause' | 'seek' } | null,
+  remoteAction: { currentTime: number; sentAt?: number; timestamp: number; action: 'play' | 'pause' | 'seek'; isPlaying?: boolean } | null,
   previousPlaying: boolean = false
 ): LiveEdgeAnchor | null {
   if (!remoteAction || !Number.isFinite(remoteAction.currentTime)) return null;
   const at = typeof remoteAction.sentAt === 'number' && Number.isFinite(remoteAction.sentAt)
     ? remoteAction.sentAt
     : remoteAction.timestamp;
-  const isPlaying = remoteAction.action === 'play'
+  const isPlaying = typeof remoteAction.isPlaying === 'boolean' ? remoteAction.isPlaying : remoteAction.action === 'play'
     ? true
     : remoteAction.action === 'seek'
     ? previousPlaying

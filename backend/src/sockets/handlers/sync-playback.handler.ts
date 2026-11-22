@@ -7,7 +7,7 @@ import { RoomService } from '../../services/room.service.js';
 import { activeUsers } from '../socket-state.js';
 import { PrivilegedPayload, denySocket, resolveSocketClaim } from '../socket-auth.js';
 import { checkSocketThrottle, isDuplicateSocketEvent } from '../socket-limits.js';
-import { resetVideoReady } from './video-ready.handler.js';
+import { resetVideoReady, isVideoWaitingForReady } from './video-ready.handler.js';
 
 const VIDEO_MOD_ONLY = 'Solo el anfitrión o un co-anfitrión puede cambiar el video de la sala.';
 
@@ -40,6 +40,7 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       if (!isSyncAction(action)) return;
       if (!Number.isFinite(currentTime) || currentTime < 0) return;
       const cleanRoomId = roomId.toUpperCase().trim();
+      if (isVideoWaitingForReady(cleanRoomId)) return;
       if (isDuplicateSocketEvent(socket.id, 'sync-video', `${cleanRoomId}|${action}|${currentTime}`, SYNC_DEDUP_WINDOW_MS)) {
         return;
       }

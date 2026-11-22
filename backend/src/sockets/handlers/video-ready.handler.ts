@@ -2,8 +2,8 @@
 //
 // Tras `video-changed`, cada cliente emite `video-ready { roomId, fileName }`
 // cuando su <video> alcanza `loadeddata` con `currentTime ≈ 0`. El servidor
-// cuenta miembros presentes (no pendientes) y, al completarse —o tras un
-// timeout de 15 s—, emite un `play` grupal con marca `autoplay: true` que el
+// cuenta miembros presentes (no pendientes) y, al completarse,
+// emite un `play` grupal programado con marca `autoplay: true` que el
 // cliente aplica como `play` normal (sin re-emitir `sync-video` ni `seek`:
 // lo cubren `isApplyingRemote` + el dedup de 500 ms existente).
 //
@@ -15,9 +15,10 @@ import { Server, Socket } from 'socket.io';
 import { SyncPlaybackUseCase } from '../../application/sync-playback.usecase.js';
 import { RoomService } from '../../services/room.service.js';
 import { activeUsers } from '../socket-state.js';
+import { roomPlayback } from '../../domain/playback-policy.js';
 import { isDuplicateSocketEvent } from '../socket-limits.js';
 
-/** Timeout de auto-play: aunque falten miembros por reportar, la sala arranca. */
+/** Valor legado conservado para compatibilidad; ya no fuerza un arranque. */
 export const VIDEO_READY_TIMEOUT_MS = 15_000;
 const VIDEO_READY_DEDUP_MS = 500;
 
@@ -29,6 +30,8 @@ interface ReadyState {
 }
 
 const readyByRoom = new Map<string, ReadyState>();
+export const isVideoWaitingForReady = (roomId: string) => readyByRoom.has(roomId.toUpperCase().trim());
+const startedByRoom = new Map<string, string>();
 
 function clearTimer(state: ReadyState): void {
   if (state.timer) {
@@ -52,12 +55,16 @@ function finishVideoReady(io: Server, roomId: string): void {
   if (!state) return;
   clearTimer(state);
   readyByRoom.delete(roomId);
+  startedByRoom.set(roomId, state.videoKey);
   const payload = SyncPlaybackUseCase.execute({ roomId, action: 'play', currentTime: state.startTime ?? 0 });
   if (!payload) return;
+  const startAt = Date.now() + 1200;
+  const snapshot = roomPlayback.get(roomId);
+  if (snapshot) snapshot.updatedAt = startAt;
   io.to(roomId).emit('sync-video', {
     action: payload.action,
     currentTime: payload.currentTime,
-    sentAt: payload.sentAt,
+    sentAt: startAt,
     autoplay: true,
   });
 }
@@ -68,6 +75,7 @@ function finishVideoReady(io: Server, roomId: string): void {
  */
 export function resetVideoReady(roomId: string): void {
   const cleanRoomId = roomId.toUpperCase().trim();
+  startedByRoom.delete(cleanRoomId);
   const state = readyByRoom.get(cleanRoomId);
   if (!state) return;
   clearTimer(state);
@@ -104,6 +112,7 @@ export function __videoReadyPendingForTests(roomId: string): boolean {
 
 /** Solo para tests: vacía todo el estado del módulo. */
 export function __resetVideoReadyForTests(): void {
+  startedByRoom.clear();
   for (const state of readyByRoom.values()) clearTimer(state);
   readyByRoom.clear();
 }
@@ -131,6 +140,7 @@ export function registerVideoReadyHandlers(io: Server, socket: Socket): void {
     if (!room) return;
     const expectedKey = room.video?.fileName || room.video?.directUrl || '';
     if (!expectedKey || fileName !== expectedKey) return;
+    if (startedByRoom.get(cleanRoomId) === expectedKey) return;
 
     let state = readyByRoom.get(cleanRoomId);
     if (!state || state.videoKey !== expectedKey) {
@@ -138,12 +148,8 @@ export function registerVideoReadyHandlers(io: Server, socket: Socket): void {
       const fresh: ReadyState = { videoKey: expectedKey, startTime: room.video?.startTime ?? 0, ready: new Set(), timer: null };
       readyByRoom.set(cleanRoomId, fresh);
       state = fresh;
-      const timer = setTimeout(() => {
-        finishVideoReady(io, cleanRoomId);
-      }, VIDEO_READY_TIMEOUT_MS);
-      const maybeUnref = timer as unknown as { unref?: () => void };
-      if (typeof maybeUnref.unref === 'function') maybeUnref.unref();
-      state.timer = timer;
+      io.to(cleanRoomId).emit('sync-video', { action: 'pause', currentTime: fresh.startTime ?? 0, sentAt: Date.now(), awaitingReady: true });
+      // Remain paused until every present member is ready. Never start on a timeout.
     }
     state.ready.add(socket.id);
 

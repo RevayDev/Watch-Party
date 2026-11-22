@@ -1,8 +1,15 @@
 import { onPageResume } from '../shared/pageResume';
+import { resetRoomClock, sampleRoomClock } from '../shared/roomClock';
 import { io, Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
 let stopResume: (() => void) | null = null;
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+function probeClock() {
+  if (!socket?.connected || typeof socket.emit !== 'function') return;
+  const sent = Date.now();
+  socket.emit('clock-sync', (data: { serverAt?: number }) => { if (typeof data?.serverAt === 'number') sampleRoomClock(sent, data.serverAt); });
+}
 
 export function getSocket(): Socket {
   if (!socket) {
@@ -33,12 +40,15 @@ export function getSocket(): Socket {
       timeout: 20000,
       autoConnect: true,
     });
+    resetRoomClock(); socket.on?.('connect', probeClock);
+    clockTimer = setInterval(probeClock, 30000);
   }
   stopResume ??= onPageResume(() => { if (socket && !socket.connected) socket.connect(); });
   return socket;
 }
 
 export function disconnectSocket(): void {
+  if (clockTimer) clearInterval(clockTimer); clockTimer = null;
   stopResume?.(); stopResume = null;
   if (socket) {
     socket.disconnect();

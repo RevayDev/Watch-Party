@@ -16,6 +16,7 @@ const DEFAULT_LIMIT = { max: 20, windowMs: 60_000 };
 const AUTO_NEXT_LIMIT = { max: 10, windowMs: 60_000 };
 const DEDUP_WINDOW_MS = 2_000;
 const sharedSearches = new Map<string, { state: unknown; until: number }>();
+const readyMusic = new Map<string, { entryId: string; members: Set<string> }>();
 const searchStateSchema = z.object({
   id: z.string().min(1).max(100), query: z.string().max(100),
   tracks: z.array(z.object({ id: z.string().min(1).max(100), name: z.string().max(200), artists: z.string().max(200), albumArt: z.string().max(2048).optional(), openUrl: z.string().max(2048).optional(), uri: z.string().max(2048).optional() })).max(12).nullable(),
@@ -45,6 +46,21 @@ function cleanRoomIdOf(roomId: unknown): string | null {
 
 /** Handler de la cola musical Spotify. Eventos y payloads según contrato. */
 export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
+  socket.on('music-ready', async (data: { roomId?: string; entryId?: string } | undefined) => {
+    const roomId = cleanRoomIdOf(data?.roomId);
+    if (!roomId || typeof data?.entryId !== 'string' || !memberOf(socket.id, roomId) || !checkSocketRateLimit(socket.id, 'music-ready', 90, 60000)) return;
+    const room = await RoomService.getRoomById(roomId);
+    if (!room?.musicNowPlaying?.playback?.awaitingReady || room.musicNowPlaying.entryId !== data.entryId) return;
+    let ready = readyMusic.get(roomId);
+    if (!ready || ready.entryId !== data.entryId) { ready = { entryId: data.entryId, members: new Set() }; readyMusic.set(roomId, ready); }
+    ready.members.add(socket.id);
+    const present = [...activeUsers.entries()].filter(([, user]) => user.roomId === roomId && !user.pending).map(([id]) => id);
+    if (present.length && present.every(id => ready.members.has(id))) {
+      const updated = await RoomService.syncMusic(roomId, data.entryId, 0, true, Date.now() + 1200, true);
+      readyMusic.delete(roomId);
+      if (updated) emitQueue(io, roomId, updated);
+    }
+  });
   socket.on('request-music-search', (data: { roomId?: string } | undefined) => {
     const roomId = cleanRoomIdOf(data?.roomId); if (!roomId || !memberOf(socket.id, roomId)) return;
     const cached = sharedSearches.get(roomId);
@@ -64,6 +80,7 @@ export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
     if (!roomId || !memberOf(socket.id, roomId) || !checkSocketRateLimit(socket.id, 'music-playback', 60, 60000)) return;
     const room = await RoomService.getRoomById(roomId);
     if (!room || room.settings?.musicEnabled === false) return;
+    if (room.musicNowPlaying?.playback?.awaitingReady) return;
     if (room.settings?.hostOnlySync && !requireModerator(room, resolveSocketClaim(socket, data))) return;
     const updated = await RoomService.syncMusic(roomId, data.entryId, data.currentTime, data.playing);
     if (updated) emitQueue(io, roomId, updated);
