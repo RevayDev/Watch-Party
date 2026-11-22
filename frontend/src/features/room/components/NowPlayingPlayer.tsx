@@ -23,6 +23,10 @@ export function formatPlayerTime(totalSeconds: number): string {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 
+// Like the main video, music should remain smooth through ordinary network
+// jitter. A shared checkpoint only corrects a genuinely lost position.
+export const MUSIC_SYNC_TOLERANCE_SECONDS = 20;
+
 /** The mini-player uses the existing iframe and advances the room queue when playback ends. */
 export const NowPlayingPlayer: React.FC<{
   playback?: { currentTime: number; playing: boolean; sentAt: number; awaitingReady?: boolean };
@@ -64,7 +68,9 @@ export const NowPlayingPlayer: React.FC<{
     const sentAt = point?.sentAt ?? Date.parse(startedRef.current || new Date().toISOString());
     const target = (point?.currentTime ?? 0) + (shouldPlay ? Math.max(0, (roomNow() - sentAt) / 1000) : 0);
     try {
-      if (force || Math.abs((p.getCurrentTime?.() ?? 0) - target) > 0.5) p.seekTo?.(target, true);
+      if (Math.abs((p.getCurrentTime?.() ?? 0) - target) >= MUSIC_SYNC_TOLERANCE_SECONDS) {
+        p.seekTo?.(target, true);
+      }
       const active = p.getPlayerState ? p.getPlayerState() === 1 : playingRef.current;
       if (shouldPlay && !active) p.playVideo?.();
       if (!shouldPlay) p.pauseVideo?.();

@@ -2,7 +2,7 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { NowPlayingPlayer } from '../src/features/room/components/NowPlayingPlayer';
+import { MUSIC_SYNC_TOLERANCE_SECONDS, NowPlayingPlayer } from '../src/features/room/components/NowPlayingPlayer';
 const player = vi.hoisted(() => ({ seekTo: vi.fn(), playVideo: vi.fn(), pauseVideo: vi.fn(), unMute: vi.fn(), setVolume: vi.fn(), getCurrentTime: vi.fn(() => 0), getPlayerState: vi.fn(() => 1), getDuration: () => 300 }));
 vi.mock('../src/features/player/YouTubePlayerView', () => ({ YouTubePlayerView: ({ onReady }: { onReady: (p: typeof player) => void }) => {
  const ready = React.useRef(onReady); React.useEffect(() => ready.current(player), []); return null;
@@ -20,8 +20,17 @@ it('joins at the shared elapsed position, applies pause and seek without echoing
  expect(player.seekTo).toHaveBeenLastCalledWith(25, true);
  expect(onPlayback).not.toHaveBeenCalled();
 });
+it('ignores normal music jitter and only seeks at the twenty-second threshold', () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+  player.getCurrentTime.mockReturnValue(10);
+  const view = render(<NowPlayingPlayer {...props} playback={{ currentTime: 15, playing: true, sentAt: Date.now() }} />);
+  expect(player.seekTo).not.toHaveBeenCalled();
+  view.rerender(<NowPlayingPlayer {...props} playback={{ currentTime: 10 + MUSIC_SYNC_TOLERANCE_SECONDS, playing: true, sentAt: Date.now() }} />);
+  expect(player.seekTo).toHaveBeenLastCalledWith(10 + MUSIC_SYNC_TOLERANCE_SECONDS, true);
+});
 it('publishes local play and seek controls to the room', () => {
  const onPlayback = vi.fn();
+ player.getCurrentTime.mockReturnValue(0);
  render(<NowPlayingPlayer {...props} onPlayback={onPlayback} />);
  fireEvent.click(screen.getByRole('button', { name: 'Reproducir' }));
  expect(onPlayback).toHaveBeenCalledWith(0, true);
