@@ -2,6 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { BottomSheet } from '../../../shared/components/BottomSheet';
 import { Chat } from '../../chat/Chat';
+import { MusicPanel } from './MusicPanel';
 import { Participants } from '../../participants/Participants';
 import type { IRoomData, IMusicQueueEntry, IMusicNowPlaying, IMusicTrack, IRoomSettings, ChatMessage } from '../../../types/room';
 import { buildSocketAuth } from '../../../shared/utils';
@@ -72,6 +73,19 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   toggleCamera,
   socket,
   roomId,
+  musicQueue = [],
+  musicNowPlaying = null,
+  musicSettings = { muteOnEntry: false, cameraOffOnEntry: false, allowMicReactivation: true, allowCamReactivation: true },
+  musicIsModerator = false,
+  onAddMusicUrl,
+  onMusicAdd = () => undefined,
+  onMusicRemove = () => undefined,
+  onMusicReorder = () => undefined,
+  onMusicApprove = () => undefined,
+  onMusicNext = () => undefined,
+  onMusicAutoNext = () => undefined,
+  onMusicStop = () => undefined,
+  onExpandToMain = () => undefined,
 }) => {
   const auth = () => buildSocketAuth(roomId, myName);
   const currentTab = activeSideTab ?? sideTabView;
@@ -193,6 +207,26 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onUpdateSettings={(settings) => {
               socket.emit('update-room-settings', { roomId, settings, ...auth() });
             }}
+          />
+        )}
+        {currentTab === 'music' && (
+          <MusicPanel
+            roomId={roomId}
+            queue={musicQueue}
+            nowPlaying={musicNowPlaying}
+            settings={musicSettings}
+            isModerator={musicIsModerator}
+            myName={myName}
+            userId={userId}
+            onAddUrl={onAddMusicUrl}
+            onAdd={onMusicAdd}
+            onRemove={onMusicRemove}
+            onReorder={onMusicReorder}
+            onApprove={onMusicApprove}
+            onNext={onMusicNext}
+            onAutoNext={onMusicAutoNext}
+            onStop={onMusicStop}
+            onExpandToMain={onExpandToMain}
           />
         )}
       </div>
