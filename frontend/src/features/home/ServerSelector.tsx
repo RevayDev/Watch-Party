@@ -3,7 +3,7 @@ import { Field, Button } from '../../shared/components/ui';
 import { useEffect, useState } from 'react';
 import { BACKEND_BASE } from '../../services/api';
 
-export type RoomServerMode = 'external' | 'host';
+export type RoomServerMode = 'external' | 'hybrid' | 'host';
 type Availability = 'checking' | 'available' | 'unavailable';
 
 export function ServerSelector({ mode, onChange, onAvailability }: {
@@ -30,11 +30,14 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
         if (!active) return;
         setAvailability(available ? 'available' : 'unavailable');
         onAvailability(available);
-        if (!available) onChange('host');
+        // El modo mixto conserva su intención: al crear, Home decidirá entre
+        // Render y el anfitrión. El modo externo explícito sí cae a host para
+        // no dejar el botón de crear bloqueado.
+        if (!available && mode === 'external') onChange('host');
       })
       .finally(() => clearTimeout(timeout));
     return () => { active = false; controller.abort(); clearTimeout(timeout); };
-  }, [attempt, onAvailability, onChange]);
+  }, [attempt, mode, onAvailability, onChange]);
 
   return (
     <fieldset className="server-selector">
@@ -57,6 +60,14 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
         </label>
         <p className="room-settings__box-desc">Tu equipo coordina video, chat y llamadas, con relevo automático entre participantes. Mantén la pestaña abierta; depende de tu conexión.</p>
         <span className="server-selector__limits">Hasta 8 personas · Archivos de hasta 256 MB</span>
+      </div>
+      <div className={`server-selector__card server-selector__card--hybrid ${mode === 'hybrid' ? 'is-selected' : ''}`}>
+        <label className="server-selector__option">
+          <Field type="radio" name="server-mode" value="hybrid" checked={mode === 'hybrid'} onChange={() => onChange('hybrid')} />
+          Mixto inteligente
+        </label>
+        <p className="room-settings__box-desc">Usa Render para sala, chat, reacciones, YouTube, sincronización y señalización de cámara/micrófono. Si Render no responde al crearla, continúa con el navegador del anfitrión.</p>
+        <p role="status">{availability === 'available' ? 'Usará el servidor en tiempo real.' : availability === 'checking' ? 'Comprobando si podrá usar Render…' : 'Render no responde: al crear usará el anfitrión como respaldo.'}</p>
       </div>
     </fieldset>
   );

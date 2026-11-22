@@ -29,6 +29,16 @@ it('enables Render only after validating its health response', async () => {
   expect(onChange).not.toHaveBeenCalled();
 });
 
+it('keeps mixed mode selected when Render is offline so creation can fall back to the host', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+  const onChange = vi.fn();
+  const available = vi.fn();
+  render(<ServerSelector mode="hybrid" onChange={onChange} onAvailability={available} />);
+  await waitFor(() => expect(available).toHaveBeenLastCalledWith(false));
+  expect(screen.getByRole('radio', { name: /Mixto inteligente/ })).toBeChecked();
+  expect(onChange).not.toHaveBeenCalled();
+});
+
 
 it('retries in place without removing the external card', async () => {
  const fetch = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(Response.json({ ok: true }));

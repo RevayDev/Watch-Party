@@ -178,7 +178,11 @@ export const Home: React.FC<HomeProps> = ({
       onCreateHostRoom(createLeaderName.trim());
       return;
     }
-    if (onCreateHostRoom && !externalAvailable) {
+    if (serverMode === 'hybrid' && onCreateHostRoom && !externalAvailable) {
+      onCreateHostRoom(createLeaderName.trim());
+      return;
+    }
+    if (serverMode === 'external' && onCreateHostRoom && !externalAvailable) {
       setCreateError('Render no está disponible. Elige el navegador del anfitrión.');
       return;
     }

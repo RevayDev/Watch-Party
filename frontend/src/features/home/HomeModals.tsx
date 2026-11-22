@@ -118,7 +118,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
         </div>
 
         {/* Modo de sala: Temporal vs Guardar Video */}
-        {serverMode === 'external' && <div
+        {serverMode !== 'host' && <div
           className="form-group"
           style={{
             marginBottom: '1.25rem',
