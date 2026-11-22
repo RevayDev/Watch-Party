@@ -154,216 +154,34 @@ export const NowPlayingPlayer: React.FC<{
 
 
   return (
-    <div>
-
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.65rem' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#a78bfa', fontSize: '0.84rem', fontWeight: 600 }}>
-        <AudioLines size={15} />
-        Sonando ahora
-      </span>
-    </div>
-
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '0.6rem' }}>
-      {thumb ? (
-        <img
-          src={thumb}
-          alt=""
-          style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
-        />
-      ) : (
-        <div
-          style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: '8px',
-            background: 'rgba(139, 92, 246, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#a78bfa',
-            flexShrink: 0,
-          }}
-        >
-          <Youtube size={22} />
-        </div>
-      )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9rem', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {title}
-        </p>
-        <p style={{ margin: '0.1rem 0 0', fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {subtitle}
-        </p>
+    <section className="music-player" aria-label="Reproductor de música">
+      <div className="music-player__status"><AudioLines size={16} /> Sonando ahora</div>
+      <div className="music-player__heading">
+        {thumb ? <img className="music-player__art" src={thumb} alt="" /> : <div className="music-player__art music-player__placeholder"><Youtube size={24} /></div>}
+        <div className="music-player__info"><strong>{title}</strong><span>{subtitle}</span></div>
+        {showModerator && <div className="music-player__actions">
+          <button type="button" className="music-player__icon" title="Ampliar a la pantalla de la sala" aria-label="Ampliar a la pantalla de la sala" onClick={() => { const position = playerRef.current?.getCurrentTime?.() ?? current; playerRef.current?.pauseVideo?.(); onExpand(position); }}><Maximize2 size={18} /></button>
+          <button type="button" className="music-player__icon music-player__stop" title="Detener música" aria-label="Detener música" onClick={onStop}><Square size={18} /></button>
+        </div>}
       </div>
-    </div>
-    {/* The queue uses its own controls and keeps the iframe out of the layout. */}
-    <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
-      <YouTubePlayerView
-        key={trackKey}
-        videoId={videoId}
-        className=""
-        onReady={(player) => {
-          playerRef.current = player;
-          tryPlay();
-        }}
-        onStateChange={(event) => {
+      <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
+        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onReady={(player) => { playerRef.current = player; tryPlay(); }} onStateChange={(event) => {
           if (event.data === 1) setPlaying(true);
           else if (event.data === 2) setPlaying(false);
-          else if (event.data === 0) {
-            // Advance the shared queue once the iframe reports the track ended.
-            setPlaying(false);
-            onEndedRef.current();
-          }
-        }}
-      />
-    </div>
-    <div
-      className="yt-miniplayer-controls"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        marginTop: '0.5rem',
-      }}
-    >
-      <button
-        type="button"
-        onClick={restart}
-        title="Reiniciar canción"
-        aria-label="Reiniciar canción"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 30,
-          height: 30,
-          borderRadius: '50%',
-          background: 'transparent',
-          color: '#cbd5e1',
-          border: 'none',
-          cursor: 'pointer',
-          flexShrink: 0,
-        }}
-      >
-        <SkipBack size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={togglePlay}
-        title={playing ? 'Pausar' : 'Reproducir'}
-        aria-label={playing ? 'Pausar' : 'Reproducir'}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 40,
-          height: 40,
-          borderRadius: '50%',
-          background: '#7c3aed',
-          color: '#fff',
-          border: 'none',
-          cursor: 'pointer',
-          flexShrink: 0,
-        }}
-      >
-        {playing ? <Pause size={17} /> : <Play size={17} style={{ marginLeft: 2 }} />}
-      </button>
-      {showModerator && (
-        <button
-          type="button"
-          onClick={onNext}
-          title="Siguiente canción"
-          aria-label="Siguiente canción"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            background: 'transparent',
-            color: '#cbd5e1',
-            border: 'none',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          <SkipForward size={14} />
-        </button>
-      )}
-      <input
-        type="range"
-        min={0}
-        max={Math.max(1, Math.floor(duration))}
-        step={1}
-        value={Math.min(Math.floor(current), Math.max(1, Math.floor(duration)))}
-        onChange={(e) => seekTo(Number(e.target.value))}
-        title="Adelantar o retroceder"
-        aria-label="Adelantar o retroceder"
-        disabled={duration <= 0}
-        style={{ flex: 1, minWidth: 0, accentColor: '#8b5cf6', cursor: 'pointer' }}
-      />
-      <button
-        type="button"
-        onClick={toggleMute}
-        title={muted ? 'Activar sonido' : 'Silenciar'}
-        aria-label={muted ? 'Activar sonido' : 'Silenciar'}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 30,
-          height: 30,
-          borderRadius: '50%',
-          background: 'transparent',
-          color: '#cbd5e1',
-          border: 'none',
-          cursor: 'pointer',
-          flexShrink: 0,
-        }}
-      >
-        {muted || volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
-      </button>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        step={1}
-        value={muted ? 0 : volume}
-        onChange={(e) => changeVolume(Number(e.target.value))}
-        title="Volumen"
-        aria-label="Volumen"
-        style={{ width: 64, flexShrink: 0, accentColor: '#8b5cf6', cursor: 'pointer' }}
-      />
-      {showModerator && (
-        <button
-          type="button"
-          onClick={() => {
-            const position = playerRef.current?.getCurrentTime?.() ?? current;
-            playerRef.current?.pauseVideo?.();
-            onExpand(position);
-          }}
-          title="Ampliar a la pantalla de la sala"
-          aria-label="Ampliar a la pantalla de la sala"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            background: 'transparent',
-            color: '#cbd5e1',
-            border: 'none',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          <Maximize2 size={15} />
-        </button>
-      )}
-      {showModerator && <button type="button" className="music-row-options" title="Detener música" aria-label="Detener música" onClick={onStop}><Square size={14} /></button>}
-    </div>
-    </div>
+          else if (event.data === 0) { setPlaying(false); onEndedRef.current(); }
+        }} />
+      </div>
+      <div className="yt-miniplayer-controls music-player__controls">
+        <button type="button" className="music-player__icon" title="Reiniciar canción" aria-label="Reiniciar canción" onClick={restart}><SkipBack size={18} /></button>
+        <button type="button" className="music-player__icon music-player__play" title={playing ? 'Pausar' : 'Reproducir'} aria-label={playing ? 'Pausar' : 'Reproducir'} onClick={togglePlay}>{playing ? <Pause size={20} /> : <Play size={20} />}</button>
+        {showModerator && <button type="button" className="music-player__icon" title="Siguiente canción" aria-label="Siguiente canción" onClick={onNext}><SkipForward size={18} /></button>}
+        <div className="music-player__progress">
+          <input className="music-player__range" type="range" min={0} max={Math.max(1, Math.floor(duration))} step={1} value={Math.min(Math.floor(current), Math.max(1, Math.floor(duration)))} onChange={(e) => seekTo(Number(e.target.value))} title="Adelantar o retroceder" aria-label="Adelantar o retroceder" disabled={duration <= 0} style={{ '--range-progress': (duration > 0 ? Math.min(100, current / duration * 100) : 0) + '%' } as React.CSSProperties} />
+          <span className="music-player__time">{formatPlayerTime(current)} / {formatPlayerTime(duration)}</span>
+        </div>
+        <button type="button" className="music-player__icon" title={muted ? 'Activar sonido' : 'Silenciar'} aria-label={muted ? 'Activar sonido' : 'Silenciar'} onClick={toggleMute}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
+        <input className="music-player__range music-player__volume" type="range" min={0} max={100} step={1} value={muted ? 0 : volume} onChange={(e) => changeVolume(Number(e.target.value))} title="Volumen" aria-label="Volumen" style={{ '--range-progress': (muted ? 0 : volume) + '%' } as React.CSSProperties} />
+      </div>
+    </section>
   );
 };

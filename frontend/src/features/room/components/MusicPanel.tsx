@@ -363,19 +363,12 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       )}
 
       {/* Tarjeta de la cola musical (desplegable) */}
-      <div className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.6rem', cursor: 'pointer' }} onClick={() => setQueueCollapsed((v) => !v)}>
-          <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#f1f5f9' }}>
-            Cola de reproducción
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', color: '#64748b' }}>
-            {active.length} vídeo{active.length === 1 ? '' : 's'}
-            <ListMusic size={14} />
-          </span>
-          <ChevronDown size={14} style={{ transition: 'transform 0.2s ease', transform: queueCollapsed ? 'rotate(0deg)' : 'rotate(180deg)' }} />
-        </div>
+      <div className="room-settings__box music-queue">
+        <button type="button" className="music-queue__toggle" aria-expanded={!queueCollapsed} aria-controls="music-queue-entries" onClick={() => setQueueCollapsed(v => !v)}>
+          <ListMusic size={18} /><span>Cola de reproducción</span><span className="music-queue__count">{active.length} vídeo{active.length === 1 ? '' : 's'}</span><ChevronDown size={16} style={{ transform: queueCollapsed ? undefined : 'rotate(180deg)' }} />
+        </button>
         {!queueCollapsed && (
-          <div style={{ display: active.length === 0 ? 'flex' : 'block' }}>
+          <div id="music-queue-entries" style={{ display: active.length === 0 ? 'flex' : 'block' }}>
             {active.length === 0 ? (
               <div className="drawer-chat__empty" style={{ padding: '1.5rem 1rem' }}>
                 <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.84rem' }}>
