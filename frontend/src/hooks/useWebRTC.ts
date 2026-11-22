@@ -812,6 +812,17 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
     // 2. User Joined: prepare connection and announce our media state
     const onUserJoined = (d: { socketId: string; userName: string; isLeader: boolean }) => {
       if (!d.socketId || d.socketId === socket.id) return;
+      // A phone reconnect gets a new Socket.IO id. Drop its previous peer
+      // immediately instead of letting its pending ICE retries turn into a
+      // false “Audio o cámara sin conexión” warning.
+      const joinedName = d.userName.trim().toLowerCase();
+      if (joinedName) {
+        for (const [peerId, meta] of peerMeta.current) {
+          if (peerId !== d.socketId && meta.userName.trim().toLowerCase() === joinedName) {
+            cleanupPeer(peerId);
+          }
+        }
+      }
       console.log(`[WebRTC] User joined room: ${d.userName} (${d.socketId})`);
       getOrCreatePeerConnection(d.socketId, d.userName, d.isLeader);
       socket.emit('peer-media-state', {

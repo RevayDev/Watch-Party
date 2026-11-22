@@ -123,6 +123,25 @@ it('reintenta ICE si se pierde la oferta y vuelve a negociar tras reconectar el 
   unmount();
 });
 
+it('removes the stale peer when the same participant reconnects with a new socket id', async () => {
+  const connections: Array<{ close: ReturnType<typeof vi.fn> }> = [];
+  class TestConnection {
+    connectionState = 'new'; signalingState = 'stable';
+    constructor() { connections.push(this); }
+    getTransceivers = () => [];
+    addTransceiver = vi.fn();
+    createOffer = vi.fn(async () => ({ type: 'offer' }));
+    setLocalDescription = vi.fn();
+    close = vi.fn(() => { this.connectionState = 'closed'; });
+  }
+  vi.stubGlobal('RTCPeerConnection', TestConnection);
+  const events = Object.assign(new EventEmitter(), { id: 'local', connected: true });
+  renderHook(() => useWebRTC(events as unknown as Socket, 'SALA', 'Ana', true));
+  await act(async () => { events.emit('room-state', { peers: [{ socketId: 'old', userName: 'Andres', isLeader: false }] }); });
+  await act(async () => { events.emit('user-joined', { socketId: 'new', userName: 'Andres', isLeader: false }); });
+  expect(connections[0].close).toHaveBeenCalledOnce();
+});
+
 it('permite activar el audio recibido cuando el navegador bloquea la reproducción automática', async () => {
   vi.stubGlobal('MediaStream', TestStream);
   const play = vi.spyOn(HTMLMediaElement.prototype, 'play')
