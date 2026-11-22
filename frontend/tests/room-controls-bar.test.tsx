@@ -51,8 +51,8 @@ describe('RoomControls (orden y etiquetas)', () => {
       'Silenciar',
       'Detener video',
       'Reacciones',
-      'Participantes',
       'Chat',
+      'Participantes',
       'Ocultar',
       'Música',
       'Salir',
@@ -72,7 +72,6 @@ describe('RoomControls (orden y etiquetas)', () => {
     expect(groups).toEqual([
       'meet-bar-group--left',
       'meet-bar-group--social',
-      'meet-bar-group--visibility',
       'meet-bar-group--right',
       'meet-bar-group--end',
     ]);
@@ -127,8 +126,8 @@ describe('RoomControls (orden y etiquetas)', () => {
       'Activar micrófono',
       'Iniciar video',
       'Reacciones',
-      'Participantes',
       'Chat',
+      'Participantes',
       'Mostrar',
       'Música',
       'Salir',
@@ -143,4 +142,16 @@ it('places screen sharing with music and forwards its stop action', () => {
  expect(button.getAttribute('aria-pressed')).toBe('true');
  fireEvent.click(button); expect(toggle).toHaveBeenCalledTimes(1);
  expect(container.querySelector('.meet-bar-group--end')?.textContent).toContain('Salir');
+});
+
+it('opens each local device tester from its own arrow without toggling the device', () => {
+ const mic = vi.fn(), camera = vi.fn();
+ render(<RoomControls {...barProps({ toggleMic: mic, toggleCamera: camera })} />);
+ fireEvent.click(screen.getByRole('button', { name: 'Opciones de micrófono' }));
+ expect(screen.getByRole('region', { name: 'Prueba de micrófono' })).toBeTruthy();
+ expect(mic).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button', { name: 'Opciones de cámara' }));
+ expect(screen.queryByRole('region', { name: 'Prueba de micrófono' })).toBeNull();
+ expect(screen.getByRole('region', { name: 'Prueba de cámara' })).toBeTruthy();
+ expect(camera).not.toHaveBeenCalled();
 });

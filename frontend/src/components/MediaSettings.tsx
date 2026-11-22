@@ -2,7 +2,7 @@ import { Button } from '../shared/components/ui';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '../shared/components/BottomSheet';
 
-function DeviceTest({ kind, localStream }: { kind: 'audio' | 'video'; localStream: MediaStream | null }) {
+export function DeviceTest({ kind, localStream }: { kind: 'audio' | 'video'; localStream: MediaStream | null }) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');

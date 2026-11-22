@@ -1,12 +1,15 @@
+import { DeviceTest } from '../../../components/MediaSettings';
 import { Button, Popover } from '../../../shared/components/ui';
-import React, { useEffect } from 'react';
-import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff, Music, ScreenShare, ScreenShareOff } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff, Music, ScreenShare, ScreenShareOff, ChevronDown } from 'lucide-react';
 import { Reactions } from '../../../components/Reactions';
 
 /**
  * Barra inferior de la sala (extraída verbatim de pages/Room.tsx, solo composición).
  */
 interface RoomControlsProps {
+  localStream?: MediaStream | null;
+  onRetryMedia?: () => void;
   isScreenSharing?: boolean;
   onToggleScreenShare?: () => void;
   isMicOn: boolean;
@@ -62,6 +65,8 @@ const BarItem: React.FC<{ label: string; className?: string; children: React.Rea
 );
 
 export const RoomControls: React.FC<RoomControlsProps> = ({
+  localStream = null,
+  onRetryMedia,
   isScreenSharing = false,
   onToggleScreenShare,
   isMicOn,
@@ -92,6 +97,7 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   layout = 'spread',
   showLabels = true,
 }) => {
+  const [deviceMenu, setDeviceMenu] = useState<'audio' | 'video' | null>(null);
   // Picker persistente: solo se cierra con el botón Smile (toggle), Esc o
   // swipe-down (emojiSheetRef). Reaccionar NO lo cierra.
   useEffect(() => {
@@ -118,24 +124,38 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       <div className="meet-bar-group meet-bar-group--left">
       <BarItem label={isMicOn ? 'Silenciar' : 'Activar micrófono'}>
         {/* Mic toggle — green when ON, red when OFF */}
-        <Button variant="unstyled"
+        <div className="meet-device-control">
+          <Button variant="unstyled"
           onClick={toggleMic}
           className={`meet-circle-btn ${isMicOn ? 'meet-circle-btn--mic-on' : 'meet-circle-btn--off'}`}
           title={isMicOn ? 'Silenciar micrófono' : 'Activar micrófono'}
         >
           {isMicOn ? <Mic size={18} /> : <MicOff size={18} />}
         </Button>
+          <Button variant="unstyled" type="button" className="meet-device-arrow" aria-label="Opciones de micrófono" aria-expanded={deviceMenu === 'audio'} onClick={() => setDeviceMenu(value => value === 'audio' ? null : 'audio')}><ChevronDown size={14} /></Button>
+          {deviceMenu === 'audio' && <Popover className="meet-device-menu" aria-label="Opciones de micrófono" onDismiss={() => setDeviceMenu(null)}>
+            <DeviceTest kind="audio" localStream={localStream} />
+            {onRetryMedia && <Button type="button" variant="secondary" onClick={onRetryMedia}>Reconectar dispositivos</Button>}
+          </Popover>}
+        </div>
       </BarItem>
 
       <BarItem label={isCameraOn ? 'Detener video' : 'Iniciar video'}>
         {/* Camera toggle */}
-        <Button variant="unstyled"
+        <div className="meet-device-control">
+          <Button variant="unstyled"
           onClick={toggleCamera}
           className={`meet-circle-btn ${isCameraOn ? 'meet-circle-btn--on' : 'meet-circle-btn--off'}`}
           title={isCameraOn ? 'Apagar cámara' : 'Activar cámara'}
         >
           {isCameraOn ? <Video size={18} /> : <VideoOff size={18} />}
         </Button>
+          <Button variant="unstyled" type="button" className="meet-device-arrow" aria-label="Opciones de cámara" aria-expanded={deviceMenu === 'video'} onClick={() => setDeviceMenu(value => value === 'video' ? null : 'video')}><ChevronDown size={14} /></Button>
+          {deviceMenu === 'video' && <Popover className="meet-device-menu" aria-label="Opciones de cámara" onDismiss={() => setDeviceMenu(null)}>
+            <DeviceTest kind="video" localStream={localStream} />
+            {onRetryMedia && <Button type="button" variant="secondary" onClick={onRetryMedia}>Reconectar dispositivos</Button>}
+          </Popover>}
+        </div>
       </BarItem>
 
       </div>
@@ -166,17 +186,6 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
         </div>
       </BarItem>
 
-      <BarItem label="Participantes" className="meet-btn--hide-mobile">
-        {/* Participants Drawer Toggle — hidden on mobile (moved to … menu) */}
-        <Button variant="unstyled"
-          onClick={() => setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
-          className={`meet-circle-btn meet-btn--hide-mobile ${activeSideTab === 'participants' ? 'meet-circle-btn--active' : ''}`}
-          title="Ver participantes"
-        >
-          <Users size={18} />
-        </Button>
-      </BarItem>
-
       <BarItem label="Chat" className="meet-btn--hide-mobile">
         {/* Chat Drawer Toggle — hidden on mobile (moved to … menu) */}
         <Button variant="unstyled"
@@ -190,8 +199,30 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
           )}
         </Button>
       </BarItem>
+      <BarItem label="Participantes" className="meet-btn--hide-mobile">
+        {/* Participants Drawer Toggle — hidden on mobile (moved to … menu) */}
+        <Button variant="unstyled"
+          onClick={() => setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
+          className={`meet-circle-btn meet-btn--hide-mobile ${activeSideTab === 'participants' ? 'meet-circle-btn--active' : ''}`}
+          title="Ver participantes"
+        >
+          <Users size={18} />
+        </Button>
+      </BarItem>
 
 
+
+
+      <BarItem label={isRightPanelCollapsed ? 'Mostrar' : 'Ocultar'} className="meet-btn--hide-mobile">
+        {/* Toggle Collapse Cameras Strip (Accordion) — hidden on mobile */}
+        <Button variant="unstyled"
+          onClick={() => setIsRightPanelCollapsed((v) => !v)}
+          className={`meet-circle-btn meet-btn--hide-mobile ${isRightPanelCollapsed ? 'meet-circle-btn--active' : ''}`}
+          title={isRightPanelCollapsed ? 'Mostrar cámaras laterales' : 'Ocultar cámaras laterales'}
+        >
+          {isRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
+        </Button>
+      </BarItem>
       </div>
 
 
@@ -258,18 +289,7 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
         )}
       </div>
 
-      <div className="meet-bar-group meet-bar-group--visibility">
-      <BarItem label={isRightPanelCollapsed ? 'Mostrar' : 'Ocultar'} className="meet-btn--hide-mobile">
-        {/* Toggle Collapse Cameras Strip (Accordion) — hidden on mobile */}
-        <Button variant="unstyled"
-          onClick={() => setIsRightPanelCollapsed((v) => !v)}
-          className={`meet-circle-btn meet-btn--hide-mobile ${isRightPanelCollapsed ? 'meet-circle-btn--active' : ''}`}
-          title={isRightPanelCollapsed ? 'Mostrar cámaras laterales' : 'Ocultar cámaras laterales'}
-        >
-          {isRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
-        </Button>
-      </BarItem>
-      </div>
+
       {/* ── Características: música y pantalla ── */}
       <div className="meet-bar-group meet-bar-group--right">
       <BarItem label="Música">

@@ -51,7 +51,7 @@ it('reutiliza el sender negociado al encender, apagar y volver a encender el mic
 
   await act(async () => { events.emit('room-state', { peers: [{ socketId: 'peer', userName: 'Luis' }] }); });
   const audioSender = transceivers[0].sender;
-  expect(addTransceiver.mock.calls.map(([kind]) => kind)).toEqual(['audio', 'video']);
+  expect(addTransceiver.mock.calls.map(([kind]) => kind)).toEqual(['audio', 'video', 'video']);
   expect(audioSender.track).toBeNull();
 
   await act(async () => { await result.current.toggleMic(); });
@@ -62,7 +62,7 @@ it('reutiliza el sender negociado al encender, apagar y volver a encender el mic
   await act(async () => { await result.current.toggleMic(); });
   expect(audioSender.track).toBe(microphone);
   expect(createOffer).toHaveBeenCalledTimes(1);
-  expect(addTransceiver).toHaveBeenCalledTimes(2);
+  expect(addTransceiver).toHaveBeenCalledTimes(3);
 
   await act(async () => { microphone.dispatchEvent(new Event('ended')); });
   expect(result.current.isMicOn).toBe(false);

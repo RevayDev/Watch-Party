@@ -162,7 +162,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
       <main className={`meet-stage ${r.isRightPanelCollapsed ? 'meet-stage--cams-collapsed' : ''}`}>
         {/* Cinematic Video Card */}
         <section className="meet-stage__video-wrapper">
-<ScreenSharingStage localStream={r.localStream} isScreenSharing={r.isScreenSharing} remotePeers={r.remotePeers} peerMediaStates={r.peerMediaStates} />
+<ScreenSharingStage localScreenStream={r.localScreenStream} isScreenSharing={r.isScreenSharing} remotePeers={r.remotePeers} peerMediaStates={r.peerMediaStates} />
           <RemoteAudio peers={r.remotePeers} />
           <VideoPlayer
             roomId={roomId}
@@ -215,7 +215,7 @@ onVideoReady={r.handleVideoReady}
               currentUserName={r.myName}
               isLeader={r.isLeader}
               isMicOn={r.isMicOn}
-              isCameraOn={r.isCameraOn || r.isScreenSharing}
+              isCameraOn={r.isCameraOn}
               peerMediaStates={r.peerMediaStates}
               peerSignalStates={r.peerSignalStates}
               dataSaverMode={r.dataSaver}
@@ -262,7 +262,7 @@ onVideoReady={r.handleVideoReady}
       </main>
 
       {/* ── Bottom Bar (text buttons) ── */}
-      <RoomControls
+      <RoomControls localStream={r.localStream} onRetryMedia={r.retryMediaConnection}
         isScreenSharing={r.isScreenSharing} onToggleScreenShare={r.toggleScreenShare}
         roomId={roomId}
         musicOpen={r.activeSideTab === 'music'}

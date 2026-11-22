@@ -25,6 +25,7 @@ export interface RemotePeer {
   userName: string;
   isLeader: boolean;
   stream: MediaStream;
+  screenStream?: MediaStream;
 }
 
 export interface PeerMediaState {
@@ -74,6 +75,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());
   const peerMeta = useRef<Map<string, { userName: string; isLeader: boolean }>>(new Map());
+  const remoteScreenStreams = useRef<Map<string, MediaStream>>(new Map());
   const remoteStreams = useRef<Map<string, MediaStream>>(new Map());
   const pendingCandidates = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const makingOfferRef = useRef<Map<string, boolean>>(new Map());
@@ -85,6 +87,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
 
   // Master local media tracks (live hardware)
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const screenBusy = useRef(false);
   const mediaMounted = useRef(true);
@@ -104,6 +107,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
         userName: meta.userName,
         isLeader: meta.isLeader,
         stream: new MediaStream(stream.getTracks()),
+        screenStream: remoteScreenStreams.current.get(socketId),
       });
     });
     setRemotePeers(list);
@@ -128,7 +132,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
     const payload = JSON.stringify({
       type: 'media-state',
       isScreenSharing: !!screenTrackRef.current,
-      isCameraOn: camState || !!screenTrackRef.current,
+      isCameraOn: camState,
       isMicOn: micState,
       userName,
     });
@@ -147,7 +151,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
         dc.send(JSON.stringify({
           type: 'media-state',
           isScreenSharing: !!screenTrackRef.current,
-          isCameraOn: isCameraOnRef.current || !!screenTrackRef.current,
+          isCameraOn: isCameraOnRef.current,
           isMicOn: isMicOnRef.current,
           userName,
         }));
@@ -180,20 +184,17 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
 
   // ── Attach Current Local Tracks to a PeerConnection ─────────────────────────
   const attachLocalTracksToPC = useCallback(async (pc: RTCPeerConnection, createMissing = false) => {
-    const tracks = { audio: localAudioTrackRef.current, video: screenTrackRef.current ?? localVideoTrackRef.current };
     const transceivers = pc.getTransceivers();
-    await Promise.all((['audio', 'video'] as const).map(async (kind) => {
-      const compatible = transceivers.filter((item) => item.receiver.track.kind === kind && item.direction !== 'stopped');
-      const transceiver = compatible.find((item) => item.mid !== null) ?? compatible[0];
-      if (transceiver) {
-        // Una pista apagada deja el sender vacío, pero mantiene la misma línea SDP.
-        transceiver.direction = 'sendrecv';
-        if (transceiver.sender.track !== tracks[kind]) {
-          await transceiver.sender.replaceTrack(tracks[kind]);
-        }
-      } else if (createMissing) {
-        pc.addTransceiver(tracks[kind] ?? kind, { direction: 'sendrecv' });
-      }
+    const audio = transceivers.filter(item => item.receiver.track.kind === 'audio' && item.direction !== 'stopped');
+    const video = transceivers.filter(item => item.receiver.track.kind === 'video' && item.direction !== 'stopped');
+    // Stable SDP slots: microphone, camera, display. Display never replaces the camera sender.
+    await Promise.all([
+      { track: localAudioTrackRef.current, slot: audio[0], kind: 'audio' as const },
+      { track: localVideoTrackRef.current, slot: video[0], kind: 'video' as const },
+      { track: screenTrackRef.current, slot: video[1], kind: 'video' as const },
+    ].map(async ({ track, slot, kind }) => {
+      if (slot) { slot.direction = 'sendrecv'; if (slot.sender.track !== track) await slot.sender.replaceTrack(track); }
+      else if (createMissing) pc.addTransceiver(track ?? kind, { direction: 'sendrecv' });
     }));
   }, []);
 
@@ -209,6 +210,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
     peerMeta.current.delete(targetSocketId);
     pendingCandidates.current.delete(targetSocketId);
     remoteStreams.current.delete(targetSocketId);
+    remoteScreenStreams.current.delete(targetSocketId);
     makingOfferRef.current.delete(targetSocketId);
     restartAttempts.current.delete(targetSocketId);
     lastFramesRef.current.delete(targetSocketId);
@@ -295,10 +297,15 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
       // Remote track received
       pc.ontrack = (ev) => {
         console.log(`[WebRTC] Received remote track (${ev.track.kind}) from ${targetSocketId}`);
-        let st = remoteStreams.current.get(targetSocketId);
+        const videos = pc.getTransceivers().filter(item => item.receiver.track.kind === 'video');
+        const display = ev.track.kind === 'video' && videos.indexOf(ev.transceiver) === 1;
+        const streams = display ? remoteScreenStreams.current : remoteStreams.current;
+        // Keep a camera/audio entry even when the display arrives first.
+        if (!remoteStreams.current.has(targetSocketId)) remoteStreams.current.set(targetSocketId, new MediaStream());
+        let st = streams.get(targetSocketId);
         if (!st) {
           st = new MediaStream();
-          remoteStreams.current.set(targetSocketId, st);
+          streams.set(targetSocketId, st);
         }
 
         // Remove old track of kind and add incoming track
@@ -488,7 +495,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
       }
 
       // Publicar el estado real aunque el otro dispositivo haya fallado.
-      const tracks = [localAudioTrackRef.current, screenTrackRef.current ?? localVideoTrackRef.current]
+      const tracks = [localAudioTrackRef.current, localVideoTrackRef.current]
         .filter((track): track is MediaStreamTrack => track !== null);
       const updatedStream = tracks.length > 0 ? new MediaStream(tracks) : null;
       setLocalStream(updatedStream);
@@ -500,7 +507,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
           }
         });
       }
-      const cameraOn = !!screenTrackRef.current || isCameraOnRef.current;
+      const cameraOn = isCameraOnRef.current;
       const micOn = isMicOnRef.current;
       broadcastMediaStateP2P(cameraOn, micOn);
       if (socket?.connected) {
@@ -532,6 +539,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
     track.stop();
     if (!mediaMounted.current) return;
     setIsScreenSharing(false);
+    setLocalScreenStream(null);
     await enableMedia(isMicOnRef.current, isCameraOnRef.current);
   }, [enableMedia]);
 
@@ -549,6 +557,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
       screenTrackRef.current = track;
       track.onended = () => { void stopScreenShare(); };
       setIsScreenSharing(true);
+      setLocalScreenStream(new MediaStream([track]));
       await enableMedia(isMicOnRef.current, isCameraOnRef.current);
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'NotAllowedError') return;
@@ -954,6 +963,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
       pendingCandidates.current.clear();
       peerMeta.current.clear();
       remoteStreams.current.clear();
+      remoteScreenStreams.current.clear();
       makingOfferRef.current.clear();
       restartAttempts.current.clear();
       lastFramesRef.current.clear();
@@ -964,6 +974,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
 
   return {
     localStream,
+    localScreenStream,
     remotePeers,
     peerMediaStates,
     peerSignalStates,

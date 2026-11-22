@@ -266,6 +266,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
   );
   const {
     localStream,
+    localScreenStream,
     remotePeers,
     peerMediaStates,
     peerSignalStates,
@@ -1410,6 +1411,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     toggleBarsVisibility,
     socket,
     localStream,
+    localScreenStream,
     remotePeers,
     peerMediaStates,
     peerSignalStates,

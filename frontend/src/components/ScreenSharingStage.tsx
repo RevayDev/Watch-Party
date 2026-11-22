@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react';
 import { Maximize2, Monitor } from 'lucide-react';
 import type { PeerMediaState, RemotePeer } from '../hooks/useWebRTC';
 import { Button } from '../shared/components/ui';
-export function ScreenSharingStage({ localStream, isScreenSharing, remotePeers, peerMediaStates }: { localStream: MediaStream | null; isScreenSharing?: boolean; remotePeers: RemotePeer[]; peerMediaStates: Record<string, PeerMediaState> }) {
+export function ScreenSharingStage({ localScreenStream, isScreenSharing, remotePeers, peerMediaStates }: { localScreenStream: MediaStream | null; isScreenSharing?: boolean; remotePeers: RemotePeer[]; peerMediaStates: Record<string, PeerMediaState> }) {
  const video = useRef<HTMLVideoElement>(null);
- const remote = remotePeers.find(peer => peerMediaStates[peer.socketId]?.isScreenSharing);
- const stream = isScreenSharing ? localStream : remote?.stream;
+ const remote = remotePeers.find(peer => peerMediaStates[peer.socketId]?.isScreenSharing && peer.screenStream);
+ const stream = isScreenSharing ? localScreenStream : remote?.screenStream;
  const name = isScreenSharing ? 'Tu pantalla' : remote ? 'Pantalla de ' + remote.userName : '';
  useEffect(() => { const element = video.current; if (!element) return; element.srcObject = stream ?? null; if (stream) void element.play().catch(() => {}); return () => { element.srcObject = null; }; }, [stream]);
  if (!stream) return null;

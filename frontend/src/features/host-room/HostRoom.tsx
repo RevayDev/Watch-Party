@@ -220,7 +220,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         participantsActive={activeSideTab === 'participants'} onLeaveClick={() => setShowExit(true)}
         className={!uiPinned ? 'header--hidden' : ''} />}
       player={<>
-<ScreenSharingStage localStream={media.localStream} isScreenSharing={media.isScreenSharing} remotePeers={media.remotePeers} peerMediaStates={media.peerMediaStates} />
+<ScreenSharingStage localScreenStream={media.localScreenStream} isScreenSharing={media.isScreenSharing} remotePeers={media.remotePeers} peerMediaStates={media.peerMediaStates} />
         <RemoteAudio peers={media.remotePeers} />
         {selected?.source === 'file' && !view.fileUrl ? (
           <div className="player-container"><div className="player-container__placeholder" role="status">
@@ -244,7 +244,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       </>}
       cameras={<CameraGrid localStream={media.localStream} remotePeers={media.remotePeers}
         participants={roomData.participants} currentUserName={options.name} dataSaverMode={state.roomSettings?.dataSaver} isLeader={isHost}
-        isMicOn={media.isMicOn} isCameraOn={media.isCameraOn || media.isScreenSharing}
+        isMicOn={media.isMicOn} isCameraOn={media.isCameraOn}
         peerMediaStates={media.peerMediaStates} peerSignalStates={media.peerSignalStates} />}
       drawer={<RoomDrawer activeSideTab={activeSideTab} sideTabView={sideTabView} setActiveSideTab={setActiveSideTab}
         messages={state.messages}
@@ -262,7 +262,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         onMusicAutoNext={() => { if (isHost) session.command({ type: 'music-next' }); }}
         onMusicStop={() => session.command({ type: 'music-stop' })}
         onExpandToMain={(link, title, currentTime = 0) => { void setVideoUrl(link, title, currentTime); }} />}
-      controls={<RoomControls isScreenSharing={media.isScreenSharing} onToggleScreenShare={media.toggleScreenShare} roomId={options.roomId} layout={barPrefs.layout} showLabels={barPrefs.showLabels}
+      controls={<RoomControls localStream={media.localStream} onRetryMedia={media.retryMediaConnection} isScreenSharing={media.isScreenSharing} onToggleScreenShare={media.toggleScreenShare} roomId={options.roomId} layout={barPrefs.layout} showLabels={barPrefs.showLabels}
         isMicOn={media.isMicOn} isCameraOn={media.isCameraOn} toggleMic={media.toggleMic} toggleCamera={media.toggleCamera}
         showEmojiPicker={showEmojiPicker} setShowEmojiPicker={setShowEmojiPicker} emojiPresence={emojiPresence}
         emojiSheetRef={emojiSheetRef} handleReaction={(emoji) => session.emit('reaction', { emoji })}
