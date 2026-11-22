@@ -14,7 +14,7 @@ it('leaves external media untouched instead of silencing it', async () => {
 });
 it('applies gain, bass and balance without rebuilding the source and keeps playing when folded', async () => {
  const gain = vi.fn(), bass = vi.fn(), pan = vi.fn(), close = vi.fn();
- const node = () => ({ connect: vi.fn().mockReturnThis() });
+ const node = () => ({ connect: vi.fn().mockReturnThis(), disconnect: vi.fn() });
  const source = vi.fn(node);
  vi.stubGlobal('AudioContext', vi.fn(function () { return { currentTime: 0, destination: {}, createGain: () => ({ ...node(), gain: { setTargetAtTime: gain } }), createBiquadFilter: () => ({ ...node(), frequency: {}, gain: { setTargetAtTime: bass } }), createStereoPanner: () => ({ ...node(), pan: { setTargetAtTime: pan } }), createDynamicsCompressor: () => ({ ...node(), threshold: {}, knee: {}, ratio: {}, attack: {}, release: {} }), createMediaElementSource: source, resume: async () => {}, close }; }));
  const video = document.createElement('video'); video.src = '/video.mp4';
@@ -30,5 +30,22 @@ it('applies gain, bass and balance without rebuilding the source and keeps playi
  fireEvent.click(screen.getByText('Restablecer sonido'));
  await vi.waitFor(() => expect(gain).toHaveBeenLastCalledWith(1, 0, .03));
  expect(source).toHaveBeenCalledTimes(1);
- view.unmount(); expect(close).toHaveBeenCalledTimes(1);
+  view.unmount(); expect(close).not.toHaveBeenCalled();
+ const remount = render(<VideoAudioBoost videoRef={{ current: video }} />);
+ fireEvent.change(screen.getByLabelText('Amplificación del video'), { target: { value: '200' } });
+ await vi.waitFor(() => expect(gain).toHaveBeenLastCalledWith(2, 0, .03));
+ expect(source).toHaveBeenCalledTimes(1);
+ remount.unmount();
+});
+it('does not capture media when an effect is unsupported', async () => {
+ const source = vi.fn(), close = vi.fn().mockResolvedValue(undefined);
+ vi.stubGlobal('AudioContext', vi.fn(function () { return { createGain: () => ({}), createBiquadFilter: () => ({}), createStereoPanner: () => { throw new Error('unsupported'); }, createMediaElementSource: source, close }; }));
+ const video = document.createElement('video'); video.src = '/unsupported.mp4';
+ render(<VideoAudioBoost videoRef={{ current: video }} />);
+ fireEvent.change(screen.getByLabelText('Amplificación del video'), { target: { value: '200' } });
+ expect((await screen.findByRole('status')).textContent).toContain('Recuperar audio');
+ expect(source).not.toHaveBeenCalled();
+ expect(close).toHaveBeenCalledTimes(1);
+ fireEvent.click(screen.getByLabelText('Ocultar sonido'));
+ expect(screen.queryByRole('status')).toBeNull();
 });
