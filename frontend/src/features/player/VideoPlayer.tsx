@@ -1,3 +1,4 @@
+import { VideoAudioBoost } from './VideoAudioBoost';
 import { PlayerActionDock } from './PlayerActionDock';
 import { Field, Button } from '../../shared/components/ui';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
@@ -913,6 +914,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </div>
 
       {isLeader && <PlayerActionDock onChange={() => openChangePanel()} onClear={onClearVideo} />}
+
+      {video.sourceType !== 'youtube' && <VideoAudioBoost key={video.fileName || video.directUrl} videoRef={videoRef} />}
 
       {/* Mobile-only floating button: opens the "Cambiar video" panel (top bar auto-hides on touch) */}
 

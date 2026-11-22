@@ -8214,3 +8214,10 @@ a.home-faq-hl--frontend {
  .meet-device-menu .ui-action { border-radius: 8px; }
  .reactions-bar__btn { border-radius: 8px; }
 }
+
+.video-audio-boost { position: absolute; z-index: 32; left: 12px; top: 52px; color: var(--color-text-main); font-size: 12px; }
+.video-audio-boost summary { cursor: pointer; width: max-content; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-input); }
+.video-audio-boost__panel { width: min(270px, calc(100vw - 48px)); margin-top: 6px; padding: 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-input); }
+.video-audio-boost label { display: grid; gap: 10px; }
+.video-audio-boost input { width: 100%; accent-color: var(--color-primary); }
+.video-audio-boost p { color: var(--color-muted-light); margin: 10px 0; }
