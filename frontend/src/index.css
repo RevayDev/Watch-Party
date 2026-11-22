@@ -8237,3 +8237,9 @@ a.home-faq-hl--frontend {
 .video-audio-boost--inline .video-audio-boost__panel { position: absolute; right: 0; top: calc(100% + 4px); box-sizing: border-box; z-index: 1; }
 .player-action-dock[data-edge="bottom"] .video-audio-boost__panel { top: auto; bottom: calc(100% + 4px); }
 .player-action-dock[data-edge="left"] .video-audio-boost__panel { left: 0; right: auto; }
+
+/* Keep both music sliders on the playback button centerline. */
+.music-player__controls { position: relative; align-items: center; padding-bottom: 14px; }
+.music-player__progress { position: relative; display: flex; align-items: center; }
+.music-player__progress > .music-player__range, .music-player__volume { display: block; margin: 0; }
+.music-player__time { position: absolute; top: calc(50% + 12px); right: 0; white-space: nowrap; line-height: 1; pointer-events: none; }
