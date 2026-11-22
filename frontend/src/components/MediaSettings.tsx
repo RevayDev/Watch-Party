@@ -1,8 +1,9 @@
+import { Mic, Video } from 'lucide-react';
 import { Button } from '../shared/components/ui';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '../shared/components/BottomSheet';
 
-export function DeviceTest({ kind, localStream }: { kind: 'audio' | 'video'; localStream: MediaStream | null }) {
+export function DeviceTest({ kind, localStream, compact = false }: { kind: 'audio' | 'video'; localStream: MediaStream | null; compact?: boolean }) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -101,7 +102,7 @@ export function DeviceTest({ kind, localStream }: { kind: 'audio' | 'video'; loc
 
   return (
     <section className="room-settings__box" aria-label={`Prueba de ${label}`}>
-      <h4>{microphone ? 'Micrófono' : 'Cámara'}</h4>
+      <h4>{compact && (microphone ? <Mic size={18} aria-hidden="true" /> : <Video size={18} aria-hidden="true" />)}{microphone ? 'Micrófono' : 'Cámara'}</h4>
       <p className="room-settings__box-desc">{microphone ? 'Comprueba el nivel de entrada antes de hablar en la sala.' : 'Revisa tu imagen sin compartirla con los participantes.'}</p>
       <Button variant="primary" type="button" className="btn btn--primary" onClick={() => void toggleTest()} disabled={pending}>
         {pending ? 'Esperando permiso…' : stream ? `Detener prueba de ${label}` : `Probar ${label}`}

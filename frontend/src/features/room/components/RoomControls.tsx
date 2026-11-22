@@ -134,8 +134,8 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
         </Button>
           <Button variant="unstyled" type="button" className="meet-device-arrow" aria-label="Opciones de micrófono" aria-expanded={deviceMenu === 'audio'} onClick={() => setDeviceMenu(value => value === 'audio' ? null : 'audio')}><ChevronDown size={14} /></Button>
           {deviceMenu === 'audio' && <Popover className="meet-device-menu" aria-label="Opciones de micrófono" onDismiss={() => setDeviceMenu(null)}>
-            <DeviceTest kind="audio" localStream={localStream} />
-            {onRetryMedia && <Button type="button" variant="secondary" onClick={onRetryMedia}>Reconectar dispositivos</Button>}
+            <DeviceTest compact kind="audio" localStream={localStream} />
+            {onRetryMedia && <Button type="button" variant="ghost" size="sm" onClick={onRetryMedia}>Reconectar dispositivos</Button>}
           </Popover>}
         </div>
       </BarItem>
@@ -152,8 +152,8 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
         </Button>
           <Button variant="unstyled" type="button" className="meet-device-arrow" aria-label="Opciones de cámara" aria-expanded={deviceMenu === 'video'} onClick={() => setDeviceMenu(value => value === 'video' ? null : 'video')}><ChevronDown size={14} /></Button>
           {deviceMenu === 'video' && <Popover className="meet-device-menu" aria-label="Opciones de cámara" onDismiss={() => setDeviceMenu(null)}>
-            <DeviceTest kind="video" localStream={localStream} />
-            {onRetryMedia && <Button type="button" variant="secondary" onClick={onRetryMedia}>Reconectar dispositivos</Button>}
+            <DeviceTest compact kind="video" localStream={localStream} />
+            {onRetryMedia && <Button type="button" variant="ghost" size="sm" onClick={onRetryMedia}>Reconectar dispositivos</Button>}
           </Popover>}
         </div>
       </BarItem>

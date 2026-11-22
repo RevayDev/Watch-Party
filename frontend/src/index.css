@@ -8081,3 +8081,19 @@ a.home-faq-hl--frontend {
  .meet-bottom-bar--spread .meet-bar-group--end { grid-column: 4; justify-self: end; margin: 0; }
 }
 @media (max-width: 600px) { .meet-device-control { gap: 0; } .meet-device-arrow { width: 18px; } .meet-device-menu { position: fixed; left: 16px; bottom: 100px; width: calc(100vw - 32px); } .meet-bottom-bar { gap: 4px; padding: 8px 4px; } .meet-bar-group { gap: 4px; } }
+
+/* A single outlined device control groups the toggle and its options. */
+.meet-device-control { gap: 0; padding: 3px; border: 1px solid rgba(255,255,255,.16); border-radius: 14px; background: transparent; }
+.meet-device-control:focus-within { border-color: var(--color-primary-light); }
+.meet-device-control .meet-circle-btn { width: 42px; height: 42px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; }
+.meet-device-control .meet-circle-btn:hover { background: transparent; box-shadow: none; transform: none; }
+.meet-device-control .meet-device-arrow { width: 26px; height: 42px; border-radius: 8px; background: transparent; }
+.meet-device-control .meet-device-arrow:hover, .meet-device-control .meet-device-arrow[aria-expanded="true"] { color: var(--color-text-main); background: transparent; }
+.meet-device-menu.ui-popover { padding: 16px; border: 1px solid rgba(255,255,255,.14); border-radius: 16px; background: var(--color-bg-main, #080c14); box-shadow: 0 12px 32px rgba(0,0,0,.35); }
+.meet-device-menu .room-settings__box { padding: 0; }
+.meet-device-menu h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--color-text-main); }
+.meet-device-menu h4 svg { color: var(--color-muted-light); }
+.meet-device-menu .room-settings__box-desc { margin: 0 0 16px; font-size: 13px; line-height: 1.6; }
+.meet-device-menu .room-settings__box > .ui-action { width: 100%; }
+.meet-device-menu > .ui-action { margin-top: 8px; font-size: 12px; }
+@media (max-width: 600px) { .meet-device-control { padding: 2px; border-radius: 12px; } .meet-device-control .meet-circle-btn { width: 32px; height: 36px; } .meet-device-control .meet-device-arrow { width: 18px; height: 36px; } }
