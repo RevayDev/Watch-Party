@@ -8182,3 +8182,8 @@ a.home-faq-hl--frontend {
  .header__share-btn .header__pill-label { display: none; }
  .header__share-btn { width: 36px; padding: 0; }
 }
+
+/* Keep message actions reachable across the whole row, including the gap. */
+.drawer-chat__row { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: flex-start; }
+.drawer-chat__row--mine { justify-content: flex-end; }
+.drawer-chat__row:hover .drawer-chat__actions, .drawer-chat__row:focus-within .drawer-chat__actions, .drawer-chat__actions:hover { opacity: 1; pointer-events: auto; }

@@ -13,7 +13,7 @@ it('places each reader avatar only under their most recent read message', () => 
  render(<Chat messages={messages} currentUserName="Ana" currentUserId="ana" onSendMessage={vi.fn()} readReceipts={[{ readerId: 'beto', userName: 'Beto', messageId: 'two' }, { readerId: 'ana', userName: 'Ana', messageId: 'two' }]} />);
  expect(screen.getAllByRole('img')).toHaveLength(1);
  const avatar = screen.getByRole('img', { name: 'Visto por Beto' });
- expect(avatar.parentElement?.previousElementSibling?.id).toBe('msg-two');
+ expect(avatar.parentElement?.previousElementSibling?.querySelector('#msg-two')).toBeTruthy();
  expect(document.querySelector('time')?.getAttribute('datetime')).toBe(messages[0].timestamp);
 });
 it('reports only visible messages while the document is visible, never moving backward', () => {

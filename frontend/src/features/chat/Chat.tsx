@@ -246,6 +246,7 @@ export const Chat: React.FC<ChatProps> = ({
                   )}
                 </div>}
 
+                <div className={`drawer-chat__row ${isMine(m.user) ? 'drawer-chat__row--mine' : ''}`}>
                 <div
                   data-message-id={m.id}
                   id={`msg-${m.id}`}
@@ -272,6 +273,7 @@ export const Chat: React.FC<ChatProps> = ({
                   </Popover>}
                   {!m.deleted && !!m.reactions?.length && <div className="drawer-chat__message-reactions">{[...new Set(m.reactions.map(reaction => reaction.emoji))].map(emoji => <Button variant="unstyled" key={emoji} type="button" title={m.reactions!.filter(reaction => reaction.emoji === emoji).map(reaction => reaction.userName).join(', ')} aria-label={`Reacción ${emoji}`} onClick={() => onReactMessage(m.id, emoji)}>{emoji} {m.reactions!.filter(reaction => reaction.emoji === emoji).length}</Button>)}</div>}
 
+                </div>
                 </div>
                 {readReceipts.some(receipt => receipt.messageId === m.id && receipt.readerId !== currentUserId && receipt.userName !== currentUserName) && <div className={`drawer-chat__seen ${isMine(m.user) ? 'drawer-chat__seen--mine' : ''}`} aria-label="Visto por">
                   {readReceipts.filter(receipt => receipt.messageId === m.id && receipt.readerId !== currentUserId && receipt.userName !== currentUserName).map(receipt => <span key={receipt.readerId} className="drawer-chat__seen-avatar" role="img" aria-label={`Visto por ${receipt.userName}`} title={receipt.userName} style={{ background: getAvatarColor(receipt.userName) }}>{getInitials(receipt.userName)}</span>)}
