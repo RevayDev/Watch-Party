@@ -66,3 +66,4 @@ Los paneles de Sala usan altura automática con máximo 85dvh: una lista de un p
 
 En móvil, la cabecera y la barra de controles usan radio de 12 px; los botones y controles agrupados, 8 px. Los desplegables de dispositivos y reacciones comparten el fondo de la barra y bordes discretos. Conservar los colores de estado existentes y evitar cápsulas o círculos en esta navegación.
 Sonido: sección personal compartida por Render y anfitrión, con ganancia 100–600 %, bajos −12/+12 dB y balance estéreo. El acceso del video se pliega al borde derecho sin desconectar el audio. Los ajustes duran durante la sesión de la página; no se sincronizan con otros usuarios. YouTube y fuentes externas sin acceso al audio no admiten procesamiento.
+Acciones del video: barra centrada arriba por defecto; al plegar, se ancla al borde más cercano (arriba, abajo, izquierda o derecha). Al desplegar conserva su posición anterior. Sonido permanece montado y activo durante el plegado.

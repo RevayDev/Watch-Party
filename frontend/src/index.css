@@ -8235,3 +8235,5 @@ a.home-faq-hl--frontend {
 .video-audio-boost--inline summary { border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; }
 .video-audio-boost--inline summary:hover { background: var(--color-bg-hover); }
 .video-audio-boost--inline .video-audio-boost__panel { position: absolute; right: 0; top: calc(100% + 4px); box-sizing: border-box; z-index: 1; }
+.player-action-dock[data-edge="bottom"] .video-audio-boost__panel { top: auto; bottom: calc(100% + 4px); }
+.player-action-dock[data-edge="left"] .video-audio-boost__panel { left: 0; right: auto; }
