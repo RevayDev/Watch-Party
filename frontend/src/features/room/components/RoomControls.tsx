@@ -46,6 +46,8 @@ interface RoomControlsProps {
   shape?: 'square' | 'rounded';
   /** Etiquetas bajo los iconos (gusto personal). */
   showLabels?: boolean;
+  /** Explained instead of requesting local media when this room cannot relay it safely. */
+  mediaUnavailableMessage?: string;
 }
 
 /**
@@ -98,10 +100,14 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   layout = 'spread',
   shape = 'square',
   showLabels = true,
+  mediaUnavailableMessage,
 }) => {
   const [deviceMenu, setDeviceMenu] = useState<'audio' | 'video' | null>(null);
+  const [blockedMedia, setBlockedMedia] = useState<'audio' | 'video' | null>(null);
   const [screenNotice, setScreenNotice] = useState(false);
   const screenAnchor = useRef<HTMLButtonElement>(null);
+  const micAnchor = useRef<HTMLButtonElement>(null);
+  const cameraAnchor = useRef<HTMLButtonElement>(null);
   // Picker persistente: solo se cierra con el botón Smile (toggle), Esc o
   // swipe-down (emojiSheetRef). Reaccionar NO lo cierra.
   useEffect(() => {
@@ -130,14 +136,14 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       <BarItem label={isMicOn ? 'Silenciar' : 'Activar micrófono'}>
         {/* Mic toggle — green when ON, red when OFF */}
         <div className="meet-device-control">
-          <Button variant="unstyled"
-          onClick={toggleMic}
+          <Button ref={micAnchor} variant="unstyled"
+          onClick={() => mediaUnavailableMessage ? setBlockedMedia('audio') : toggleMic()}
           className={`meet-circle-btn ${isMicOn ? 'meet-circle-btn--mic-on' : 'meet-circle-btn--off'}`}
           title={isMicOn ? 'Silenciar micrófono' : 'Activar micrófono'}
         >
           {isMicOn ? <Mic size={18} /> : <MicOff size={18} />}
         </Button>
-          <Button variant="unstyled" type="button" className="meet-device-arrow" aria-label="Opciones de micrófono" aria-expanded={deviceMenu === 'audio'} onClick={() => setDeviceMenu(value => value === 'audio' ? null : 'audio')}><ChevronDown size={14} /></Button>
+          <Button variant="unstyled" type="button" className="meet-device-arrow" aria-label="Opciones de micrófono" aria-expanded={deviceMenu === 'audio'} onClick={() => mediaUnavailableMessage ? setBlockedMedia('audio') : setDeviceMenu(value => value === 'audio' ? null : 'audio')}><ChevronDown size={14} /></Button>
           {deviceMenu === 'audio' && <Popover className="meet-device-menu" aria-label="Opciones de micrófono" onDismiss={() => setDeviceMenu(null)}>
             <DeviceTest compact kind="audio" localStream={localStream} />
             {onRetryMedia && <Button type="button" variant="ghost" size="sm" onClick={onRetryMedia}>Reconectar dispositivos</Button>}
@@ -148,14 +154,14 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       <BarItem label={isCameraOn ? 'Detener video' : 'Iniciar video'}>
         {/* Camera toggle */}
         <div className="meet-device-control">
-          <Button variant="unstyled"
-          onClick={toggleCamera}
+          <Button ref={cameraAnchor} variant="unstyled"
+          onClick={() => mediaUnavailableMessage ? setBlockedMedia('video') : toggleCamera()}
           className={`meet-circle-btn ${isCameraOn ? 'meet-circle-btn--on' : 'meet-circle-btn--off'}`}
           title={isCameraOn ? 'Apagar cámara' : 'Activar cámara'}
         >
           {isCameraOn ? <Video size={18} /> : <VideoOff size={18} />}
         </Button>
-          <Button variant="unstyled" type="button" className="meet-device-arrow" aria-label="Opciones de cámara" aria-expanded={deviceMenu === 'video'} onClick={() => setDeviceMenu(value => value === 'video' ? null : 'video')}><ChevronDown size={14} /></Button>
+          <Button variant="unstyled" type="button" className="meet-device-arrow" aria-label="Opciones de cámara" aria-expanded={deviceMenu === 'video'} onClick={() => mediaUnavailableMessage ? setBlockedMedia('video') : setDeviceMenu(value => value === 'video' ? null : 'video')}><ChevronDown size={14} /></Button>
           {deviceMenu === 'video' && <Popover className="meet-device-menu" aria-label="Opciones de cámara" onDismiss={() => setDeviceMenu(null)}>
             <DeviceTest compact kind="video" localStream={localStream} />
             {onRetryMedia && <Button type="button" variant="ghost" size="sm" onClick={onRetryMedia}>Reconectar dispositivos</Button>}
@@ -164,6 +170,12 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       </BarItem>
 
       </div>
+
+      {blockedMedia && mediaUnavailableMessage && <Popover anchor={blockedMedia === 'audio' ? micAnchor.current : cameraAnchor.current} className="meet-device-menu" role="dialog" aria-label={`${blockedMedia === 'audio' ? 'Micrófono' : 'Cámara'} no disponible`} onDismiss={() => setBlockedMedia(null)}>
+        <h4>{blockedMedia === 'audio' ? 'Micrófono no disponible' : 'Cámara no disponible'}</h4>
+        <p>{mediaUnavailableMessage}</p>
+        <Button variant="secondary" onClick={() => setBlockedMedia(null)}>Entendido</Button>
+      </Popover>}
 
 
 

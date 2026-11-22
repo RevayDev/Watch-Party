@@ -69,3 +69,12 @@ it('uses the Render layout with a lateral camera strip and the standard bottom c
   expect(screen.getByRole('region', { name: 'Prueba de micrófono' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Configurar micrófono y cámara' })).toBeNull();
 });
+
+it('explains why browser-hosted rooms keep camera and microphone disabled', () => {
+  render(<HostRoom options={{ roomId: 'a'.repeat(24), key: 'b'.repeat(64), name: 'Ana', create: true }} onLeave={vi.fn()} />);
+  fireEvent.click(screen.getByTitle('Activar micrófono'));
+  expect(screen.getByRole('dialog', { name: 'Micrófono no disponible' }).textContent).toMatch(/relay TURN seguro/i);
+  fireEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+  fireEvent.click(screen.getByTitle('Activar cámara'));
+  expect(screen.getByRole('dialog', { name: 'Cámara no disponible' }).textContent).toMatch(/relay TURN seguro/i);
+});

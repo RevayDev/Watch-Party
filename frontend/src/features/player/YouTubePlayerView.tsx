@@ -82,10 +82,14 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
             enablejsapi: 1,
             modestbranding: 1,
             rel: 0,
+            playsinline: 1,
             origin: window.location.origin,
           },
           events: {
             onReady: (event: any) => {
+              // iOS requires inline playback and an explicit autoplay grant
+              // even when playVideo() is called from the room's play button.
+              try { event.target.getIframe?.().setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture'); } catch {}
               if (active) onReadyRef.current?.(event.target);
             },
             onStateChange: (event: any) => {

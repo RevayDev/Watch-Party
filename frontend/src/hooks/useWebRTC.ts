@@ -35,16 +35,33 @@ export interface PeerMediaState {
   userName?: string;
 }
 
-const ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
+const STUN_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
-  ],
-};
+];
+
+/**
+ * Browser-hosted rooms have no backend to mint temporary TURN credentials.
+ * These public build variables therefore accept short-lived credentials from
+ * the deployed TURN provider. Render rooms still append their server-issued
+ * credentials after joining.
+ */
+export function browserHostedIceConfiguration(env: Record<string, string | undefined> = import.meta.env): RTCConfiguration {
+  const urls = (env.VITE_TURN_URLS ?? env.VITE_HOST_TURN_URLS ?? '')
+    .split(',').map((url) => url.trim()).filter((url) => /^turns?:[^\s]+$/i.test(url));
+  const username = (env.VITE_TURN_USERNAME ?? env.VITE_HOST_TURN_USERNAME ?? '').trim();
+  const credential = (env.VITE_TURN_CREDENTIAL ?? env.VITE_HOST_TURN_CREDENTIAL ?? '').trim();
+  const turn: RTCIceServer[] = urls.length > 0 && username && credential
+    ? [{ urls, username, credential }]
+    : [];
+  return { iceServers: [...STUN_SERVERS, ...turn] };
+}
+
+const ICE_SERVERS = browserHostedIceConfiguration();
 
 export interface WebRTCTransport {
   id?: string;

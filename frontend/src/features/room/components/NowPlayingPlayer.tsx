@@ -107,8 +107,9 @@ export const NowPlayingPlayer: React.FC<{
     try {
       const p = playerRef.current;
       if (!p) return;
-      // React state can lag behind a remote seek/play after a phone resumes.
-      const active = p.getPlayerState?.() === 1 || playingRef.current;
+      // The shared checkpoint wins after a remote update; without one this
+      // remains a purely local first-play gesture.
+      const active = playback ? playback.playing : playingRef.current;
       const next = !active;
       publish(p.getCurrentTime?.() ?? current, next);
       playingRef.current = next;
@@ -226,7 +227,9 @@ export const NowPlayingPlayer: React.FC<{
           <Button variant="unstyled" type="button" className="music-player__icon music-player__stop" title="Detener música" aria-label="Detener música" onClick={onStop}><Square size={18} /></Button>
         </div>}
       </div>
-      <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
+      {/* Keep the iframe painted. Mobile WebKit refuses audio from a fully
+          invisible frame even after the user presses this player's button. */}
+      <div aria-hidden="true" style={{ position: 'absolute', width: 2, height: 2, overflow: 'hidden', opacity: 0.01, pointerEvents: 'none' }}>
         <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; synchronize(true); reportReady(); }} onStateChange={(event) => {
           if (checkpoint.current?.awaitingReady) { playerRef.current?.pauseVideo?.(); reportReady(); }
           if (event.data === 1) { playingRef.current = true; setPlaying(true); }
