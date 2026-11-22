@@ -142,6 +142,8 @@ export interface CreateRoomDTO {
   leaderName: string;
   isTemporary?: boolean;
   userId?: string;
+  /** El anfitrión conserva play/pausa de video y YouTube; Socket.IO sigue coordinando la sala. */
+  hostOnlySync?: boolean;
 }
 
 export interface JoinRoomDTO {

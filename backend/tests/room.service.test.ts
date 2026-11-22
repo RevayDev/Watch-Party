@@ -48,6 +48,12 @@ describe('RoomService.createRoom / getRoomById', () => {
     expect(found?.roomId).toBe(roomId);
     expect(await RoomService.getRoomById('ZZZZZZ')).toBeNull();
   });
+
+  it('crea una sala mixta con la reproducción bajo control del anfitrión', async () => {
+    const { room } = await RoomService.createRoom({ leaderName: 'Ana', hostOnlySync: true });
+    created.push(room.roomId);
+    expect(room.settings?.hostOnlySync).toBe(true);
+  });
 });
 
 describe('RoomService.joinRoom (identidad estable)', () => {

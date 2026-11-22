@@ -66,8 +66,8 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
           <Field type="radio" name="server-mode" value="hybrid" checked={mode === 'hybrid'} onChange={() => onChange('hybrid')} />
           Mixto inteligente
         </label>
-        <p className="room-settings__box-desc">Usa Render para sala, chat, reacciones, YouTube, sincronización y señalización de cámara/micrófono. Si Render no responde al crearla, continúa con el navegador del anfitrión.</p>
-        <p role="status">{availability === 'available' ? 'Usará el servidor en tiempo real.' : availability === 'checking' ? 'Comprobando si podrá usar Render…' : 'Render no responde: al crear usará el anfitrión como respaldo.'}</p>
+        <p className="room-settings__box-desc">Render gestiona sala, chat, reacciones y la señalización/TURN de cámara y micrófono. El anfitrión conserva el control de video, YouTube, música y pantalla compartida; el contenido se reproduce directo entre navegadores, sin retransmitir YouTube por el servidor.</p>
+        <p role="status">{availability === 'available' ? 'Render coordinará tiempo real; el anfitrión controla la reproducción.' : availability === 'checking' ? 'Comprobando si podrá usar Render…' : 'Render no responde: al crear usará el anfitrión como respaldo.'}</p>
       </div>
     </fieldset>
   );

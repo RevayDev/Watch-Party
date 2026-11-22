@@ -7965,6 +7965,7 @@ a.home-faq-hl--frontend {
 .create-room-modal .server-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 16px 0; gap: 12px; }
 .create-room-modal .server-selector__intro { grid-column: 1 / -1; }
 .create-room-modal .server-selector__card { min-width: 0; }
+.create-room-modal .server-selector__card--hybrid { grid-column: 1 / -1; }
 .create-room-modal .leader-exit-modal__desc { margin-bottom: 12px; }
 @media (max-width: 560px) {
   .create-room-modal .server-selector { grid-template-columns: 1fr; }

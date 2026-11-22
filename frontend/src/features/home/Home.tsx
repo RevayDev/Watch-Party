@@ -193,6 +193,7 @@ export const Home: React.FC<HomeProps> = ({
       const data = await ApiService.createRoom(
         createLeaderName.trim(),
         isTemporary,
+        { hostOnlySync: serverMode === 'hybrid' },
       );
       setShowCreateModal(false);
       // Demo: re-lee la disponibilidad tras crear (si falla, se oculta solo).

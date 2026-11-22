@@ -29,13 +29,15 @@ export class ApiService {
    */
   static async createRoom(
     leaderName: string,
-    isTemporary: boolean = true
+    isTemporary: boolean = true,
+    options?: { hostOnlySync?: boolean },
   ): Promise<{ roomId: string; leaderSecret: string; leaderName: string; isTemporary?: boolean }> {
     const userId = getStoredUserId();
-    const body: { leaderName: string; isTemporary: boolean; userId?: string } = {
+    const body: { leaderName: string; isTemporary: boolean; hostOnlySync?: boolean; userId?: string } = {
       leaderName,
       isTemporary,
     };
+    if (options?.hostOnlySync === true) body.hostOnlySync = true;
     if (userId) body.userId = userId;
 
     const response = await fetch(`${API_BASE_URL}/rooms`, {

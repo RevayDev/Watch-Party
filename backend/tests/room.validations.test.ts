@@ -90,6 +90,14 @@ describe('RoomController.create: validaciones', () => {
     expect(res.body.isTemporary).toBe(false);
     created.push(res.body.roomId);
   });
+
+  it('rechaza una configuración mixta que no sea booleana', async () => {
+    const req: any = { body: { leaderName: 'Anfitriona', hostOnlySync: 'sí' } };
+    const res = mockRes();
+    await RoomController.create(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.body).toMatchObject({ error: 'hostOnlySync must be a boolean' });
+  });
 });
 
 describe('RoomController.join: validaciones y puerta de aprobación', () => {

@@ -209,6 +209,7 @@ export class RoomService {
         allowMicReactivation: true,
         allowCamReactivation: true,
         isTemporary,
+        hostOnlySync: dto.hostOnlySync === true,
         // timerEndsAt se establece cuando entra el primer participante no-leader
         // (disparador: waiting → active). Ver joinRoomLocked.
       },

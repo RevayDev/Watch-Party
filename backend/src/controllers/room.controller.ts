@@ -157,9 +157,13 @@ async function resolveFallbackVideoName(cleanUrl: string, isHls: boolean, driveF
 export class RoomController {
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { leaderName, isTemporary } = req.body;
+      const { leaderName, isTemporary, hostOnlySync } = req.body;
       if (!leaderName || typeof leaderName !== 'string' || leaderName.trim().length === 0) {
         res.status(400).json({ error: 'leaderName is required' });
+        return;
+      }
+      if (hostOnlySync !== undefined && typeof hostOnlySync !== 'boolean') {
+        res.status(400).json({ error: 'hostOnlySync must be a boolean' });
         return;
       }
 
@@ -169,6 +173,7 @@ export class RoomController {
         leaderName,
         isTemporary: isTemporary !== undefined ? Boolean(isTemporary) : true,
         userId,
+        hostOnlySync: hostOnlySync === true,
       });
 
       res.status(201).json({

@@ -40,6 +40,13 @@ describe('ApiService.createRoom', () => {
     await expect(ApiService.createRoom('')).rejects.toThrow('leaderName is required');
   });
 
+  it('marca las salas mixtas para que el anfitrión controle video y YouTube', async () => {
+    const { fetchMock } = mockFetchOnce({ roomId: 'MIXTO1', leaderSecret: 'secret', leaderName: 'Ana' });
+    await ApiService.createRoom('Ana', true, { hostOnlySync: true });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ leaderName: 'Ana', isTemporary: true, hostOnlySync: true });
+  });
+
   it('usa mensaje genérico si el cuerpo no es JSON útil', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: false,
