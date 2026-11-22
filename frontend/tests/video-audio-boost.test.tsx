@@ -24,9 +24,7 @@ it('applies gain, bass and balance without rebuilding the source and keeps playi
  fireEvent.change(screen.getByLabelText('Bajos del video'), { target: { value: '6' } });
  fireEvent.change(screen.getByLabelText('Balance del video'), { target: { value: '-0.5' } });
  await vi.waitFor(() => { expect(bass).toHaveBeenLastCalledWith(6, 0, .03); expect(pan).toHaveBeenLastCalledWith(-.5, 0, .03); });
- fireEvent.click(screen.getByLabelText('Ocultar sonido'));
  expect(close).not.toHaveBeenCalled();
- fireEvent.click(screen.getByLabelText('Mostrar sonido'));
  fireEvent.click(screen.getByText('Restablecer sonido'));
  await vi.waitFor(() => expect(gain).toHaveBeenLastCalledWith(1, 0, .03));
  expect(source).toHaveBeenCalledTimes(1);
@@ -46,6 +44,4 @@ it('does not capture media when an effect is unsupported', async () => {
  expect((await screen.findByRole('status')).textContent).toContain('Recuperar audio');
  expect(source).not.toHaveBeenCalled();
  expect(close).toHaveBeenCalledTimes(1);
- fireEvent.click(screen.getByLabelText('Ocultar sonido'));
- expect(screen.queryByRole('status')).toBeNull();
 });
