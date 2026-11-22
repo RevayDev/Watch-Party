@@ -57,8 +57,10 @@ export function HostRoom({ options, onLeave }: { options: HostRoomOptions; onLea
           <label htmlFor="host-member-name">Tu nombre</label>
           <Field id="host-member-name" className="form-group__input" value={name} maxLength={50} required onChange={(event) => setName(event.target.value)} />
           <p>La sala y sus copias se mantienen en los navegadores conectados.</p>
-          <Button variant="primary" type="submit" className="btn btn--primary">Entrar</Button>
-          <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" onClick={onLeave}>Volver</Button>
+          <div className="host-room-entry__actions">
+            <Button variant="secondary" type="button" onClick={onLeave}>Volver</Button>
+            <Button variant="primary" type="submit">Entrar</Button>
+          </div>
         </form>
       </main>
     );

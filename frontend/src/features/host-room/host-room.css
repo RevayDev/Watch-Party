@@ -11,3 +11,5 @@
 .host-room-entry__card p { margin: 0; color: #a6afbf; line-height: 1.6; font-size: .875rem; }
 .host-room-entry__eyebrow { font-size: .8125rem; color: #a6afbf; }
 .host-room-entry { place-items: center; place-content: initial; }
+.host-room-entry__actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 4px; }
+.host-room-entry__actions > .ui-action { width: 100%; min-width: 0; margin: 0; }
