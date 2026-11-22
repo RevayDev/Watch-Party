@@ -73,10 +73,10 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   useEffect(() => {
     if (!showShareMenu && !showClockMenu) return;
     const onDocClick = (e: MouseEvent) => {
-      if (showShareMenu && shareRef.current && !shareRef.current.contains(e.target as Node)) {
+      if (showShareMenu && shareRef.current && !shareRef.current.contains(e.target as Node) && !shareSheetRef.current?.contains(e.target as Node)) {
         setShowShareMenu(false);
       }
-      if (showClockMenu && clockRef.current && !clockRef.current.contains(e.target as Node)) {
+      if (showClockMenu && clockRef.current && !clockRef.current.contains(e.target as Node) && !clockSheetRef.current?.contains(e.target as Node)) {
         setShowClockMenu(false);
       }
     };
@@ -201,6 +201,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           <Button variant="unstyled"
             onClick={() => setShowShareMenu((v) => !v)}
             className="header__room-pill header__share-btn"
+            aria-label="Compartir sala"
             title="Compartir sala (código y link)"
             type="button"
           >
@@ -211,6 +212,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           {sharePresence.shown && (
             <Popover
               className={`header-share-menu ${sharePresence.closing ? 'header-share-menu--closing' : ''}`}
+              anchor={shareRef.current}
               ref={shareSheetRef}
             >
               {/* Room code */}
@@ -272,7 +274,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
         {/* Clock Pill: Penúltimo elemento (antes de Configuración) */}
         {/* Nota: la pill de duración del vídeo se quitó a propósito: con el
             reloj ya hay un solo contador en el header. */}
-        <div className="header__share-wrap" ref={clockRef}>
+        <div className="header__share-wrap header__clock-wrap" ref={clockRef}>
           <Button variant="unstyled"
             onClick={() => setShowClockMenu((v) => !v)}
             className={`header__room-pill header__timer-pill ${timerToneClass}`}
@@ -286,6 +288,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           {clockPresence.shown && (
             <Popover
               className={`header-share-menu ${clockPresence.closing ? 'header-share-menu--closing' : ''}`}
+              anchor={clockRef.current}
               ref={clockSheetRef}
             >
               {/* Estado de espera o tiempo transcurrido */}

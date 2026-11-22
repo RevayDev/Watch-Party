@@ -74,3 +74,15 @@
     grid-template-columns: 60px minmax(0, 1fr);
   }
 }
+
+@media (max-width: 768px) {
+ .youtube-search { padding: 12px !important; }
+ .youtube-search__form { gap: 8px; }
+ .youtube-search__form .ui-action { min-height: 36px; padding: 6px 10px; font-size: 12px; }
+ .youtube-search__form .ui-field { min-height: 36px; font-size: 14px; padding: 8px 10px; }
+ .youtube-search__result { grid-template-columns: 56px minmax(0,1fr); gap: 8px; padding: 12px 0; }
+ .youtube-search__info { font-size: 13px; }
+ .youtube-search__info span { font-size: 11px; }
+ .youtube-search__actions { grid-column: 1 / -1; display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; }
+ .youtube-search__actions .ui-action { min-height: 32px; padding: 6px 10px; font-size: 12px; flex: 0 1 auto; }
+}

@@ -108,7 +108,8 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
       onClose={() => setActiveSideTab(null)}
       variant="inline"
       desktopClassName={`meet-drawer ${currentTab === 'participants' || currentTab === 'music' ? 'meet-drawer--wide' : ''}`}
-      height={85}
+      height="auto"
+      className={`room-panel-sheet room-panel-sheet--${currentTab}`}
       label={currentTab === 'participants' ? 'Participantes' : currentTab === 'music' ? 'Música' : 'Chat'}
     >
       <div className="meet-drawer__body">

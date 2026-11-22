@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { RoomHeader } from '../src/components/RoomHeader';
 
 describe('RoomHeader — reloj de sala y temporizador', () => {
@@ -32,4 +32,15 @@ describe('RoomHeader — reloj de sala y temporizador', () => {
     expect(screen.getByText(/Quedan/i)).toBeTruthy();
     expect(screen.getByText(/Hora de cierre/i)).toBeTruthy();
   });
+});
+
+it('keeps the portaled share menu interactive when copying its room code', async () => {
+ const writeText = vi.fn(async () => {});
+ Object.defineProperty(navigator, 'clipboard', { configurable:true, value:{writeText} });
+ const view=render(<RoomHeader roomId="SHARE1" participantCount={1} isLeader onOpenSettings={()=>{}} />);
+ fireEvent.click(screen.getByRole('button',{name:'Compartir sala'}));
+ const copy=screen.getByTitle('Copiar código');
+ expect(view.container.contains(copy)).toBe(false);
+ fireEvent.mouseDown(copy); fireEvent.click(copy);
+ await waitFor(()=>expect(writeText).toHaveBeenCalledWith('SHARE1'));
 });

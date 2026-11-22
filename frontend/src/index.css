@@ -8143,3 +8143,42 @@ a.home-faq-hl--frontend {
 .ui-popover.chat-message-menu { width: 208px; }
 .ui-popover.chat-message-menu--reactions { width: 256px; }
 .ui-popover.chat-message-menu > .ui-action { justify-content: flex-start; text-align: left; padding: 8px 12px; }
+
+/* Mobile room chrome: use the available width without forcing tall panels. */
+@media (max-width: 768px) {
+ .meet-layout { width: 100%; max-width: 100%; min-width: 0; }
+ .meet-layout > .header { box-sizing: border-box; width: calc(100% - 12px); max-width: calc(100% - 12px); min-width: 0; margin: 6px 6px 0; padding: 6px 8px; min-height: 48px; gap: 8px; flex-wrap: wrap; }
+ .header__brand { min-width: 0; flex: 1 1 auto; gap: 6px; }
+ .header__brand-text { overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+ .header__logo-icon { width: 28px; height: 28px; flex: 0 0 28px; }
+ .header__actions { flex: 0 0 auto; min-width: 0; gap: 6px; margin-left: auto; }
+ .header__users-pill, .header__clock-wrap { display: none !important; }
+ .header__share-btn, .header__settings-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 6px 10px; }
+ .header__settings-btn { width: 36px; padding: 0; }
+ .header__name-pill { order: 3; flex: 1 0 100%; box-sizing: border-box; max-width: 100%; margin: 0; padding: 4px 8px; font-size: 12px; }
+ .meet-bottom-bar { width: calc(100% - 12px) !important; max-width: calc(100% - 12px) !important; box-sizing: border-box; margin-left: 6px !important; margin-right: 6px !important; padding: 6px; justify-content: space-between; gap: 4px; }
+ .room-panel-sheet.sheet { height: auto; max-height: 85dvh; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); background: var(--color-bg-input); }
+ .room-panel-sheet > .sheet__body { flex: 0 1 auto; overflow: auto; }
+ .room-panel-sheet .meet-drawer__body { flex: 0 1 auto; min-height: 0; }
+ .room-panel-sheet .meet-drawer__tab-header { padding: 10px 8px; }
+ .room-panel-sheet .meet-drawer__title { font-size: 15px; }
+ .room-panel-sheet .part-layout, .room-panel-sheet .part-main-panel { height: auto; min-height: 0; flex: 0 1 auto; }
+ .room-panel-sheet .part-main-panel { min-width: 0; }
+ .room-panel-sheet .part-list { flex: 0 1 auto; max-height: 48dvh; overflow-y: auto; padding: 0 4px 8px; }
+ .room-panel-sheet .part-layout:has(.part-detail-card) { min-height: min(440px, 70dvh); }
+ .room-panel-sheet--chat .drawer-chat { height: auto; min-height: min(280px, 60dvh); max-height: 70dvh; }
+ .room-panel-sheet--chat .drawer-chat__messages { max-height: 48dvh; }
+ .room-panel-sheet .meet-drawer__music { flex: 0 1 auto; }
+ .room-panel-sheet .music-panel { flex: 0 1 auto; max-height: calc(85dvh - 68px); }
+ .room-panel-sheet .music-panel__content { padding: 10px 4px; }
+ .room-panel-sheet .music-panel__footer { padding: 12px 8px !important; }
+ .room-panel-sheet .music-player-empty { min-height: 64px; padding: 0; gap: 12px; }
+ .room-panel-sheet .music-player-empty__art { width: 40px; height: 40px; }
+ .room-panel-sheet .music-queue__toggle { padding: 12px; gap: 8px; font-size: 13px; }
+ .room-panel-sheet .drawer-chat__empty { padding: 20px 12px !important; }
+ .meet-emoji-popup { width: max-content; left: 50%; right: auto; max-width: calc(100vw - 24px); transform: translateX(-50%) !important; }
+}
+@media (max-width: 420px) {
+ .header__share-btn .header__pill-label { display: none; }
+ .header__share-btn { width: 36px; padding: 0; }
+}
