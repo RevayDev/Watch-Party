@@ -5,7 +5,7 @@
 .room-settings__workspace { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 24px; flex: 1; min-height: 0; }
 .room-settings-shell .room-settings__tabs { position: static; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 4px; margin: 0; padding: 0 16px 0 0; border: 0; border-right: 0; background: none; backdrop-filter: none; overflow: auto; }
 .room-settings-shell .room-settings__tab { flex: 0 0 auto; min-height: 40px; padding: 8px 12px; text-align: left; white-space: normal; border: 0; border-radius: 8px; background: none; color: var(--color-muted-light); font-weight: 500; box-shadow: none; }
-.room-settings-shell .room-settings__tab--active { color: var(--color-text-main); background: rgba(99, 102, 241, 0.14); box-shadow: inset 3px 0 var(--color-primary-light); }
+.room-settings-shell .room-settings__tab--active { color: var(--color-text-main); background: rgba(99, 102, 241, 0.14); box-shadow: none; }
 .room-settings-shell .room-settings__tab:hover { background: var(--color-bg-hover); box-shadow: none; }
 .room-settings__page { min-width: 0; overflow-y: auto; padding: 0 8px 16px 0; scrollbar-width: thin; scrollbar-color: #3a4254 transparent; }
 .room-settings-shell .room-settings__columns { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }

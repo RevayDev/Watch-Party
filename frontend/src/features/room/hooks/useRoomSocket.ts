@@ -278,6 +278,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     retryMediaConnection,
     toggleMic,
     toggleCamera,
+    isScreenSharing,
+    toggleScreenShare,
     enableMedia,
   } = useWebRTC(socket, roomId, myName, isLeader);
 
@@ -1421,6 +1423,8 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
     retryMediaConnection,
     toggleMic,
     toggleCamera,
+    isScreenSharing,
+    toggleScreenShare,
     handleToggleTemporaryMode,
     handleSaveRoomDetails,
     handleSetRoomTimer,

@@ -89,7 +89,7 @@ describe('RoomSettingsModal (Tu vista de la barra)', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('tab', { name: 'Apariencia' }));
     });
-    const checkbox = screen.getByTitle(/reparte izquierda\/centro\/derecha/i) as HTMLInputElement;
+    const checkbox = screen.getByTitle(/agrupa comunicación/i) as HTMLInputElement;
     expect(checkbox.checked).toBe(true);
     await act(async () => {
       fireEvent.click(checkbox);

@@ -1,3 +1,5 @@
+import { ScreenSharingStage } from '../../components/ScreenSharingStage';
+import { ConnectionCard } from '../../shared/components/ConnectionCard';
 import { ActionLink, Button, Field } from '../../shared/components/ui';
 import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -6,6 +8,7 @@ import { CameraGrid } from '../../components/CameraGrid';
 import { RemoteAudio } from '../../components/RemoteAudio';
 import { RoomSettingsModal } from '../../components/RoomSettingsModal';
 import { RoomHeader } from '../../components/RoomHeader';
+import { LeaderExitModal } from '../../components/LeaderExitModal';
 import { MemberExitModal } from '../../components/MemberExitModal';
 import { RoomLayout } from '../room/components/RoomLayout';
 import { RoomControls } from '../room/components/RoomControls';
@@ -78,6 +81,8 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showExit, setShowExit] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState('');
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
   const emojiPresence = usePresence(showEmojiPicker, 160);
   const morePresence = usePresence(showMoreMenu, 160);
@@ -126,6 +131,12 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       window.removeEventListener('click', activity);
     };
   }, [uiPinned, showEmojiPicker, showMoreMenu, activeSideTab]);
+  useEffect(() => {
+    if (!session) return;
+    const closed = () => onLeave();
+    session.on('room-closed', closed);
+    return () => { session.off('room-closed', closed); };
+  }, [session, onLeave]);
   useEffect(() => {
     if (!session) return;
     const timers = new Set<ReturnType<typeof setTimeout>>();
@@ -190,13 +201,13 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
   } : null;
 
   if (!roomData || !state || !session) return (
-    <div className="room-loading">
+    <ConnectionCard>
       {!view.error && <Loader2 size={40} className="animate-spin room-loading__icon" />}
       <p className="room-loading__text" role="status">{view.status}</p>
       {view.error && <p role="alert">{view.error}</p>}
       {view.error && <Button variant="primary" type="button" className="btn btn--primary" onClick={() => setConnectionAttempt((value) => value + 1)}>Reintentar conexión</Button>}
       <Button variant="primary" type="button" className="btn btn--primary" onClick={onLeave}>Volver al inicio</Button>
-    </div>
+    </ConnectionCard>
   );
 
   return (
@@ -209,6 +220,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         participantsActive={activeSideTab === 'participants'} onLeaveClick={() => setShowExit(true)}
         className={!uiPinned ? 'header--hidden' : ''} />}
       player={<>
+<ScreenSharingStage localStream={media.localStream} isScreenSharing={media.isScreenSharing} remotePeers={media.remotePeers} peerMediaStates={media.peerMediaStates} />
         <RemoteAudio peers={media.remotePeers} />
         {selected?.source === 'file' && !view.fileUrl ? (
           <div className="player-container"><div className="player-container__placeholder" role="status">
@@ -232,7 +244,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       </>}
       cameras={<CameraGrid localStream={media.localStream} remotePeers={media.remotePeers}
         participants={roomData.participants} currentUserName={options.name} dataSaverMode={state.roomSettings?.dataSaver} isLeader={isHost}
-        isMicOn={media.isMicOn} isCameraOn={media.isCameraOn}
+        isMicOn={media.isMicOn} isCameraOn={media.isCameraOn || media.isScreenSharing}
         peerMediaStates={media.peerMediaStates} peerSignalStates={media.peerSignalStates} />}
       drawer={<RoomDrawer activeSideTab={activeSideTab} sideTabView={sideTabView} setActiveSideTab={setActiveSideTab}
         messages={state.messages}
@@ -250,7 +262,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         onMusicAutoNext={() => { if (isHost) session.command({ type: 'music-next' }); }}
         onMusicStop={() => session.command({ type: 'music-stop' })}
         onExpandToMain={(link, title, currentTime = 0) => { void setVideoUrl(link, title, currentTime); }} />}
-      controls={<RoomControls roomId={options.roomId} layout={barPrefs.layout} showLabels={barPrefs.showLabels}
+      controls={<RoomControls isScreenSharing={media.isScreenSharing} onToggleScreenShare={media.toggleScreenShare} roomId={options.roomId} layout={barPrefs.layout} showLabels={barPrefs.showLabels}
         isMicOn={media.isMicOn} isCameraOn={media.isCameraOn} toggleMic={media.toggleMic} toggleCamera={media.toggleCamera}
         showEmojiPicker={showEmojiPicker} setShowEmojiPicker={setShowEmojiPicker} emojiPresence={emojiPresence}
         emojiSheetRef={emojiSheetRef} handleReaction={(emoji) => session.emit('reaction', { emoji })}
@@ -264,7 +276,12 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       {(view.error || error || media.mediaError) && <div role="alert" className="meet-error-banner">{view.error || error || media.mediaError}</div>}
       {view.status.includes('relevo') && <div className="reconnect-pill" role="status">{view.status}</div>}
       {media.mediaConnectionFailed && <div className="meet-error-banner"><Button variant="primary" type="button" className="btn btn--primary" onClick={media.retryMediaConnection}>Reconectar micrófonos y cámaras</Button></div>}
-      <MemberExitModal isOpen={showExit} onClose={() => setShowExit(false)} onConfirmLeave={onLeave} />
+      <LeaderExitModal browserHosted isOpen={showExit && isHost} participantCount={state.members.length} busy={leaving} error={leaveError} onClose={() => setShowExit(false)} onLeaveOnlyMe={async () => {
+        if (leaving) return;
+        setLeaving(true); setLeaveError('');
+        try { await session.leaveGracefully(); onLeave(); } catch (cause) { setLeaveError(cause instanceof Error ? cause.message : 'No se pudo completar el relevo.'); } finally { setLeaving(false); }
+      }} onDeleteRoomForAll={async () => { if (leaving) return; setLeaving(true); await session.closeRoom(); onLeave(); }} />
+      <MemberExitModal isOpen={showExit && !isHost} onClose={() => setShowExit(false)} onConfirmLeave={onLeave} />
       <RoomSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} browserHosted
         youtubeProvider={state.roomSettings?.youtubeProvider}
         onYouTubeProviderChange={(youtubeProvider) => session.command({ type: 'room-settings', settings: { youtubeProvider } })}

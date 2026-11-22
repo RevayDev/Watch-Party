@@ -515,13 +515,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                   type="checkbox"
                   checked={barLayout === 'spread'}
                   onChange={(e) => onBarPrefsChange?.({ layout: e.target.checked ? 'spread' : 'centered' })}
-                  title="Reparte izquierda/centro/derecha en pantalla ancha (apagado: píldora centrada)"
+                  title="Agrupa comunicación, visibilidad y características en PC (apagado: barra compacta)"
                 />
                 <span className="part-slider" />
               </label>
             </div>
             <p className="room-settings__box-desc">
-              Izquierda, centro y derecha separados en PC.
+              Micrófono, cámara y conversación a la izquierda; ocultar en el centro; música y pantalla a la derecha. Colgar queda al final.
             </p>
         </Surface>
         )}

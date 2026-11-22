@@ -1,3 +1,4 @@
+import { ConnectionCard } from './shared/components/ConnectionCard';
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { ApiService } from './services/api';
 import { saveRecentRoom, removeRecentRoom } from './services/recentRooms';
@@ -118,7 +119,7 @@ export const App: React.FC = () => {
     <NotificationProvider>
       <div className="app">
       <ScreenErrorBoundary>
-      <Suspense fallback={<div className="app-loading">Cargando…</div>}>
+      <Suspense fallback={<ConnectionCard title="Preparando Watch Party"><p role="status">Cargando la experiencia…</p></ConnectionCard>}>
       {hostRoom && <HostRoom key={hostRoom.roomId} options={hostRoom} onLeave={handleBackToHome} />}
       {!hostRoom && view === 'home' && (
         <Home

@@ -8030,3 +8030,37 @@ a.home-faq-hl--frontend {
 @media (max-width: 480px) { .music-player__volume { width: 48px; flex-basis: 48px; } .music-player__controls { gap: 4px; } .music-player__icon { width: 32px; height: 32px; } .music-player__play { width: 40px; height: 40px; } }
 
 .music-queue__menu { position: absolute; right: 8px; top: 44px; z-index: 30; min-width: 200px; }
+
+/* Contain cards and drawers without clipping nested menus. */
+.ui-surface, .ui-field, .ui-action { box-sizing: border-box; min-width: 0; }
+.ui-surface { max-width: 100%; }
+.meet-drawer { overflow: hidden; min-width: 0; }
+.meet-drawer__tab-header { flex-shrink: 0; min-width: 0; }
+.part-layout, .part-main, .part-sidebar, .room-settings__workspace, .room-settings__page, .room-settings__column { min-width: 0; min-height: 0; }
+.room-settings__box, .settings-toggle-row { overflow-wrap: anywhere; }
+.room-settings-shell .room-settings__tab--active { box-shadow: none; }
+.meet-bar-sep { display: none; }
+@media (min-width: 1024px) and (min-height: 551px) {
+ .meet-bottom-bar--spread { display: grid; grid-template-columns: auto auto minmax(32px,1fr) auto auto; width: calc(100% - 32px) !important; max-width: calc(100% - 32px); gap: 16px; }
+ .meet-bottom-bar--spread .meet-bar-group--left { grid-column: 1; }
+ .meet-bottom-bar--spread .meet-bar-group--social { grid-column: 2; }
+ .meet-bottom-bar--spread .meet-bar-group--visibility { grid-column: 3; justify-self: center; }
+ .meet-bottom-bar--spread .meet-bar-group--right { grid-column: 4; }
+ .meet-bottom-bar--spread .meet-bar-group--end { grid-column: 5; margin-left: 16px; }
+ .meet-bottom-bar--spread .meet-more-wrap { display: none; }
+}
+.room-connection-card { width: min(440px, calc(100vw - 32px)); padding: 32px; border: 1px dashed var(--color-border-focus); border-radius: 20px; background: var(--color-bg-input); display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; box-sizing: border-box; }
+.room-connection-card p { margin: 0; color: var(--color-muted-light); line-height: 1.6; }
+.room-connection-card h2 { margin: 0; font-size: 20px; color: var(--color-text-main); }
+
+.screen-sharing-stage { position: absolute; inset: 0; z-index: 15; display: flex; flex-direction: column; background: var(--color-bg-main); border-radius: inherit; overflow: hidden; }
+.screen-sharing-stage header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 16px; color: var(--color-text-main); background: var(--color-bg-input); }
+.screen-sharing-stage header span { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.screen-sharing-stage video { width: 100%; flex: 1; min-height: 0; object-fit: contain; }
+@media (max-width: 600px) {
+  .meet-bar-group--visibility, .meet-bar-group--end { display: none; }
+  .meet-bottom-bar { gap: 8px; padding: 8px; max-width: calc(100vw - 16px); }
+  .meet-bar-group { gap: 8px; }
+  .meet-bottom-bar .meet-circle-btn { width: 40px; height: 40px; }
+  .meet-bar-label { display: none; }
+}

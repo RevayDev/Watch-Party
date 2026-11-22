@@ -38,6 +38,7 @@ export class HostSession implements WebRTCTransport {
   private status = 'Conectando con la señalización…';
   private error = '';
   private stopped = false;
+  private handoffTarget: string | null = null;
   private lastHostSeen = Date.now();
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastJoin = 0;
@@ -285,7 +286,7 @@ export class HostSession implements WebRTCTransport {
       if (message.type === 'snapshot') {
         if (message.state.hostId !== sender.id) return;
         const currentHostAlive = this.connections.get(this.state?.hostId ?? '')?.open;
-        if (!discovery && this.state && sender.id !== this.state.hostId && currentHostAlive) return;
+        if (!discovery && this.state && sender.id !== this.state.hostId && sender.id !== this.handoffTarget && currentHostAlive) return;
         if (this.state?.hostId === sender.id && message.state.revision < this.state.revision) return;
         this.accept(message.state);
         if (discovery) {
@@ -302,6 +303,16 @@ export class HostSession implements WebRTCTransport {
         if (!this.isHost) return;
         this.state = applyHostCommand(this.state, sender.id, message.command);
         this.commit();
+      } else if (message.type === 'handoff') {
+        if (sender.id !== this.state.hostId || message.targetId !== this.id) return;
+        this.status = 'Asumiendo el servidor de la sala…';
+        this.lastHostSeen = 0;
+        setTimeout(() => { if (!this.stopped) this.claimDirectory(); }, 500);
+        this.notify();
+      } else if (message.type === 'room-closed') {
+        if (sender.id !== this.state.hostId) return;
+        this.publish('room-closed', {});
+        this.stop();
       } else if (message.type === 'signal') {
         this.publish(message.event, { ...message.payload, senderSocketId: sender.id, socketId: sender.id, userName: sender.name, callerName: sender.name });
       } else {
@@ -583,6 +594,45 @@ export class HostSession implements WebRTCTransport {
       this.refreshFile();
       this.notify();
     }
+  }
+
+  /** Keep the current owner online until a connected successor publishes its snapshot. */
+  async leaveGracefully(): Promise<void> {
+    if (!this.isHost || !this.state) return;
+    const candidates = this.state.members.filter(member => member.id !== this.id && this.connections.get(member.id)?.open)
+      .sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id));
+    if (!candidates.length) return;
+    const video = this.state.video;
+    if (video?.source === 'file' && !candidates.some(member => this.ready.get(member.id) === video.id)) {
+      this.retryVideo();
+      const until = Date.now() + 15000;
+      while (!this.stopped && Date.now() < until && !candidates.some(member => this.ready.get(member.id) === video.id)) await new Promise(resolve => setTimeout(resolve, 200));
+      if (!candidates.some(member => this.ready.get(member.id) === video.id)) throw new Error('Espera a que un participante reciba una copia completa del video antes de salir.');
+    }
+    const next = video?.source === 'file' ? candidates.find(member => this.ready.get(member.id) === video.id)! : candidates[0];
+    this.handoffTarget = next.id;
+    this.state = { ...this.state, revision: this.state.revision + 1, automaticMigration: true };
+    this.commit();
+    // Release only the directory: direct media and state connections remain alive for acknowledgement.
+    this.directory?.destroy();
+    this.directory = null;
+    this.send(this.connections.get(next.id), { type: 'handoff', targetId: next.id });
+    const until = Date.now() + 15000;
+    while (!this.stopped && this.state.hostId === this.id && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 200));
+    this.handoffTarget = null;
+    if (this.stopped || this.state.hostId === this.id) {
+      if (!this.stopped) this.claimDirectory();
+      throw new Error('No se confirmó el relevo. Sigues en la sala; puedes intentarlo de nuevo.');
+    }
+  }
+
+  async closeRoom(): Promise<void> {
+    if (!this.isHost) return;
+    this.reconcile();
+    const until = Date.now() + 2000;
+    while (!this.stopped && Date.now() < until && this.state?.members.some(member => member.id !== this.id && !this.connections.get(member.id)?.open)) await new Promise(resolve => setTimeout(resolve, 50));
+    this.broadcast({ type: 'room-closed' });
+    await new Promise(resolve => setTimeout(resolve, 300));
   }
 
   stop() {

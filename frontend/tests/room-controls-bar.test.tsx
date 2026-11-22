@@ -59,9 +59,9 @@ describe('RoomControls (orden y etiquetas)', () => {
     ]);
   });
 
-  it('separa los 4 grupos con divisores', () => {
+  it('separa los grupos con espacio, sin líneas divisorias', () => {
     const { container } = render(<RoomControls {...barProps()} />);
-    expect(container.querySelectorAll('.meet-bar-sep')).toHaveLength(3);
+    expect(container.querySelectorAll('.meet-bar-sep')).toHaveLength(0);
   });
 
   it('agrupa izquierda/centro/derecha/final en orden', () => {
@@ -71,7 +71,8 @@ describe('RoomControls (orden y etiquetas)', () => {
     );
     expect(groups).toEqual([
       'meet-bar-group--left',
-      'meet-bar-group--center',
+      'meet-bar-group--social',
+      'meet-bar-group--visibility',
       'meet-bar-group--right',
       'meet-bar-group--end',
     ]);
@@ -133,4 +134,13 @@ describe('RoomControls (orden y etiquetas)', () => {
       'Salir',
     ]);
   });
+});
+
+it('places screen sharing with music and forwards its stop action', () => {
+ const toggle = vi.fn(); const { container } = render(<RoomControls {...barProps({ isScreenSharing: true, onToggleScreenShare: toggle })} />);
+ const button = screen.getByTitle('Dejar de compartir pantalla');
+ expect(button.closest('.meet-bar-group--right')).toBeTruthy();
+ expect(button.getAttribute('aria-pressed')).toBe('true');
+ fireEvent.click(button); expect(toggle).toHaveBeenCalledTimes(1);
+ expect(container.querySelector('.meet-bar-group--end')?.textContent).toContain('Salir');
 });

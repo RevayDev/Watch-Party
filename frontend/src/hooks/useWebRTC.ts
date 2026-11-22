@@ -28,6 +28,7 @@ export interface RemotePeer {
 }
 
 export interface PeerMediaState {
+  isScreenSharing?: boolean;
   isCameraOn: boolean;
   isMicOn: boolean;
   userName?: string;
@@ -83,6 +84,10 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
   const lastFramesRef = useRef<Map<string, { frames: number; at: number }>>(new Map());
 
   // Master local media tracks (live hardware)
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const screenBusy = useRef(false);
+  const mediaMounted = useRef(true);
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const localAudioTrackRef = useRef<MediaStreamTrack | null>(null);
 
@@ -105,14 +110,14 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
   }, []);
 
   // ── Update Peer Media State directly in state ─────────────────────────────
-  const updatePeerMediaState = useCallback((targetSocketId: string, state: { isCameraOn: boolean; isMicOn: boolean; userName?: string }) => {
+  const updatePeerMediaState = useCallback((targetSocketId: string, state: { isCameraOn: boolean; isMicOn: boolean; userName?: string; isScreenSharing?: boolean }) => {
     setPeerMediaStates((prev) => {
       const next = {
         ...prev,
-        [targetSocketId]: { isCameraOn: state.isCameraOn, isMicOn: state.isMicOn, userName: state.userName },
+        [targetSocketId]: { isCameraOn: state.isCameraOn, isMicOn: state.isMicOn, userName: state.userName, isScreenSharing: state.isScreenSharing ?? prev[targetSocketId]?.isScreenSharing ?? false },
       };
       if (state.userName) {
-        next[state.userName.trim().toLowerCase()] = { isCameraOn: state.isCameraOn, isMicOn: state.isMicOn, userName: state.userName };
+        next[state.userName.trim().toLowerCase()] = { isCameraOn: state.isCameraOn, isMicOn: state.isMicOn, userName: state.userName, isScreenSharing: state.isScreenSharing ?? prev[targetSocketId]?.isScreenSharing ?? false };
       }
       return next;
     });
@@ -122,7 +127,8 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
   const broadcastMediaStateP2P = useCallback((camState: boolean, micState: boolean) => {
     const payload = JSON.stringify({
       type: 'media-state',
-      isCameraOn: camState,
+      isScreenSharing: !!screenTrackRef.current,
+      isCameraOn: camState || !!screenTrackRef.current,
       isMicOn: micState,
       userName,
     });
@@ -140,7 +146,8 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
       try {
         dc.send(JSON.stringify({
           type: 'media-state',
-          isCameraOn: isCameraOnRef.current,
+          isScreenSharing: !!screenTrackRef.current,
+          isCameraOn: isCameraOnRef.current || !!screenTrackRef.current,
           isMicOn: isMicOnRef.current,
           userName,
         }));
@@ -173,7 +180,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
 
   // ── Attach Current Local Tracks to a PeerConnection ─────────────────────────
   const attachLocalTracksToPC = useCallback(async (pc: RTCPeerConnection, createMissing = false) => {
-    const tracks = { audio: localAudioTrackRef.current, video: localVideoTrackRef.current };
+    const tracks = { audio: localAudioTrackRef.current, video: screenTrackRef.current ?? localVideoTrackRef.current };
     const transceivers = pc.getTransceivers();
     await Promise.all((['audio', 'video'] as const).map(async (kind) => {
       const compatible = transceivers.filter((item) => item.receiver.track.kind === kind && item.direction !== 'stopped');
@@ -481,7 +488,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
       }
 
       // Publicar el estado real aunque el otro dispositivo haya fallado.
-      const tracks = [localAudioTrackRef.current, localVideoTrackRef.current]
+      const tracks = [localAudioTrackRef.current, screenTrackRef.current ?? localVideoTrackRef.current]
         .filter((track): track is MediaStreamTrack => track !== null);
       const updatedStream = tracks.length > 0 ? new MediaStream(tracks) : null;
       setLocalStream(updatedStream);
@@ -493,7 +500,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
           }
         });
       }
-      const cameraOn = isCameraOnRef.current;
+      const cameraOn = !!screenTrackRef.current || isCameraOnRef.current;
       const micOn = isMicOnRef.current;
       broadcastMediaStateP2P(cameraOn, micOn);
       if (socket?.connected) {
@@ -516,6 +523,38 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
     if (track.readyState === 'ended') onEnded();
     return () => track.removeEventListener('ended', onEnded);
   }, [enableMedia, localStream]);
+
+  const stopScreenShare = useCallback(async () => {
+    const track = screenTrackRef.current;
+    if (!track) return;
+    screenTrackRef.current = null;
+    track.onended = null;
+    track.stop();
+    if (!mediaMounted.current) return;
+    setIsScreenSharing(false);
+    await enableMedia(isMicOnRef.current, isCameraOnRef.current);
+  }, [enableMedia]);
+
+  const toggleScreenShare = useCallback(async () => {
+    if (screenBusy.current) return;
+    if (screenTrackRef.current) { await stopScreenShare(); return; }
+    if (!navigator.mediaDevices?.getDisplayMedia) { setMediaError('Compartir pantalla requiere HTTPS y un navegador compatible.'); return; }
+    screenBusy.current = true;
+    try {
+      // The browser owns the choice of screen, window or tab. Never capture automatically.
+      const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const track = display.getVideoTracks()[0];
+      display.getAudioTracks().forEach(audio => audio.stop());
+      if (!mediaMounted.current || !track) { display.getTracks().forEach(item => item.stop()); return; }
+      screenTrackRef.current = track;
+      track.onended = () => { void stopScreenShare(); };
+      setIsScreenSharing(true);
+      await enableMedia(isMicOnRef.current, isCameraOnRef.current);
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'NotAllowedError') return;
+      setMediaError('No se pudo compartir la pantalla. Inténtalo de nuevo.');
+    } finally { screenBusy.current = false; }
+  }, [enableMedia, stopScreenShare]);
 
   // ── Toggle Microphone ──────────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {
@@ -897,7 +936,10 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
+    mediaMounted.current = true;
     return () => {
+      mediaMounted.current = false;
+      if (screenTrackRef.current) { screenTrackRef.current.onended = null; screenTrackRef.current.stop(); screenTrackRef.current = null; }
       if (localAudioTrackRef.current) {
         try { localAudioTrackRef.current.stop(); } catch {}
       }
@@ -929,6 +971,8 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
     lowBandwidth,
     isMicOn,
     isCameraOn,
+    isScreenSharing,
+    toggleScreenShare,
     mediaError,
     mediaConnectionFailed: failedPeers.size > 0,
     retryMediaConnection,

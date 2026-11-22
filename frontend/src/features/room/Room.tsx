@@ -1,3 +1,5 @@
+import { ScreenSharingStage } from '../../components/ScreenSharingStage';
+import { ConnectionCard } from '../../shared/components/ConnectionCard';
 import { Button } from '../../shared/components/ui';
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -86,10 +88,10 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
 
   if (r.loading) {
     return (
-      <div className="room-loading">
+      <ConnectionCard>
         <Loader2 size={40} className="animate-spin room-loading__icon" />
         <p className="room-loading__text">Conectando a la sala <strong>{roomId}</strong>…</p>
-      </div>
+      </ConnectionCard>
     );
   }
 
@@ -130,10 +132,10 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
   // Not yet confirmed by the server (waiting for room-state) → keep loading
   if (!r.joined) {
     return (
-      <div className="room-loading">
+      <ConnectionCard>
         <Loader2 size={40} className="animate-spin room-loading__icon" />
         <p className="room-loading__text">Conectando a la sala <strong>{roomId}</strong>…</p>
-      </div>
+      </ConnectionCard>
     );
   }
 
@@ -160,6 +162,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
       <main className={`meet-stage ${r.isRightPanelCollapsed ? 'meet-stage--cams-collapsed' : ''}`}>
         {/* Cinematic Video Card */}
         <section className="meet-stage__video-wrapper">
+<ScreenSharingStage localStream={r.localStream} isScreenSharing={r.isScreenSharing} remotePeers={r.remotePeers} peerMediaStates={r.peerMediaStates} />
           <RemoteAudio peers={r.remotePeers} />
           <VideoPlayer
             roomId={roomId}
@@ -212,7 +215,7 @@ onVideoReady={r.handleVideoReady}
               currentUserName={r.myName}
               isLeader={r.isLeader}
               isMicOn={r.isMicOn}
-              isCameraOn={r.isCameraOn}
+              isCameraOn={r.isCameraOn || r.isScreenSharing}
               peerMediaStates={r.peerMediaStates}
               peerSignalStates={r.peerSignalStates}
               dataSaverMode={r.dataSaver}
@@ -260,6 +263,7 @@ onVideoReady={r.handleVideoReady}
 
       {/* ── Bottom Bar (text buttons) ── */}
       <RoomControls
+        isScreenSharing={r.isScreenSharing} onToggleScreenShare={r.toggleScreenShare}
         roomId={roomId}
         musicOpen={r.activeSideTab === 'music'}
         onToggleMusic={toggleMusicPanel}

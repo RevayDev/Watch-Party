@@ -41,3 +41,10 @@ TypeScript, pruebas del frontend y build. Revisar Home, música con lista larga,
 154 botones, 38 inputs, 3 rangos, 15 superficies y 2 enlaces de acción migrados; los 3 popups existentes y el menú musical usan Popover. Home y música usan AccordionTrigger. Los estilos especializados de la llamada y del video se conservan mediante la variante unstyled y clases de composición, con foco compartido. La lógica de las capacidades del servidor sigue en cada adaptador.
 
 Validación: 44 archivos de pruebas, 336 pruebas aprobadas y 8 omitidas existentes; TypeScript y build correctos. Revisión visual en Home, configuración y música de una sala del anfitrión, en escritorio y a 390 px. Se comprobó reproducción real de YouTube y posición de las acciones en la cabecera del reproductor. La paridad con backend se mantiene usando los mismos componentes y las pruebas existentes de ambos layouts.
+
+## Barra y colaboración
+En PC: comunicación a la izquierda, visibilidad centrada, características (música y pantalla) a la derecha, salida al final. Separar por espacio, no líneas. La selección de configuración se indica por superficie, sin barra lateral. Los drawers contienen su contenido con min-width/min-height 0 y mantienen sus esquinas; los formularios no sobrepasan las tarjetas. ConnectionCard presenta conexiones y errores con borde discontinuo.
+
+Compartir pantalla usa el selector del navegador para pantalla, ventana o pestaña y sustituye temporalmente la pista de cámara; el micrófono se conserva. La imagen compartida se muestra en el escenario principal, con audio remoto en su reproductor existente para evitar duplicados. No se captura audio del sistema. Al detener o salir se libera la captura y se restaura la cámara previa.
+
+El propietario del servidor del navegador elige salir solo o cerrar para todos. La salida voluntaria espera un snapshot del sucesor; para archivos locales se exige una copia confirmada antes del relevo. Si no se confirma, conserva al usuario en la sala y ofrece reintentar. La selección, permisos y captura deben probarse entre dos navegadores/dispositivos reales además de los tests simulados.

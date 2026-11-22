@@ -62,6 +62,8 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('music-stop') }),
 ]);
 export const envelopeSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('handoff'), targetId: id }),
+  z.object({ type: z.literal('room-closed') }),
   z.object({ type: z.literal('hello'), proof: z.string().regex(/^[a-f0-9]{64}$/), member: memberSchema }),
   z.object({ type: z.literal('snapshot'), state: snapshotSchema }),
   z.object({ type: z.literal('command'), command: commandSchema }),

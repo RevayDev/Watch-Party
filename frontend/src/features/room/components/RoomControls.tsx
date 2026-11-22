@@ -1,12 +1,14 @@
 import { Button, Popover } from '../../../shared/components/ui';
 import React, { useEffect } from 'react';
-import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff, Music } from 'lucide-react';
+import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff, Music, ScreenShare, ScreenShareOff } from 'lucide-react';
 import { Reactions } from '../../../components/Reactions';
 
 /**
  * Barra inferior de la sala (extraída verbatim de pages/Room.tsx, solo composición).
  */
 interface RoomControlsProps {
+  isScreenSharing?: boolean;
+  onToggleScreenShare?: () => void;
   isMicOn: boolean;
   isCameraOn: boolean;
   toggleMic: () => void;
@@ -60,6 +62,8 @@ const BarItem: React.FC<{ label: string; className?: string; children: React.Rea
 );
 
 export const RoomControls: React.FC<RoomControlsProps> = ({
+  isScreenSharing = false,
+  onToggleScreenShare,
   isMicOn,
   isCameraOn,
   toggleMic,
@@ -136,10 +140,10 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
 
       </div>
 
-      <div className="meet-bar-sep" aria-hidden="true" />
 
-      {/* ── Centro: reacciones, participantes, chat y ocultar ── */}
-      <div className="meet-bar-group meet-bar-group--center">
+
+      {/* Conversación */}
+      <div className="meet-bar-group meet-bar-group--social">
       <BarItem label="Reacciones">
         {/* Emoji Reactions trigger */}
         <div style={{ position: 'relative' }}>
@@ -187,19 +191,10 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
         </Button>
       </BarItem>
 
-      <BarItem label={isRightPanelCollapsed ? 'Mostrar' : 'Ocultar'} className="meet-btn--hide-mobile">
-        {/* Toggle Collapse Cameras Strip (Accordion) — hidden on mobile */}
-        <Button variant="unstyled"
-          onClick={() => setIsRightPanelCollapsed((v) => !v)}
-          className={`meet-circle-btn meet-btn--hide-mobile ${isRightPanelCollapsed ? 'meet-circle-btn--active' : ''}`}
-          title={isRightPanelCollapsed ? 'Mostrar cámaras laterales' : 'Ocultar cámaras laterales'}
-        >
-          {isRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
-        </Button>
-      </BarItem>
+
       </div>
 
-      <div className="meet-bar-sep" aria-hidden="true" />
+
 
       {/* ⋯ More Menu — visible only on mobile (the only icon-only button besides Share) */}
       <div className="meet-more-wrap" ref={moreMenuRef}>
@@ -263,7 +258,19 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
         )}
       </div>
 
-      {/* ── Derecha: música ── */}
+      <div className="meet-bar-group meet-bar-group--visibility">
+      <BarItem label={isRightPanelCollapsed ? 'Mostrar' : 'Ocultar'} className="meet-btn--hide-mobile">
+        {/* Toggle Collapse Cameras Strip (Accordion) — hidden on mobile */}
+        <Button variant="unstyled"
+          onClick={() => setIsRightPanelCollapsed((v) => !v)}
+          className={`meet-circle-btn meet-btn--hide-mobile ${isRightPanelCollapsed ? 'meet-circle-btn--active' : ''}`}
+          title={isRightPanelCollapsed ? 'Mostrar cámaras laterales' : 'Ocultar cámaras laterales'}
+        >
+          {isRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
+        </Button>
+      </BarItem>
+      </div>
+      {/* ── Características: música y pantalla ── */}
       <div className="meet-bar-group meet-bar-group--right">
       <BarItem label="Música">
         <Button variant="unstyled"
@@ -276,9 +283,14 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
           <Music size={18} />
         </Button>
       </BarItem>
+      {onToggleScreenShare && <BarItem label={isScreenSharing ? 'Dejar de compartir' : 'Compartir pantalla'}>
+        <Button variant="unstyled" type="button" onClick={onToggleScreenShare} className={`meet-circle-btn ${isScreenSharing ? 'meet-circle-btn--active' : ''}`} title={isScreenSharing ? 'Dejar de compartir pantalla' : 'Compartir pantalla o ventana'} aria-pressed={isScreenSharing}>
+          {isScreenSharing ? <ScreenShareOff size={18} /> : <ScreenShare size={18} />}
+        </Button>
+      </BarItem>}
       </div>
 
-      <div className="meet-bar-sep" aria-hidden="true" />
+
 
       {/* ── Final: salir ── */}
       <div className="meet-bar-group meet-bar-group--end">

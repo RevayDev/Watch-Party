@@ -199,3 +199,37 @@ it('replicates music queue changes and restricts playback to the current host', 
   expect(applyHostCommand(transferred, 'guest', { type: 'clear-video' })).toBe(transferred);
   expect(applyHostCommand(transferred, 'host', { type: 'clear-video' }).video).toBeNull();
 });
+
+it('confirms voluntary server and ownership handoff before the current owner leaves, then passes it on again', async () => {
+ const host = start('Ana', true);
+ await vi.advanceTimersByTimeAsync(1);
+ const guest = start('Beto');
+ await settleUntil(() => guest.snapshot?.members.length === 2);
+ const third = start('Caro');
+ await settleUntil(() => third.snapshot?.members.length === 3 && guest.snapshot?.members.length === 3);
+ host.command({ type: 'chat', id: 'preserved', text: 'Seguimos aquí' });
+ await settleUntil(() => guest.snapshot?.messages.length === 1);
+ let finished = false;
+ const leaving = host.leaveGracefully().then(() => { finished = true; });
+ expect(finished).toBe(false);
+ await settleUntil(() => guest.isHost && finished);
+ await leaving;
+ expect(host.snapshot?.hostId).toBe(guest.id);
+ expect(guest.snapshot?.messages[0].text).toBe('Seguimos aquí');
+ host.stop();
+ let nextFinished = false;
+ const next = guest.leaveGracefully().then(() => { nextFinished = true; });
+ await settleUntil(() => third.isHost && nextFinished);
+ await next;
+ expect(third.snapshot?.hostId).toBe(third.id);
+ expect(third.snapshot?.messages[0].text).toBe('Seguimos aquí');
+});
+it('notifies guests when the host explicitly closes the room', async () => {
+ const host = start('Ana', true); await vi.advanceTimersByTimeAsync(1);
+ const guest = start('Beto'); await settleUntil(() => guest.snapshot?.members.length === 2);
+ const closed = vi.fn(); guest.on('room-closed', closed);
+ const closing = host.closeRoom();
+ await settleUntil(() => closed.mock.calls.length === 1);
+ await vi.advanceTimersByTimeAsync(400); await closing;
+ expect(guest.connected).toBe(false);
+});
