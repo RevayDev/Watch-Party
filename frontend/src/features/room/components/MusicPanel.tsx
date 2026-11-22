@@ -63,6 +63,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   const [inputError, setInputError] = useState('');
   const [customTitle, setCustomTitle] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [queueCollapsed, setQueueCollapsed] = useState(false);
 
   const musicEnabled = settings.musicEnabled !== false;
   const allowAdd = isModerator || settings.musicCanAdd !== 'moderator';
@@ -249,13 +250,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       {/* Formulario para agregar canciones/karaokes de YouTube */}
       {allowAdd ? (
         <form onSubmit={handlePasteSubmit} className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
-          <div className="room-settings__box-head" style={{ marginBottom: '0.55rem' }}>
-            <span className="room-settings__box-title" style={{ fontSize: '0.85rem' }}>
-              <Plus size={15} style={{ color: '#ef4444' }} />
-              Agregar video/música a la cola
-            </span>
-          </div>
-          
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
             <input
               type="text"
@@ -401,9 +395,9 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         </div>
       )}
 
-      {/* Tarjeta de la cola musical (diseño mockup) */}
+      {/* Tarjeta de la cola musical (desplegable) */}
       <div className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.6rem', cursor: 'pointer' }} onClick={() => setQueueCollapsed((v) => !v)}>
           <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#f1f5f9' }}>
             Cola de reproducción
           </span>
@@ -411,9 +405,13 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             {active.length} vídeo{active.length === 1 ? '' : 's'}
             <ListMusic size={14} />
           </span>
+          <span style={{ color: '#94a3b8', fontSize: '0.75rem', transition: 'transform 0.2s ease', transform: queueCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
+            ▸
+          </span>
         </div>
-
-        {active.length === 0 ? (
+        {!queueCollapsed && (
+          <div style={{ display: active.length === 0 ? 'flex' : 'block' }}>
+            {active.length === 0 ? (
           <div className="drawer-chat__empty" style={{ padding: '1.5rem 1rem' }}>
             <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.84rem' }}>
               La cola está vacía. ¡Pega el primer enlace de YouTube arriba!
@@ -669,9 +667,11 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             })}
           </div>
         )}
+        </div>
+      )})
       </div>
 
-      {/* Reproductor "Sonando ahora" debajo de la tarjeta (diseño mockup) */}
+      {/* Reproductor "Sonando ahora" (fijo en footer) */}
       {nowPlaying && nowVideoId ? (
         <div
           className="room-settings__box"
