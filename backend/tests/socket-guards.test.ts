@@ -277,7 +277,8 @@ describe('socket join-room: colisión de nombres (H8)', () => {
     await fire(sock.handlers, 'join-room', { roomId: room.roomId, userName: 'Ana2', userId: 'u-ana' });
 
     expect(lastEmitted(sock.emitted, 'join-rejected')).toHaveLength(0);
-    expect(lastEmitted(sock.emitted, 'room-state')).toHaveLength(1);
+    const [state] = lastEmitted(sock.emitted, 'room-state') as Array<Record<string, unknown>>;
+    expect(state).toMatchObject({ musicQueue: [], musicNowPlaying: null });
   });
 });
 

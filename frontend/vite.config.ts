@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // La aplicación publicada no debe escribir trazas de Socket/WebRTC en la
+  // consola del navegador. Los errores se comunican por la interfaz.
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   build: {
     sourcemap: false,
     cssCodeSplit: true,

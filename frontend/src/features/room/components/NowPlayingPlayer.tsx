@@ -48,6 +48,7 @@ export const NowPlayingPlayer: React.FC<{
   const volumeAnchor = useRef<HTMLButtonElement>(null);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [needsActivation, setNeedsActivation] = useState(false);
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
   const checkpoint = useRef(playback);
@@ -102,26 +103,48 @@ export const NowPlayingPlayer: React.FC<{
     onPlayback?.(seconds, active);
   };
 
+  // Android browsers can reject a programmatic iframe play. This function is
+  // called directly from the phone's tap and never changes room playback.
+  const activateLocalPlayback = () => {
+    const p = playerRef.current;
+    if (!p) return;
+    const point = checkpoint.current;
+    const shouldPlay = point?.playing ?? true;
+    const sentAt = point?.sentAt ?? Date.parse(startedRef.current || new Date().toISOString());
+    const target = (point?.currentTime ?? 0) + (shouldPlay ? Math.max(0, (roomNow() - sentAt) / 1000) : 0);
+    try {
+      p.seekTo?.(target, true);
+      p.unMute?.();
+      p.setVolume?.(volume);
+      p.playVideo?.();
+      setCurrent(target);
+      setMuted(false);
+      setNeedsActivation(false);
+    } catch {
+      setNeedsActivation(true);
+    }
+  };
+
   const togglePlay = () => {
     if (playback?.awaitingReady) { reportReady(); return; }
     try {
       const p = playerRef.current;
       if (!p) return;
-      // The shared checkpoint wins after a remote update; without one this
-      // remains a purely local first-play gesture.
-      const active = playback ? playback.playing : playingRef.current;
-      const next = !active;
+      // A newly joined phone can know that the room is playing while its
+      // iframe is still paused by autoplay policy. The first tap starts only
+      // that phone; it must not publish a global pause.
+      if (checkpoint.current?.playing && !playingRef.current) {
+        activateLocalPlayback();
+        return;
+      }
+      const next = !playingRef.current;
       publish(p.getCurrentTime?.() ?? current, next);
       playingRef.current = next;
       setPlaying(next);
       if (!next) {
         if (typeof p.pauseVideo === 'function') p.pauseVideo();
       } else {
-        // A user gesture lets the browser resume playback with sound.
-        if (typeof p.unMute === 'function') p.unMute();
-        if (typeof p.setVolume === 'function') p.setVolume(volume);
-        if (typeof p.playVideo === 'function') p.playVideo();
-        setMuted(false);
+        activateLocalPlayback();
       }
     } catch {
       /* noop */
@@ -190,6 +213,7 @@ export const NowPlayingPlayer: React.FC<{
     readyTrackRef.current = null;
     setCurrent(0);
     setDuration(0);
+    setNeedsActivation(false);
   }, [trackKey]);
 
   // Read iframe progress while the track is playing.
@@ -230,15 +254,16 @@ export const NowPlayingPlayer: React.FC<{
       {/* Keep the iframe painted. Mobile WebKit refuses audio from a fully
           invisible frame even after the user presses this player's button. */}
       <div aria-hidden="true" style={{ position: 'absolute', width: 2, height: 2, overflow: 'hidden', opacity: 0.01, pointerEvents: 'none' }}>
-        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; synchronize(true); reportReady(); }} onStateChange={(event) => {
+        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; synchronize(true); reportReady(); }} onAutoplayBlocked={() => setNeedsActivation(true)} onStateChange={(event) => {
           if (checkpoint.current?.awaitingReady) { playerRef.current?.pauseVideo?.(); reportReady(); }
-          if (event.data === 1) { playingRef.current = true; setPlaying(true); }
+          if (event.data === 1) { playingRef.current = true; setPlaying(true); setNeedsActivation(false); }
           else if (event.data === 2) { playingRef.current = false; setPlaying(false); }
           else if (event.data === 0) { setPlaying(false); onEndedRef.current(); }
         }} />
       </div>
       <div className="yt-miniplayer-controls music-player__controls">
         {playback?.awaitingReady && <span role="status">Esperando a que todos estén listos…</span>}
+        {needsActivation && <Button variant="unstyled" type="button" className="music-player__activate" onClick={activateLocalPlayback}>Activar audio en este teléfono</Button>}
         <Button variant="unstyled" type="button" className="music-player__icon" title="Reiniciar canción" aria-label="Reiniciar canción" onClick={restart}><SkipBack size={18} /></Button>
         <Button variant="unstyled" type="button" className="music-player__icon music-player__play" title={playing ? 'Pausar' : 'Reproducir'} aria-label={playing ? 'Pausar' : 'Reproducir'} onClick={togglePlay}>{playing ? <Pause size={20} /> : <Play size={20} />}</Button>
         {showModerator && <Button variant="unstyled" type="button" className="music-player__icon" title="Siguiente canción" aria-label="Siguiente canción" onClick={onNext}><SkipForward size={18} /></Button>}
