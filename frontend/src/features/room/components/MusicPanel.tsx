@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Youtube, Plus, Trash2, ArrowUp, ArrowDown, Check, Disc, Play, Pause, SkipForward, Maximize2, ListMusic, MoreVertical, ExternalLink, Square } from 'lucide-react';
+import { Youtube, Plus, Trash2, ArrowUp, ArrowDown, Check, Disc, Play, Pause, SkipForward, Maximize2, ListMusic, MoreVertical, ExternalLink, Square, ChevronDown } from 'lucide-react';
 import type { IMusicNowPlaying, IMusicQueueEntry, IMusicTrack, IRoomSettings } from '../../../types/room';
 import { parseYouTubeUrl } from '../../../shared/youtube';
 import { formatPlayerTime, NowPlayingPlayer } from './NowPlayingPlayer';
@@ -61,7 +61,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   const [ytInput, setYtInput] = useState('');
   const [addingYt, setAddingYt] = useState(false);
   const [inputError, setInputError] = useState('');
-  const [customTitle, setCustomTitle] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [queueCollapsed, setQueueCollapsed] = useState(false);
 
@@ -85,7 +84,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       if (onAddUrl) {
         await onAddUrl(raw);
       } else {
-        const title = customTitle.trim() || `YouTube Music (${ytRef.videoId})`;
+        const title = `YouTube Music (${ytRef.videoId})`;
         onAdd({
           id: ytRef.videoId,
           name: title,
@@ -96,7 +95,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         });
       }
       setYtInput('');
-      setCustomTitle('');
     } catch (err: any) {
       setInputError(err?.message || 'Error al agregar a la cola');
     } finally {
@@ -245,50 +243,39 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   };
 
   return (
-    <div className="drawer-chat__messages" aria-label="Música y Karaoke de YouTube" style={{ padding: '0.85rem' }}>
+    <div className="drawer-chat__messages" aria-label="Música y Karaoke de YouTube" style={{ padding: '0.85rem', position: 'relative', minHeight: '400px' }}>
       {allowAdd && <YouTubeSearch onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
       {/* Formulario para agregar canciones/karaokes de YouTube */}
       {allowAdd ? (
         <form onSubmit={handlePasteSubmit} className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+          <div style={{ display: 'flex', gap: '0.45rem' }}>
             <input
               type="text"
               className="room-settings__input"
-              placeholder=""
+              placeholder="Pega enlace de YouTube (ej: https://youtu.be/...)"
               value={ytInput}
               onChange={(e) => {
                 setYtInput(e.target.value);
                 setInputError('');
               }}
-              style={{ fontSize: '0.84rem', padding: '0.55rem 0.75rem' }}
+              style={{ flex: 1, fontSize: '0.84rem', padding: '0.55rem 0.75rem' }}
             />
-            
-            <div style={{ display: 'flex', gap: '0.45rem' }}>
-              <input
-                type="text"
-                className="room-settings__input"
-                placeholder="Título opcional (ej: Bohemian Rhapsody)"
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-                style={{ flex: 1, fontSize: '0.82rem', padding: '0.5rem 0.7rem' }}
-              />
-              <button
-                type="submit"
-                className="btn btn--primary"
-                disabled={!ytInput.trim() || addingYt}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  fontSize: '0.82rem',
-                  padding: '0.5rem 0.9rem',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <Plus size={15} />
-                {addingYt ? 'Añadiendo...' : 'Añadir'}
-              </button>
-            </div>
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={!ytInput.trim() || addingYt}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                fontSize: '0.82rem',
+                padding: '0.5rem 0.9rem',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Plus size={15} />
+              {addingYt ? 'Añadiendo...' : 'Añadir'}
+            </button>
           </div>
 
           {inputError && (
@@ -405,9 +392,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             {active.length} vídeo{active.length === 1 ? '' : 's'}
             <ListMusic size={14} />
           </span>
-          <span style={{ color: '#94a3b8', fontSize: '0.75rem', transition: 'transform 0.2s ease', transform: queueCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
-            ▸
-          </span>
+          <ChevronDown size={14} style={{ transition: 'transform 0.2s ease', transform: queueCollapsed ? 'rotate(0deg)' : 'rotate(180deg)' }} />
         </div>
         {!queueCollapsed && (
           <div style={{ display: active.length === 0 ? 'flex' : 'block' }}>
@@ -671,38 +656,42 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         )}
       </div>
 
-      {/* Reproductor "Sonando ahora" (fijo en footer) */}
+      {/* Reproductor "Sonando ahora" fijo en el fondo del panel */}
       {nowPlaying && nowVideoId ? (
-        <div
-          className="room-settings__box"
-          style={{
-            marginBottom: '1rem',
-            padding: '0.85rem',
-            border: '1px solid rgba(139, 92, 246, 0.22)',
-            background: 'rgba(15, 20, 35, 0.55)',
-          }}
-        >
-          <NowPlayingPlayer
-            trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
-            videoId={nowVideoId}
-            title={nowPlaying.name}
-            subtitle={`${nowPlaying.artists || 'YouTube Music'} · propuesto por ${nowPlaying.proposedBy}`}
-            thumb={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
-            onEnded={onAutoNext}
-            onNext={onNext}
-            onStop={onStop}
-            onExpand={() => {
-              const url = nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`;
-              if (url) onExpandToMain(url, nowPlaying.name);
+        <div style={{
+          position: 'absolute',
+          bottom: 0.5,
+          left: 0.85,
+          right: 0.85,
+          zIndex: 10,
+        }}>
+          <div
+            className="room-settings__box"
+            style={{
+              padding: '0.85rem',
+              border: '1px solid rgba(139, 92, 246, 0.22)',
+              background: 'rgba(15, 20, 35, 0.55)',
+              borderRadius: 12,
             }}
-            showModerator={isModerator}
-          />
+          >
+            <NowPlayingPlayer
+              trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
+              videoId={nowVideoId}
+              title={nowPlaying.name}
+              subtitle={`${nowPlaying.artists || 'YouTube Music'} · propuesto por ${nowPlaying.proposedBy}`}
+              thumb={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
+              onEnded={onAutoNext}
+              onNext={onNext}
+              onStop={onStop}
+              onExpand={() => {
+                const url = nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`;
+                if (url) onExpandToMain(url, nowPlaying.name);
+              }}
+              showModerator={isModerator}
+            />
+          </div>
         </div>
       ) : null}
-
-      <p className="room-settings__box-desc" style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.74rem' }}>
-        🎵 La cola reproduce canciones de YouTube en grupo. Disfruta con letras sincronizadas y sin límites.
-      </p>
     </div>
   );
 };
