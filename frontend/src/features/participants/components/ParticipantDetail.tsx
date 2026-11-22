@@ -1,3 +1,4 @@
+import { Field, Button } from '../../../shared/components/ui';
 import React from 'react';
 import { Ban, Crown, Pencil, Shield, ShieldOff, UserX } from 'lucide-react';
 import { IParticipant } from '../../../types/room';
@@ -101,7 +102,7 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
         >
           <h3>Renombrar usuario</h3>
           <p>El nuevo nombre será visible para todos en la sala.</p>
-          <input
+          <Field
             type="text"
             value={newNameVal}
             maxLength={50}
@@ -111,16 +112,16 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
             autoFocus
           />
           <div className="part-rename-modal__actions">
-            <button
+            <Button variant="secondary"
               type="button"
               className="leader-exit-modal__cancel-btn"
               onClick={() => setIsRenaming(false)}
             >
               Cancelar
-            </button>
-            <button type="submit" className="part-rename-save-btn">
+            </Button>
+            <Button variant="unstyled" type="submit" className="part-rename-save-btn">
               Guardar
-            </button>
+            </Button>
           </div>
         </form>
       </BottomSheet>
@@ -130,7 +131,7 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
         <div className="part-detail-actions">
           {canModerateTarget(detailView) && (
             <div className="part-detail-modrow">
-              <button
+              <Button variant="danger"
                 type="button"
                 className="part-outline-action-btn part-outline-action-btn--danger"
                 onClick={() => {
@@ -149,8 +150,8 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
               >
                 <UserX size={14} />
                 <span>Expulsar</span>
-              </button>
-              <button
+              </Button>
+              <Button variant="danger"
                 type="button"
                 className="part-outline-action-btn part-outline-action-btn--danger"
                 onClick={() => {
@@ -169,20 +170,20 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
               >
                 <Ban size={14} />
                 <span>Banear</span>
-              </button>
+              </Button>
             </div>
           )}
-          <button
+          <Button variant="unstyled"
             type="button"
             className="part-outline-action-btn part-detail-rename-btn"
             onClick={() => openRename(detailView)}
           >
             <Pencil size={14} />
             <span>Renombrar</span>
-          </button>
+          </Button>
           {canManageRoles && !isSameUser(detailView) && !isTargetHost && (
             <div className="part-detail-modrow">
-              <button
+              <Button variant="unstyled"
                 type="button"
                 className="part-outline-action-btn"
                 title={isTargetCoLeader ? 'Quitar rol de co-anfitrión' : 'Dar rol de co-anfitrión'}
@@ -192,9 +193,9 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
               >
                 {isTargetCoLeader ? <ShieldOff size={14} /> : <Shield size={14} />}
                 <span>{isTargetCoLeader ? 'Quitar co-anfitrión' : 'Co-anfitrión'}</span>
-              </button>
+              </Button>
               {isLeader && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   className="part-outline-action-btn"
                   onClick={() => {
@@ -212,7 +213,7 @@ export const ParticipantDetail: React.FC<ParticipantDetailProps> = ({
                 >
                   <Crown size={14} />
                   <span>Pasar sala</span>
-                </button>
+                </Button>
               )}
             </div>
           )}

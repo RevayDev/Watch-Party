@@ -1,3 +1,4 @@
+import { Button } from '../../shared/components/ui';
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { RoomHeader } from '../../components/RoomHeader';
@@ -100,9 +101,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
           <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
             {r.error || 'Sala no disponible'}
           </p>
-          <button onClick={r.handleLeaveOnlyMe} className="btn btn--primary btn--full">
+          <Button variant="primary" onClick={r.handleLeaveOnlyMe} className="btn btn--primary btn--full">
             Volver al inicio
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -293,7 +294,7 @@ onVideoReady={r.handleVideoReady}
       {r.mediaConnectionFailed && (
         <div className="meet-error-banner" role="status">
           No se pudo conectar el audio y video con algún participante.{' '}
-          <button type="button" className="btn btn--primary" onClick={r.retryMediaConnection}>Reintentar</button>
+          <Button variant="primary" type="button" className="btn btn--primary" onClick={r.retryMediaConnection}>Reintentar</Button>
         </div>
       )}
       {r.lowBandwidth && (

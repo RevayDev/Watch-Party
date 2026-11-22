@@ -1,3 +1,4 @@
+import { Button } from '../../../shared/components/ui';
 import React from 'react';
 import { MoreVertical, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { IParticipant } from '../../../types/room';
@@ -74,7 +75,7 @@ export const RoomTab: React.FC<RoomTabProps> = ({
             {/* Right: Interactive Action Buttons */}
             <div className="part-actions">
               {/* Interactive Mic Button */}
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={(e) => onMuteClick(p, e)}
                 className={`part-media-btn ${
@@ -98,10 +99,10 @@ export const RoomTab: React.FC<RoomTabProps> = ({
                 disabled={!isMe && (!canModerate || !media.mic)}
               >
                 {media.mic ? <Mic size={13} /> : <MicOff size={13} />}
-              </button>
+              </Button>
 
               {/* Interactive Camera Button */}
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={(e) => onCamClick(p, e)}
                 className={`part-media-btn ${
@@ -125,10 +126,10 @@ export const RoomTab: React.FC<RoomTabProps> = ({
                 disabled={!isMe && (!canModerate || !media.cam)}
               >
                 {media.cam ? <Video size={13} /> : <VideoOff size={13} />}
-              </button>
+              </Button>
 
               {/* 3-dots inspect button (icon-only button allowed) */}
-              <button
+              <Button variant="unstyled"
                 type="button"
                 className="part-more-btn"
                 onClick={(e) => {
@@ -138,7 +139,7 @@ export const RoomTab: React.FC<RoomTabProps> = ({
                 title="Opciones de participante"
               >
                 <MoreVertical size={16} />
-              </button>
+              </Button>
             </div>
           </div>
         );

@@ -1,3 +1,4 @@
+import { Field, Button } from '../../shared/components/ui';
 import React, { useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { BottomSheet } from '../../shared/components/BottomSheet';
@@ -101,7 +102,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
           >
             Tu nombre como Anfitrión
           </label>
-          <input
+          <Field
             ref={hostInputRef}
             type="text"
             className="form-group__input"
@@ -149,7 +150,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
               style={{ margin: 0, opacity: demo ? 0.5 : 1 }}
               title={demo ? 'En la demo todas las salas son temporales' : undefined}
             >
-              <input
+              <Field
                 type="checkbox"
                 checked={demo ? true : isTemporary}
                 onChange={(e) => setIsTemporary(e.target.checked)}
@@ -177,15 +178,15 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
         </div>}
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
+          <Button variant="secondary"
             type="button"
             onClick={onClose}
             className="leader-exit-modal__cancel-btn"
             style={{ marginTop: 0, flex: 1 }}
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button variant="primary"
             type="submit"
             className="btn btn--primary"
             disabled={loading || (serverMode === 'external' && !externalAvailable)}
@@ -203,7 +204,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
             ) : (
               'Iniciar sala'
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </BottomSheet>
@@ -304,7 +305,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
           >
             Tu nombre de usuario
           </label>
-          <input
+          <Field
             ref={userInputRef}
             type="text"
             className="form-group__input"
@@ -325,7 +326,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
             >
               Código de sala
             </label>
-            <input
+            <Field
               type="text"
               className="form-group__input"
               placeholder="Ej. 8FK29X"
@@ -345,7 +346,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
 
         {isUrlInvite && roomCode && (
           <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => {
                 setIsUrlInvite(false);
@@ -361,20 +362,20 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
               }}
             >
               Usar otro código de sala
-            </button>
+            </Button>
           </div>
         )}
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
+          <Button variant="secondary"
             type="button"
             onClick={onClose}
             className="leader-exit-modal__cancel-btn"
             style={{ marginTop: 0, flex: 1 }}
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button variant="primary"
             type="submit"
             className="btn btn--primary"
             style={{
@@ -384,7 +385,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
             }}
           >
             Entrar a la sala
-          </button>
+          </Button>
         </div>
       </form>
     </BottomSheet>
@@ -418,14 +419,14 @@ export const TimelineModal: React.FC<TimelineModalProps> = ({
       </div>
       <h3 className="timeline-modal__title">{event.title}</h3>
       <p className="timeline-modal__desc">{event.desc}</p>
-      <button
+      <Button variant="primary"
         type="button"
         className="btn btn--primary timeline-modal__action"
         onClick={onClose}
         autoFocus
       >
         Entendido
-      </button>
+      </Button>
     </BottomSheet>
   );
 };

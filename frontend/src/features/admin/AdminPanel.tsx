@@ -1,3 +1,4 @@
+import { Field, Button } from '../../shared/components/ui';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ApiService } from '../../services/api';
 
@@ -96,7 +97,7 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
       <div className="admin-gate">
         <h1>Panel Admin</h1>
         <p>Gestión de salas y usuarios. Requiere el ADMIN_TOKEN del servidor.</p>
-        <input
+        <Field
           type="password"
           placeholder="Token de administrador"
           value={tokenInput}
@@ -105,9 +106,9 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
             if (e.key === 'Enter') void handleLogin();
           }}
         />
-        <button type="button" className="btn btn--primary" onClick={() => void handleLogin()} disabled={busy}>
+        <Button variant="primary" type="button" className="btn btn--primary" onClick={() => void handleLogin()} disabled={busy}>
           Entrar
-        </button>
+        </Button>
         {error && (
           <p role="alert" className="admin-error">
             {error}
@@ -121,9 +122,9 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
     <div className="admin-panel">
       <h1>Panel Admin</h1>
       {onLeave && (
-        <button type="button" className="btn btn--secondary" onClick={onLeave}>
+        <Button variant="secondary" type="button" className="btn btn--secondary" onClick={onLeave}>
           ← Volver
-        </button>
+        </Button>
       )}
       {error && (
         <p role="alert" className="admin-error">
@@ -140,10 +141,10 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
               {r.name && <span> · {r.name}</span>}
               <span> · {r.participantCount} participantes</span>
               <span> · {r.status}</span>
-              <button type="button" onClick={() => void runAction(() => openDetail(token, r.roomId))}>
+              <Button variant="secondary" type="button" onClick={() => void runAction(() => openDetail(token, r.roomId))}>
                 Ver
-              </button>
-              <button
+              </Button>
+              <Button variant="secondary"
                 type="button"
                 onClick={() => {
                   if (!window.confirm(`¿Cerrar la sala ${r.roomId}? Expulsa a todos.`)) return;
@@ -153,7 +154,7 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                 }}
               >
                 Cerrar
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -170,7 +171,7 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                 <span> · {p.role}</span>
                 {!p.isLeader && (
                   <>
-                    <button
+                    <Button variant="secondary"
                       type="button"
                       onClick={() =>
                         void runAction(
@@ -180,8 +181,8 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                       }
                     >
                       Expulsar
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="secondary"
                       type="button"
                       onClick={() => {
                         if (!window.confirm(`¿Banear a ${p.name}? No podrá volver a entrar.`)) return;
@@ -196,8 +197,8 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                       }}
                     >
                       Banear
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="secondary"
                       type="button"
                       onClick={() =>
                         void runAction(
@@ -211,8 +212,8 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                       }
                     >
                       {p.role === 'coleader' ? 'Quitar rol' : 'Hacer coleader'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="secondary"
                       type="button"
                       onClick={() =>
                         void runAction(
@@ -226,8 +227,8 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                       }
                     >
                       Silenciar
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="secondary"
                       type="button"
                       onClick={() => {
                         if (!window.confirm(`¿Transferir el liderazgo a ${p.name}?`)) return;
@@ -241,15 +242,15 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                       }}
                     >
                       Transferir liderazgo
-                    </button>
-                    <input
+                    </Button>
+                    <Field
                       type="text"
                       placeholder="Nuevo nombre"
                       aria-label={`Nuevo nombre para ${p.name}`}
                       value={renameDraft[p.name] ?? ''}
                       onChange={(e) => setRenameDraft((d) => ({ ...d, [p.name]: e.target.value }))}
                     />
-                    <button
+                    <Button variant="secondary"
                       type="button"
                       onClick={() =>
                         void runAction(
@@ -263,7 +264,7 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                       }
                     >
                       Renombrar
-                    </button>
+                    </Button>
                   </>
                 )}
               </li>
@@ -277,7 +278,7 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                 {(detail.kickedUsers ?? []).map((k: any) => (
                   <li key={k.name}>
                     <span>{k.name}</span>
-                    <button
+                    <Button variant="secondary"
                       type="button"
                       onClick={() =>
                         void runAction(
@@ -287,7 +288,7 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
                       }
                     >
                       Desbanear
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -296,7 +297,7 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
 
           <h3>Ajustes</h3>
           <label>
-            <input
+            <Field
               type="checkbox"
               checked={reactionsOn}
               onChange={(e) => setReactionsOn(e.target.checked)}
@@ -304,14 +305,14 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
             Reacciones
           </label>
           <label>
-            <input
+            <Field
               type="checkbox"
               checked={effectsOn}
               onChange={(e) => setEffectsOn(e.target.checked)}
             />
             Efectos visuales
           </label>
-          <button
+          <Button variant="secondary"
             type="button"
             onClick={() =>
               void runAction(
@@ -325,7 +326,7 @@ export const AdminPanel: React.FC<{ onLeave?: () => void }> = ({ onLeave }) => {
             }
           >
             Guardar ajustes
-          </button>
+          </Button>
         </section>
       )}
     </div>

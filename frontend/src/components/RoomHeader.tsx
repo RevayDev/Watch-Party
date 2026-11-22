@@ -1,3 +1,4 @@
+import { Button, Popover } from '../shared/components/ui';
 import React, { useState, useRef, useEffect } from 'react';
 import { Video, Hash, Link as LinkIcon, Share2, Users, Settings, Clock, Hourglass } from 'lucide-react';
 import { usePresence } from '../hooks/usePresence';
@@ -197,7 +198,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
       <div className="header__actions">
         {/* Share: single button → small menu with room code + invite link */}
         <div className="header__share-wrap" ref={shareRef}>
-          <button
+          <Button variant="unstyled"
             onClick={() => setShowShareMenu((v) => !v)}
             className="header__room-pill header__share-btn"
             title="Compartir sala (código y link)"
@@ -205,10 +206,10 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           >
             <Share2 size={13} color="#818cf8" />
             <span className="header__pill-label">Compartir</span>
-          </button>
+          </Button>
 
           {sharePresence.shown && (
-            <div
+            <Popover
               className={`header-share-menu ${sharePresence.closing ? 'header-share-menu--closing' : ''}`}
               ref={shareSheetRef}
             >
@@ -220,14 +221,14 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                   </span>
                   <span className="header-share-menu__value">{roomId}</span>
                 </div>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={handleCopyCode}
                   className={`header-share-menu__copy ${copiedCode ? 'header-share-menu__copy--done' : ''}`}
                   title="Copiar código"
                 >
                   {copiedCode ? 'Copiado' : 'Copiar'}
-                </button>
+                </Button>
               </div>
 
               {/* Invite link */}
@@ -238,21 +239,21 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                   </span>
                   <span className="header-share-menu__value header-share-menu__value--url">{fullUrl}</span>
                 </div>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={handleCopyLink}
                   className={`header-share-menu__copy ${copiedLink ? 'header-share-menu__copy--done' : ''}`}
                   title="Copiar link"
                 >
                   {copiedLink ? 'Copiado' : 'Copiar'}
-                </button>
+                </Button>
               </div>
-            </div>
+            </Popover>
           )}
         </div>
 
         {/* Participant count: abre el panel igual que el botón de abajo */}
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={onOpenParticipants}
           className={`header__users-pill ${participantsActive ? 'header__users-pill--active' : ''}`}
@@ -265,14 +266,14 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
         >
           <Users size={14} />
           <span>{demo || capacity ? `${participantCount}/${capacity ?? DEMO_MAX_USERS_PER_ROOM}` : participantCount}</span>
-        </button>
+        </Button>
 
 
         {/* Clock Pill: Penúltimo elemento (antes de Configuración) */}
         {/* Nota: la pill de duración del vídeo se quitó a propósito: con el
             reloj ya hay un solo contador en el header. */}
         <div className="header__share-wrap" ref={clockRef}>
-          <button
+          <Button variant="unstyled"
             onClick={() => setShowClockMenu((v) => !v)}
             className={`header__room-pill header__timer-pill ${timerToneClass}`}
             title={timerPillTitle}
@@ -280,10 +281,10 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           >
             {isWaiting ? <Hourglass size={13} color={timerIconColor} /> : <Clock size={13} color={timerIconColor} />}
             <span className="header__timer-pill__label">{timerPillText}</span>
-          </button>
+          </Button>
 
           {clockPresence.shown && (
-            <div
+            <Popover
               className={`header-share-menu ${clockPresence.closing ? 'header-share-menu--closing' : ''}`}
               ref={clockSheetRef}
             >
@@ -335,20 +336,20 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                   </div>
                 </div>
               )}
-            </div>
+            </Popover>
           )}
         </div>
 
         {/* ⚙ Room settings (leader only): name, info, save-mode, approval, timer */}
         {(isLeader || showSettings) && onOpenSettings && (
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onOpenSettings}
             className="header__room-pill header__settings-btn"
             title="Configuración de la sala"
           >
             <Settings size={15} />
-          </button>
+          </Button>
         )}
       </div>
     </header>

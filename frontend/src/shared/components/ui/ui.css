@@ -1,0 +1,32 @@
+/* Shared visual contract. Layout stays with each feature. */
+.ui-action { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ui-action:not(.ui-action--unstyled) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; min-height: 40px; padding: 8px 16px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 14px; font-weight: 600; line-height: 1.4; text-decoration: none; box-shadow: none; background: var(--color-bg-card-solid); color: var(--color-text-main); transition: background-color .16s ease, border-color .16s ease, color .16s ease; }
+.ui-action.ui-action--primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.ui-action.ui-action--primary:hover { background: var(--color-primary-dark); border-color: var(--color-primary-dark); transform: none; box-shadow: none; }
+.ui-action.ui-action--secondary { background: var(--color-bg-card-solid); color: var(--color-text-main); }
+.ui-action.ui-action--secondary:hover, .ui-action.ui-action--ghost:hover, .ui-action.ui-action--icon:hover { background: var(--color-bg-hover); border-color: var(--color-border); transform: none; box-shadow: none; }
+.ui-action.ui-action--ghost, .ui-action.ui-action--icon { background: transparent; border-color: transparent; color: var(--color-muted-light); }
+.ui-action.ui-action--danger { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.24); color: #fca5a5; }
+.ui-action.ui-action--danger:hover { background: rgba(239,68,68,.2); transform: none; box-shadow: none; }
+.ui-action.ui-action--sm { min-height: 32px; padding: 6px 12px; font-size: 12px; }
+.ui-action.ui-action--lg { min-height: 48px; padding: 12px 24px; font-size: 16px; }
+.ui-action.ui-action--icon { width: 36px; min-height: 36px; padding: 0; flex-shrink: 0; }
+.ui-action:disabled { cursor: not-allowed; opacity: .45; }
+.ui-action:focus-visible, .ui-field:focus-visible, .ui-range:focus-visible, .ui-native-field:focus-visible { outline: 2px solid var(--color-primary-light); outline-offset: 2px; box-shadow: none; }
+.ui-field { box-sizing: border-box; min-width: 0; min-height: 40px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-input); color: var(--color-text-main); font: inherit; font-size: 14px; }
+.ui-field::placeholder { color: var(--color-text-muted); }
+.ui-field:disabled { opacity: .5; cursor: not-allowed; }
+.ui-select { color-scheme: dark; padding-right: 32px; }
+.ui-textarea { resize: vertical; line-height: 1.5; }
+.ui-native-field { accent-color: var(--color-primary); }
+.ui-range { appearance: none; height: 4px; min-height: 4px; padding: 0; border: 0; border-radius: 4px; margin: 8px 0; cursor: pointer; background: linear-gradient(to right, var(--color-primary) var(--range-progress, 0%), #3a4254 var(--range-progress, 0%)); }
+.ui-range::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--color-primary-light); }
+.ui-range::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--color-primary-light); }
+.ui-range:disabled { opacity: .4; cursor: default; }
+.ui-surface { border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-card-solid); }
+.ui-popover { border: 1px solid var(--color-border); border-radius: 12px; padding: 8px; background: var(--color-bg-card-solid); color: var(--color-text-main); box-shadow: 0 12px 32px rgba(0,0,0,.32); }
+.ui-popover > .ui-action, .ui-popover > a { border-radius: 8px; }
+.ui-popover .ui-action:hover, .ui-popover > a:hover { background-color: var(--color-bg-hover) !important; }
+@media (prefers-reduced-motion: reduce) { .ui-action { transition: none !important; } }
+
+.home-faq-question.ui-action { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }

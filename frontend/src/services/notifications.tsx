@@ -1,3 +1,4 @@
+import { Button } from '../shared/components/ui';
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react';
 import { BottomSheet } from '../shared/components/BottomSheet';
@@ -197,7 +198,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               {toast.title && <strong className="notif-toast__title">{toast.title}</strong>}
               <span className="notif-toast__message">{toast.message}</span>
             </div>
-            <button
+            <Button variant="unstyled"
               type="button"
               className="notif-toast__close"
               onClick={(e) => {
@@ -208,7 +209,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               aria-label="Cerrar notificación"
             >
               <X size={14} />
-            </button>
+            </Button>
             <div
               className={`notif-toast__progress notif-toast__progress--${toast.type}`}
               style={{ animationDuration: `${TOAST_DURATION}ms` }}
@@ -229,14 +230,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             <h3 className="notif-confirm__title">{confirmState.options.title}</h3>
             <p className="notif-confirm__message">{confirmState.options.message}</p>
             <div className="notif-confirm__actions">
-              <button
+              <Button variant="unstyled"
                 type="button"
                 className="notif-confirm__btn notif-confirm__btn--cancel"
                 onClick={() => resolveConfirm(false)}
               >
                 {confirmState.options.cancelLabel || 'Cancelar'}
-              </button>
-              <button
+              </Button>
+              <Button variant="primary"
                 type="button"
                 className={`notif-confirm__btn ${
                   confirmState.options.danger
@@ -247,7 +248,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 onClick={() => resolveConfirm(true)}
               >
                 {confirmState.options.confirmLabel || 'Aceptar'}
-              </button>
+              </Button>
             </div>
         </BottomSheet>
       )}

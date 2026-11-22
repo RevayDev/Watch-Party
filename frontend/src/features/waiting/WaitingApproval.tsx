@@ -1,3 +1,4 @@
+import { Button } from '../../shared/components/ui';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, Mic, MicOff, Video, VideoOff, Clock } from 'lucide-react';
 
@@ -203,7 +204,7 @@ export const WaitingApproval: React.FC<WaitingApprovalProps> = ({
 
         {/* Media controls */}
         <div className="waiting-controls">
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={handleToggleMic}
             className={`meet-circle-btn meet-circle-btn--text ${micOn ? 'meet-circle-btn--mic-on' : 'meet-circle-btn--off'}`}
@@ -211,8 +212,8 @@ export const WaitingApproval: React.FC<WaitingApprovalProps> = ({
           >
             {micOn ? <Mic size={16} /> : <MicOff size={16} />}
             <span>Mic {micOn ? 'activado' : 'apagado'}</span>
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             onClick={handleToggleCam}
             className={`meet-circle-btn meet-circle-btn--text ${camOn ? 'meet-circle-btn--on' : 'meet-circle-btn--off'}`}
@@ -220,12 +221,12 @@ export const WaitingApproval: React.FC<WaitingApprovalProps> = ({
           >
             {camOn ? <Video size={16} /> : <VideoOff size={16} />}
             <span>Cámara {camOn ? 'encendida' : 'apagada'}</span>
-          </button>
+          </Button>
         </div>
 
-        <button type="button" className="waiting-cancel" onClick={onCancel}>
+        <Button variant="unstyled" type="button" className="waiting-cancel" onClick={onCancel}>
           <span>Cancelar solicitud</span>
-        </button>
+        </Button>
       </div>
     </div>
   );

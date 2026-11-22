@@ -1,3 +1,4 @@
+import { Button, Field } from '../../shared/components/ui';
 import React, { useState, useLayoutEffect, useRef } from 'react';
 import { Send, X, ArrowDown, Pencil, Reply } from 'lucide-react';
 import { ChatMessage } from '../../types/room';
@@ -195,7 +196,7 @@ export const Chat: React.FC<ChatProps> = ({
                   }`}
                 >
                   {m.replyTo && (
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       className="drawer-chat__quote"
                       onClick={() => jumpToMessage(m.replyTo!.id)}
@@ -203,7 +204,7 @@ export const Chat: React.FC<ChatProps> = ({
                     >
                       <span className="drawer-chat__quote-user">{m.replyTo.user}</span>
                       <span className="drawer-chat__quote-text">{m.replyTo.text}</span>
-                    </button>
+                    </Button>
                   )}
                   <span className="drawer-chat__author">{m.user}</span>
                   <span className="drawer-chat__text">
@@ -212,7 +213,7 @@ export const Chat: React.FC<ChatProps> = ({
                   </span>
                   <span className="drawer-chat__time">{m.timestamp}</span>
                   <span className="drawer-chat__actions">
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       className="drawer-chat__action"
                       title={`Responder a ${m.user}`}
@@ -220,9 +221,9 @@ export const Chat: React.FC<ChatProps> = ({
                       onClick={() => startReply(m)}
                     >
                       <Reply size={13} />
-                    </button>
+                    </Button>
                     {isMine(m.user) && (
-                      <button
+                      <Button variant="unstyled"
                         type="button"
                         className="drawer-chat__action"
                         title="Editar mensaje"
@@ -230,7 +231,7 @@ export const Chat: React.FC<ChatProps> = ({
                         onClick={() => startEdit(m)}
                       >
                         <Pencil size={13} />
-                      </button>
+                      </Button>
                     )}
                   </span>
                 </div>
@@ -241,7 +242,7 @@ export const Chat: React.FC<ChatProps> = ({
 
         {/* Flechita para bajar al último mensaje (estilo WhatsApp) */}
         {isOpen && showJump && (
-          <button
+          <Button variant="unstyled"
             type="button"
             className="drawer-chat__jump"
             title="Bajar al último mensaje"
@@ -254,7 +255,7 @@ export const Chat: React.FC<ChatProps> = ({
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -286,7 +287,7 @@ export const Chat: React.FC<ChatProps> = ({
       {editingId && (
         <div className="drawer-chat__context" role="status">
           <span className="drawer-chat__context-label">Editando mensaje</span>
-          <button
+          <Button variant="unstyled"
             type="button"
             className="drawer-chat__context-close"
             title="Cancelar edición"
@@ -294,7 +295,7 @@ export const Chat: React.FC<ChatProps> = ({
             onClick={cancelEditing}
           >
             <X size={14} />
-          </button>
+          </Button>
         </div>
       )}
       {!editingId && replyTo && (
@@ -302,7 +303,7 @@ export const Chat: React.FC<ChatProps> = ({
           <span className="drawer-chat__context-label">
             Respondiendo a <strong>{replyTo.user}</strong>: {replyTo.text}
           </span>
-          <button
+          <Button variant="unstyled"
             type="button"
             className="drawer-chat__context-close"
             title="Quitar respuesta"
@@ -310,13 +311,13 @@ export const Chat: React.FC<ChatProps> = ({
             onClick={() => setReplyTo(null)}
           >
             <X size={14} />
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Input bar always visible */}
       <form onSubmit={handleSubmit} className="drawer-chat__input-bar">
-        <input
+        <Field
           ref={inputRef}
           type="text"
           className="drawer-chat__input"
@@ -326,7 +327,7 @@ export const Chat: React.FC<ChatProps> = ({
           onFocus={handleInputFocus}
           autoComplete="off"
         />
-        <button
+        <Button variant="unstyled"
           type="submit"
           className="drawer-chat__send"
           disabled={!input.trim()}
@@ -334,7 +335,7 @@ export const Chat: React.FC<ChatProps> = ({
           aria-label="Enviar mensaje"
         >
           <Send size={16} />
-        </button>
+        </Button>
       </form>
     </div>
   );

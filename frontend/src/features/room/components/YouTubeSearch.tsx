@@ -1,3 +1,4 @@
+import { Field, Button } from '../../../shared/components/ui';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { ApiService } from '../../../services/api';
@@ -54,7 +55,7 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
   return (
     <section className="room-settings__box youtube-search" aria-label="Buscar videos en YouTube">
       <form className="youtube-search__form" onSubmit={search}>
-        <input
+        <Field
           type="search"
           className="room-settings__input"
           aria-label="Buscar en YouTube"
@@ -63,9 +64,9 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
           value={query}
           onChange={(event) => event.target.value ? setQuery(event.target.value) : resetSearch()}
         />
-        <button type="submit" className="btn btn--primary" disabled={loading || query.trim().length < 2}>
+        <Button variant="primary" type="submit" className="btn btn--primary" disabled={loading || query.trim().length < 2}>
           <Search size={16} aria-hidden="true" /> Buscar
-        </button>
+        </Button>
       </form>
       {loading && <p role="status">Buscando en YouTube…</p>}
       {error && <p role="alert" className="youtube-search__error">{error}</p>}
@@ -82,13 +83,13 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
                   <span>{track.artists}</span>
                 </div>
                 <div className="youtube-search__actions">
-                  <button type="button" className="btn btn--primary" onClick={() => { onAdd(track); resetSearch(); }} aria-label={`Añadir ${track.name} a la cola`}>
+                  <Button variant="primary" type="button" className="btn btn--primary" onClick={() => { onAdd(track); resetSearch(); }} aria-label={`Añadir ${track.name} a la cola`}>
                     <Plus size={15} aria-hidden="true" /> A la cola
-                  </button>
+                  </Button>
                   {onPlay && url && (
-                    <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => { onPlay(url, track.name); resetSearch(); }}>
+                    <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" onClick={() => { onPlay(url, track.name); resetSearch(); }}>
                       Ver en sala
-                    </button>
+                    </Button>
                   )}
                 </div>
               </li>

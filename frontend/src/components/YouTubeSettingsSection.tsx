@@ -1,3 +1,4 @@
+import { Field, Surface, Button } from '../shared/components/ui';
 import { useEffect, useState } from 'react';
 import { ApiService, BACKEND_BASE } from '../services/api';
 
@@ -66,18 +67,18 @@ export function YouTubeSettingsSection({ provider = '', onChange, canEdit }: {
   return <section className="youtube-settings">
     <div className="settings-section-heading"><h4>Búsqueda de YouTube</h4><p>Los enlaces se reproducen sin una clave. La API key se necesita para buscar canciones y videos.</p></div>
     <div className="settings-source-options">
-      <label><input type="radio" name="youtube-source" checked={source === 'platform'} disabled={!editable} onChange={() => setSource('platform')} /><span><strong>Servicio de la plataforma</strong><small>Usa el servicio configurado por el administrador</small></span></label>
-      <label><input type="radio" name="youtube-source" checked={source === 'room'} disabled={!editable} onChange={() => setSource('room')} /><span><strong>Proveedor de esta sala</strong><small>Registra tu API key de YouTube</small></span></label>
+      <label><Field type="radio" name="youtube-source" checked={source === 'platform'} disabled={!editable} onChange={() => setSource('platform')} /><span><strong>Servicio de la plataforma</strong><small>Usa el servicio configurado por el administrador</small></span></label>
+      <label><Field type="radio" name="youtube-source" checked={source === 'room'} disabled={!editable} onChange={() => setSource('room')} /><span><strong>Proveedor de esta sala</strong><small>Registra tu API key de YouTube</small></span></label>
     </div>
     <p className="settings-connection-status" role="status">{status}</p>
-    {source === 'platform' ? null : <div className="room-settings__box">
-      <label className="room-settings__group">API key<input type="password" autoComplete="off" className="room-settings__input" value={apiKey} disabled={!editable} maxLength={200} onChange={(event) => setApiKey(event.target.value)} placeholder="Pega tu API key de YouTube Data API v3" /></label>
+    {source === 'platform' ? null : <Surface className="room-settings__box">
+      <label className="room-settings__group">API key<Field type="password" autoComplete="off" className="room-settings__input" value={apiKey} disabled={!editable} maxLength={200} onChange={(event) => setApiKey(event.target.value)} placeholder="Pega tu API key de YouTube Data API v3" /></label>
       <p className="room-settings__box-desc">La credencial se guarda solo en la memoria del backend durante 6 horas. No se envía a los participantes y debe registrarse de nuevo si el backend se reinicia.</p>
       <a className="settings-help-link" href="https://developers.google.com/youtube/data/guides/authentication" target="_blank" rel="noreferrer">Cómo obtener una API key</a>
-    </div>}
+    </Surface>}
     <div className="youtube-settings__actions">
-      {editable && <button type="button" className="btn btn--primary" disabled={busy || (source === 'room' && apiKey.trim().length < 20)} onClick={() => void save()}>{busy ? 'Procesando…' : source === 'room' ? 'Registrar para la sala' : 'Usar plataforma'}</button>}
-      <button type="button" className="leader-exit-modal__cancel-btn" disabled={busy} onClick={() => void test()}>Probar búsqueda actual</button>
+      {editable && <Button variant="primary" type="button" className="btn btn--primary" disabled={busy || (source === 'room' && apiKey.trim().length < 20)} onClick={() => void save()}>{busy ? 'Procesando…' : source === 'room' ? 'Registrar para la sala' : 'Usar plataforma'}</Button>}
+      <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" disabled={busy} onClick={() => void test()}>Probar búsqueda actual</Button>
     </div>
     {message && <p role="status" className="room-settings__box-desc">{message}</p>}
   </section>;

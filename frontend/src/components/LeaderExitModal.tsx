@@ -1,3 +1,4 @@
+import { Button } from '../shared/components/ui';
 import React from 'react';
 import { BottomSheet } from '../shared/components/BottomSheet';
 
@@ -39,7 +40,7 @@ export const LeaderExitModal: React.FC<LeaderExitModalProps> = ({
 
         <div className="leader-exit-modal__actions">
           {/* Salir sólo yo (siempre disponible para anfitrión en salas permanentes, o cuando hay más participantes) */}
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onLeaveOnlyMe}
             className="leader-exit-modal__opt-btn leader-exit-modal__opt-btn--transfer"
@@ -52,10 +53,10 @@ export const LeaderExitModal: React.FC<LeaderExitModalProps> = ({
                   : 'Saldrás de la sala pero el código y el video seguirán guardados para cuando vuelvas.'}
               </span>
             </div>
-          </button>
+          </Button>
 
           {/* Eliminar sala para todos */}
-          <button
+          <Button variant="danger"
             type="button"
             onClick={onDeleteRoomForAll}
             className="leader-exit-modal__opt-btn leader-exit-modal__opt-btn--danger"
@@ -64,16 +65,16 @@ export const LeaderExitModal: React.FC<LeaderExitModalProps> = ({
               <strong>{isTemporary ? 'Cerrar y eliminar sala' : 'Eliminar sala permanentemente'}</strong>
               <span>Desconecta a todos los miembros y elimina el registro de la sala.</span>
             </div>
-          </button>
+          </Button>
         </div>
 
-        <button
+        <Button variant="secondary"
           type="button"
           onClick={onClose}
           className="leader-exit-modal__cancel-btn"
         >
           Cancelar
-        </button>
+        </Button>
     </BottomSheet>
   );
 };

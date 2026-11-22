@@ -1,3 +1,4 @@
+import { Button, Field, Surface, Popover, AccordionTrigger } from '../../../shared/components/ui';
 import React, { useState } from 'react';
 import { Youtube, Plus, Trash2, ArrowUp, ArrowDown, Check, Disc, Play, Pause, SkipForward, Maximize2, ListMusic, MoreVertical, ExternalLink, Square, ChevronDown } from 'lucide-react';
 import type { IMusicNowPlaying, IMusicQueueEntry, IMusicTrack, IRoomSettings } from '../../../types/room';
@@ -164,23 +165,10 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   }> = ({ rowId, url, title: menuTitle, openUrl, entryId, canDelete, isCurrentlyPlaying }) => {
     void rowId;
     return (
-      <div
-        style={{
-          position: 'absolute',
-          right: '0.4rem',
-          top: '2.7rem',
-          zIndex: 30,
-          minWidth: 190,
-          background: '#1d2438',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: 10,
-          padding: '0.3rem',
-          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.55)',
-        }}
-      >
+      <Popover className="music-queue__menu" onDismiss={() => setOpenMenuId(null)} aria-label="Opciones de la canción">
         {isModerator && (
           <>
-            {url && <button
+            {url && <Button variant="unstyled"
               type="button"
               onClick={() => {
                 if (url) onExpandToMain(url, menuTitle);
@@ -189,10 +177,10 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
               style={menuItemStyle}
             >
               <Maximize2 size={13} /> Ampliar a la sala
-            </button>}
+            </Button>}
             {isCurrentlyPlaying && (
               <>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => {
                     onNext();
@@ -201,8 +189,8 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                   style={menuItemStyle}
                 >
                   <SkipForward size={13} /> Siguiente
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => {
                     onStop();
@@ -211,7 +199,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                   style={{ ...menuItemStyle, color: '#f87171' }}
                 >
                   <Square size={13} /> Detener
-                </button>
+                </Button>
               </>
             )}
           </>
@@ -228,7 +216,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
           </a>
         )}
         {canDelete && entryId && (
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => {
               onRemove(entryId);
@@ -237,9 +225,9 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             style={{ ...menuItemStyle, color: '#f87171' }}
           >
             <Trash2 size={13} /> Eliminar
-          </button>
+          </Button>
         )}
-      </div>
+      </Popover>
     );
   };
 
@@ -251,7 +239,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       {allowAdd ? (
         <form onSubmit={handlePasteSubmit} className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.45rem' }}>
-            <input
+            <Field
               type="text"
               className="room-settings__input"
               placeholder="Pega enlace de YouTube (ej: https://youtu.be/...)"
@@ -262,7 +250,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
               }}
               style={{ flex: 1, fontSize: '0.84rem', padding: '0.55rem 0.75rem' }}
             />
-            <button
+            <Button variant="primary"
               type="submit"
               className="btn btn--primary"
               disabled={!ytInput.trim() || addingYt}
@@ -277,7 +265,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             >
               <Plus size={15} />
               {addingYt ? 'Añadiendo...' : 'Añadir'}
-            </button>
+            </Button>
           </div>
 
           {inputError && (
@@ -328,15 +316,15 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                     por {e.proposedBy}
                   </p>
                 </div>
-                <button
+                <Button variant="primary"
                   type="button"
                   className="btn btn--primary"
                   style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem' }}
                   onClick={() => onApprove(e.id)}
                 >
                   <Check size={14} /> Aprobar
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   className="music-row-options"
                   aria-label={`Opciones de ${e.name}`}
@@ -344,7 +332,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                   onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
                 >
                   <MoreVertical size={15} />
-                </button>
+                </Button>
                 {openMenuId === e.id && (
                   <PlayingMenu
                     rowId={e.id}
@@ -363,10 +351,10 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       )}
 
       {/* Tarjeta de la cola musical (desplegable) */}
-      <div className="room-settings__box music-queue">
-        <button type="button" className="music-queue__toggle" aria-expanded={!queueCollapsed} aria-controls="music-queue-entries" onClick={() => setQueueCollapsed(v => !v)}>
+      <Surface className="room-settings__box music-queue">
+        <AccordionTrigger expanded={!queueCollapsed} controls="music-queue-entries" className="music-queue__toggle" onClick={() => setQueueCollapsed(v => !v)}>
           <ListMusic size={18} /><span>Cola de reproducción</span><span className="music-queue__count">{active.length} vídeo{active.length === 1 ? '' : 's'}</span><ChevronDown size={16} style={{ transform: queueCollapsed ? undefined : 'rotate(180deg)' }} />
-        </button>
+        </AccordionTrigger>
         {!queueCollapsed && (
           <div id="music-queue-entries" style={{ display: active.length === 0 ? 'flex' : 'block' }}>
             {active.length === 0 ? (
@@ -419,7 +407,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                         {nowPlaying.artists || 'YouTube Music'} · propuesto por {nowPlaying.proposedBy}
                       </p>
                     </div>
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       aria-label={`Opciones de ${nowPlaying.name}`}
                       title="Opciones"
@@ -439,7 +427,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                       }}
                     >
                       <MoreVertical size={15} />
-                    </button>
+                    </Button>
                     {openMenuId === `now-${nowPlaying.entryId}` && (
                       <PlayingMenu
                         rowId={`now-${nowPlaying.entryId}`}
@@ -540,7 +528,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                       )}
 
                       {!isPlayingNow && canRemove(e) && (
-                        <button
+                        <Button variant="secondary"
                           type="button"
                           className="leader-exit-modal__cancel-btn"
                           style={{ width: 'auto', margin: 0, padding: '0.28rem 0.5rem', color: '#f87171' }}
@@ -549,9 +537,9 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                           title="Eliminar de la cola"
                         >
                           <Trash2 size={13} />
-                        </button>
+                        </Button>
                       )}
-                      <button
+                      <Button variant="unstyled"
                         type="button"
                         aria-label={`Opciones de ${e.name}`}
                         title="Opciones"
@@ -571,7 +559,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                         }}
                       >
                         <MoreVertical size={15} />
-                      </button>
+                      </Button>
                       {openMenuId === e.id && (
                         <PlayingMenu
                           rowId={e.id}
@@ -586,7 +574,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
 
                       {!isPlayingNow && isModerator && settings.musicAllowReorder === true && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             style={{
                               background: 'transparent',
@@ -601,8 +589,8 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                             title="Subir posición"
                           >
                             <ArrowUp size={12} />
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="unstyled"
                             type="button"
                             style={{
                               background: 'transparent',
@@ -617,7 +605,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                             title="Bajar posición"
                           >
                             <ArrowDown size={12} />
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -627,10 +615,10 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             )}
           </div>
         )}
-      </div>
+      </Surface>
 
       </div>
-      <div className="room-settings__box music-panel__footer">
+      <Surface className="room-settings__box music-panel__footer">
         {nowPlaying && nowVideoId ? <NowPlayingPlayer
           trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
           videoId={nowVideoId} title={nowPlaying.name}
@@ -642,9 +630,9 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         /> : <div className="music-player-empty">
           <div className="music-player-empty__art" aria-hidden="true"><Disc size={28} /></div>
           <div className="music-player-empty__info"><strong>Sin reproducción</strong><span>Añade una canción para empezar</span></div>
-          <button type="button" className="music-player-empty__play" aria-label="Reproducir cola" disabled={!isModerator || active.length === 0} onClick={onNext}><Play size={20} /></button>
+          <Button variant="unstyled" type="button" className="music-player-empty__play" aria-label="Reproducir cola" disabled={!isModerator || active.length === 0} onClick={onNext}><Play size={20} /></Button>
         </div>}
-      </div>
+      </Surface>
     </div>
   );
 };

@@ -1,3 +1,4 @@
+import { Button, Range } from '../../../shared/components/ui';
 import React, { useEffect, useRef, useState } from 'react';
 import { AudioLines, Maximize2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, Youtube, Square } from 'lucide-react';
 import { YouTubePlayerView } from '../../player/YouTubePlayerView';
@@ -160,8 +161,8 @@ export const NowPlayingPlayer: React.FC<{
         {thumb ? <img className="music-player__art" src={thumb} alt="" /> : <div className="music-player__art music-player__placeholder"><Youtube size={24} /></div>}
         <div className="music-player__info"><strong>{title}</strong><span>{subtitle}</span></div>
         {showModerator && <div className="music-player__actions">
-          <button type="button" className="music-player__icon" title="Ampliar a la pantalla de la sala" aria-label="Ampliar a la pantalla de la sala" onClick={() => { const position = playerRef.current?.getCurrentTime?.() ?? current; playerRef.current?.pauseVideo?.(); onExpand(position); }}><Maximize2 size={18} /></button>
-          <button type="button" className="music-player__icon music-player__stop" title="Detener música" aria-label="Detener música" onClick={onStop}><Square size={18} /></button>
+          <Button variant="unstyled" type="button" className="music-player__icon" title="Ampliar a la pantalla de la sala" aria-label="Ampliar a la pantalla de la sala" onClick={() => { const position = playerRef.current?.getCurrentTime?.() ?? current; playerRef.current?.pauseVideo?.(); onExpand(position); }}><Maximize2 size={18} /></Button>
+          <Button variant="unstyled" type="button" className="music-player__icon music-player__stop" title="Detener música" aria-label="Detener música" onClick={onStop}><Square size={18} /></Button>
         </div>}
       </div>
       <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
@@ -172,15 +173,15 @@ export const NowPlayingPlayer: React.FC<{
         }} />
       </div>
       <div className="yt-miniplayer-controls music-player__controls">
-        <button type="button" className="music-player__icon" title="Reiniciar canción" aria-label="Reiniciar canción" onClick={restart}><SkipBack size={18} /></button>
-        <button type="button" className="music-player__icon music-player__play" title={playing ? 'Pausar' : 'Reproducir'} aria-label={playing ? 'Pausar' : 'Reproducir'} onClick={togglePlay}>{playing ? <Pause size={20} /> : <Play size={20} />}</button>
-        {showModerator && <button type="button" className="music-player__icon" title="Siguiente canción" aria-label="Siguiente canción" onClick={onNext}><SkipForward size={18} /></button>}
+        <Button variant="unstyled" type="button" className="music-player__icon" title="Reiniciar canción" aria-label="Reiniciar canción" onClick={restart}><SkipBack size={18} /></Button>
+        <Button variant="unstyled" type="button" className="music-player__icon music-player__play" title={playing ? 'Pausar' : 'Reproducir'} aria-label={playing ? 'Pausar' : 'Reproducir'} onClick={togglePlay}>{playing ? <Pause size={20} /> : <Play size={20} />}</Button>
+        {showModerator && <Button variant="unstyled" type="button" className="music-player__icon" title="Siguiente canción" aria-label="Siguiente canción" onClick={onNext}><SkipForward size={18} /></Button>}
         <div className="music-player__progress">
-          <input className="music-player__range" type="range" min={0} max={Math.max(1, Math.floor(duration))} step={1} value={Math.min(Math.floor(current), Math.max(1, Math.floor(duration)))} onChange={(e) => seekTo(Number(e.target.value))} title="Adelantar o retroceder" aria-label="Adelantar o retroceder" disabled={duration <= 0} style={{ '--range-progress': (duration > 0 ? Math.min(100, current / duration * 100) : 0) + '%' } as React.CSSProperties} />
+          <Range className="music-player__range" type="range" min={0} max={Math.max(1, Math.floor(duration))} step={1} value={Math.min(Math.floor(current), Math.max(1, Math.floor(duration)))} onChange={(e) => seekTo(Number(e.target.value))} title="Adelantar o retroceder" aria-label="Adelantar o retroceder" disabled={duration <= 0} style={{ '--range-progress': (duration > 0 ? Math.min(100, current / duration * 100) : 0) + '%' } as React.CSSProperties} />
           <span className="music-player__time">{formatPlayerTime(current)} / {formatPlayerTime(duration)}</span>
         </div>
-        <button type="button" className="music-player__icon" title={muted ? 'Activar sonido' : 'Silenciar'} aria-label={muted ? 'Activar sonido' : 'Silenciar'} onClick={toggleMute}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
-        <input className="music-player__range music-player__volume" type="range" min={0} max={100} step={1} value={muted ? 0 : volume} onChange={(e) => changeVolume(Number(e.target.value))} title="Volumen" aria-label="Volumen" style={{ '--range-progress': (muted ? 0 : volume) + '%' } as React.CSSProperties} />
+        <Button variant="unstyled" type="button" className="music-player__icon" title={muted ? 'Activar sonido' : 'Silenciar'} aria-label={muted ? 'Activar sonido' : 'Silenciar'} onClick={toggleMute}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</Button>
+        <Range className="music-player__range music-player__volume" type="range" min={0} max={100} step={1} value={muted ? 0 : volume} onChange={(e) => changeVolume(Number(e.target.value))} title="Volumen" aria-label="Volumen" style={{ '--range-progress': (muted ? 0 : volume) + '%' } as React.CSSProperties} />
       </div>
     </section>
   );

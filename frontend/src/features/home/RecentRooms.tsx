@@ -1,3 +1,4 @@
+import { Button } from '../../shared/components/ui';
 import React from 'react';
 import { History, Crown, User } from 'lucide-react';
 import { RecentRoom } from '../../services/recentRooms';
@@ -86,14 +87,14 @@ export const RecentRooms: React.FC<RecentRoomsProps> = ({
                 </span>
               </div>
               <div className="home-recent-item__actions">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   className="home-recent-item__enter-btn"
                   onClick={() => onEnter(room)}
                 >
                   Entrar
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   className="home-recent-item__remove-btn"
                   title="Quitar de la lista"
@@ -101,7 +102,7 @@ export const RecentRooms: React.FC<RecentRoomsProps> = ({
                   onClick={() => onRemove(room.roomId)}
                 >
                   ×
-                </button>
+                </Button>
               </div>
             </li>
           ))}

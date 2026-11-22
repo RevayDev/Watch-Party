@@ -1,3 +1,4 @@
+import { Button } from '../../../shared/components/ui';
 import React from 'react';
 import { X } from 'lucide-react';
 import { BottomSheet } from '../../../shared/components/BottomSheet';
@@ -110,7 +111,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
                 ? 'Música'
                 : 'Chat'}
           </span>
-          <button
+          <Button variant="unstyled"
             type="button"
             className="drawer-close-btn"
             onClick={() => setActiveSideTab(null)}
@@ -118,7 +119,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             aria-label="Cerrar panel"
           >
             <X size={18} />
-          </button>
+          </Button>
         </div>
 
         {activeSideTab === 'chat' && (

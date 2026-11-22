@@ -1,3 +1,4 @@
+import { Button, Field, TextArea, Surface, Range } from '../shared/components/ui';
 import React, { useEffect, useState } from "react";
 import { YouTubeSettingsSection } from './YouTubeSettingsSection';
 import { MediaSettingsSection } from './MediaSettings';
@@ -154,7 +155,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               ['youtube', 'YouTube'],
             ] as const
           ).map(([key, label]) => (
-            <button
+            <Button variant="unstyled"
               key={key}
               type="button"
               role="tab"
@@ -163,7 +164,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               onClick={() => setTab(key)}
             >
               {label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -185,7 +186,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             <div className="room-settings__group">
               <label className="room-settings__label" htmlFor="room-settings-name">Nombre de la sala</label>
 
-              <input
+              <Field
                 id="room-settings-name"
                 type="text"
                 className="room-settings__input"
@@ -203,7 +204,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 Información de la sala
               </label>
 
-              <textarea id="room-settings-description"
+              <TextArea id="room-settings-description"
                 className="room-settings__textarea"
                 maxLength={240}
                 rows={3}
@@ -215,20 +216,20 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             </div>
 
             {/* Temporizador */}
-            <div className="room-settings__box">
+            <Surface className="room-settings__box">
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">
                   Temporizador de sala
                 </span>
 
                 {timerEndsAt && !demo && (
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     className="room-settings__timer-remove"
                     onClick={() => handleSetTimer(null)}
                   >
                     Eliminar
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -251,7 +252,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
 
               <div className="room-settings__timer-grid">
                 {TIMER_OPTIONS.map((min) => (
-                  <button
+                  <Button variant="unstyled"
                     key={min}
                     type="button"
                     className={`room-settings__timer-chip ${
@@ -262,7 +263,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                     title={demo ? 'En la demo el temporizador lo configura el servidor' : undefined}
                   >
                     {min >= 60 ? `${min / 60} h` : `${min} min`}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -270,13 +271,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 Al llegar a 0 la sala se cierra para todos
                 {isTemporary && " y se borra el video temporalmente"}.
               </p>
-            </div>
+            </Surface>
           </div>
 
           {/* COLUMNA 2 — Opciones */}
           <div className="room-settings__column">
             {/* Sala temporal */}
-            <div className="room-settings__box">
+            <Surface className="room-settings__box">
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">
                   {demo ? "Sala Temporal" : isTemporary ? "Sala Temporal" : "Video Guardado"}
@@ -287,7 +288,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                   style={{ margin: 0, opacity: demo ? 0.5 : 1 }}
                   title={demo ? 'En la demo todas las salas son temporales' : undefined}
                 >
-                  <input
+                  <Field
                     type="checkbox"
                     checked={demo ? true : isTemporary}
                     onChange={() => onToggleTemporary()}
@@ -305,17 +306,17 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                     ? "Al cerrar la sala se borra el video y la sala automáticamente (ideal para videos pesados o funciones rápidas)."
                     : "El video se conserva subido en el servidor para futuras sesiones."}
               </p>
-            </div>
+            </Surface>
 
             {/* Aprobar entrada */}
-            <div className="room-settings__box">
+            <Surface className="room-settings__box">
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">
                   Aprobar entrada
                 </span>
 
                 <label className="part-switch" style={{ margin: 0 }}>
-                  <input
+                  <Field
                     type="checkbox"
                     checked={requireApproval}
                     disabled={!canEdit || !onToggleRequireApproval}
@@ -328,17 +329,17 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <p className="room-settings__box-desc">
                 Los invitados esperan tu aprobación en Participantes.
               </p>
-            </div>
+            </Surface>
 
             {/* Solo anfitriones controlan el video */}
-            <div className="room-settings__box">
+            <Surface className="room-settings__box">
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">
                   Control solo de anfitriones
                 </span>
 
                 <label className="part-switch" style={{ margin: 0 }}>
-                  <input
+                  <Field
                     type="checkbox"
                     checked={hostOnlySync}
                     onChange={() => onToggleHostOnlySync?.()}
@@ -351,7 +352,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <p className="room-settings__box-desc">
                 Activo: solo anfitrión y co-anfitriones controlan el video.
               </p>
-            </div>
+            </Surface>
           </div>
         </div>
         </>
@@ -359,7 +360,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
 
         {/* Rendimiento (rol B): ancho completo en PC */}
         {tab === 'rendimiento' && (
-          <div className="room-settings__box room-settings__box--perf room-settings__box--full">
+          <Surface className="room-settings__box room-settings__box--perf room-settings__box--full">
               <div className="room-settings__box-head room-settings__box-head--title">
                 <span className="room-settings__box-title">Rendimiento</span>
               </div>
@@ -373,7 +374,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">Modo ahorro de datos</span>
                 <label className="part-switch" style={{ margin: 0 }}>
-                  <input
+                  <Field
                     type="checkbox"
                     checked={dataSaver}
                     disabled={perfDisabled}
@@ -391,7 +392,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">Avisos en pantalla completa</span>
                 <label className="part-switch" style={{ margin: 0 }}>
-                  <input
+                  <Field
                     type="checkbox"
                     checked={fullscreenToasts}
                     disabled={perfDisabled}
@@ -409,7 +410,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">Reacciones</span>
                 <label className="part-switch" style={{ margin: 0 }}>
-                  <input
+                  <Field
                     type="checkbox"
                     checked={reactionsEnabled}
                     disabled={perfDisabled}
@@ -427,7 +428,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">Efectos visuales</span>
                 <label className="part-switch" style={{ margin: 0 }}>
-                  <input
+                  <Field
                     type="checkbox"
                     checked={visualEffects}
                     disabled={perfDisabled}
@@ -445,7 +446,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               <div className="room-settings__box-head">
                 <span className="room-settings__box-title">Atenuar vídeo al hablar</span>
                 <label className="part-switch" style={{ margin: 0 }}>
-                  <input
+                  <Field
                     type="checkbox"
                     checked={duckingEnabled}
                     disabled={perfDisabled}
@@ -462,7 +463,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 <label className="room-settings__label" htmlFor="perf-duck-level">
                   Nivel
                 </label>
-                <input
+                <Range
                   id="perf-duck-level"
                   type="range"
                   className="perf-slider"
@@ -476,14 +477,14 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 />
                 <span className="perf-slider-value">{duckPct}%</span>
               </div>
-            </div>
+            </Surface>
         )}
 
 
         {/* Tu vista de la barra: gusto personal, solo en este navegador.
             No se emite a la sala (a diferencia de Rendimiento). */}
         {tab === 'barra' && (
-        <div className="room-settings__box room-settings__box--full">
+        <Surface className="room-settings__box room-settings__box--full">
             <div className="room-settings__box-head room-settings__box-head--title">
               <span className="room-settings__box-title">Tu vista de la barra</span>
             </div>
@@ -494,7 +495,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             <div className="room-settings__box-head">
               <span className="room-settings__box-title">Textos bajo los iconos</span>
               <label className="part-switch" style={{ margin: 0 }}>
-                <input
+                <Field
                   type="checkbox"
                   checked={barShowLabels}
                   onChange={(e) => onBarPrefsChange?.({ showLabels: e.target.checked })}
@@ -510,7 +511,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             <div className="room-settings__box-head">
               <span className="room-settings__box-title">Barra distribuida en PC</span>
               <label className="part-switch" style={{ margin: 0 }}>
-                <input
+                <Field
                   type="checkbox"
                   checked={barLayout === 'spread'}
                   onChange={(e) => onBarPrefsChange?.({ layout: e.target.checked ? 'spread' : 'centered' })}
@@ -522,28 +523,28 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
             <p className="room-settings__box-desc">
               Izquierda, centro y derecha separados en PC.
             </p>
-        </div>
+        </Surface>
         )}
 
         </section>
         </div>
         {/* Actions */}
         <div className="room-settings__actions">
-          <button
+          <Button variant="secondary"
             type="button"
             className="leader-exit-modal__cancel-btn"
             onClick={onClose}
           >
             {tab === 'general' && canEdit ? 'Cancelar' : 'Cerrar'}
-          </button>
+          </Button>
 
-          {tab === 'general' && canEdit && <button
+          {tab === 'general' && canEdit && <Button variant="primary"
             type="button"
             className="btn btn--primary"
             onClick={handleSave}
           >
             Guardar
-          </button>}
+          </Button>}
         </div>
     </BottomSheet>
   );

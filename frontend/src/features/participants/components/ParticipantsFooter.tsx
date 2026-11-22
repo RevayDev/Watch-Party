@@ -1,3 +1,4 @@
+import { Field, Button } from '../../../shared/components/ui';
 import React from 'react';
 import { MicOff, VideoOff } from 'lucide-react';
 import { IRoomSettings } from '../../../types/room';
@@ -29,7 +30,7 @@ export const ParticipantsFooter: React.FC<ParticipantsFooterProps> = ({
         <span className="part-footer-title">Al entrar</span>
         <div className="part-toggle-row">
           <label className="part-switch">
-            <input
+            <Field
               type="checkbox"
               checked={muteOnEntry}
               onChange={(e) => {
@@ -45,7 +46,7 @@ export const ParticipantsFooter: React.FC<ParticipantsFooterProps> = ({
         </div>
         <div className="part-toggle-row">
           <label className="part-switch">
-            <input
+            <Field
               type="checkbox"
               checked={cameraOffOnEntry}
               onChange={(e) => {
@@ -67,22 +68,22 @@ export const ParticipantsFooter: React.FC<ParticipantsFooterProps> = ({
       <div className="part-footer-col">
         <span className="part-footer-title">Restricciones</span>
         <div className="part-footer-actions">
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onMuteAll}
             className="part-outline-action-btn"
           >
             <MicOff size={14} />
             <span>Silenciar todos</span>
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             onClick={onDisableAllCameras}
             className="part-outline-action-btn"
           >
             <VideoOff size={14} />
             <span>Apagar cámaras</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

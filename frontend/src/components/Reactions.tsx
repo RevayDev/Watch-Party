@@ -1,3 +1,4 @@
+import { Button } from '../shared/components/ui';
 import React, { useState } from 'react';
 
 /** Emojis principales (incluye chispa ✨ y saturno 🪐 en la misma fila + clásicos). */
@@ -16,7 +17,7 @@ export const Reactions: React.FC<ReactionsProps> = ({ onReact }) => {
     <div className="reactions-bar" role="toolbar" aria-label="Reacciones">
       <div className="reactions-bar__row">
         {MAIN_EMOJIS.map((emoji) => (
-          <button
+          <Button variant="unstyled"
             key={emoji}
             type="button"
             className="reactions-bar__btn"
@@ -25,9 +26,9 @@ export const Reactions: React.FC<ReactionsProps> = ({ onReact }) => {
             aria-label={`Reaccionar con ${emoji}`}
           >
             {emoji}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button variant="unstyled"
           type="button"
           className="reactions-bar__btn reactions-bar__more-btn"
           onClick={() => setExpanded((v) => !v)}
@@ -36,12 +37,12 @@ export const Reactions: React.FC<ReactionsProps> = ({ onReact }) => {
           aria-expanded={expanded}
         >
           {expanded ? '−' : '+'}
-        </button>
+        </Button>
       </div>
       {expanded && (
         <div className="reactions-bar__row reactions-bar__row--extra">
           {EXTRA_EMOJIS.map((emoji) => (
-            <button
+            <Button variant="unstyled"
               key={emoji}
               type="button"
               className="reactions-bar__btn"
@@ -50,7 +51,7 @@ export const Reactions: React.FC<ReactionsProps> = ({ onReact }) => {
               aria-label={`Reaccionar con ${emoji}`}
             >
               {emoji}
-            </button>
+            </Button>
           ))}
         </div>
       )}

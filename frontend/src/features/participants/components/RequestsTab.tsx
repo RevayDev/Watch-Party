@@ -1,3 +1,4 @@
+import { Button } from '../../../shared/components/ui';
 import React from 'react';
 import { Check, X, Ban } from 'lucide-react';
 import { IJoinRequest } from '../../../types/room';
@@ -53,7 +54,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
             </span>
             {/* Actions below the name: own wrapping row, never clipped */}
             <div className="part-request-actions">
-              <button
+              <Button variant="unstyled"
                 type="button"
                 className="part-float-btn part-float-btn--ok part-float-btn--text"
                 title="Aceptar solicitud"
@@ -68,8 +69,8 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
               >
                 <Check size={13} />
                 Aceptar
-              </button>
-              <button
+              </Button>
+              <Button variant="danger"
                 type="button"
                 className="part-float-btn part-float-btn--danger part-float-btn--text"
                 title="Rechazar solicitud (podrá volver a pedir)"
@@ -93,8 +94,8 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
               >
                 <X size={13} />
                 Rechazar
-              </button>
-              <button
+              </Button>
+              <Button variant="danger"
                 type="button"
                 className="part-float-btn part-float-btn--danger part-float-btn--ban part-float-btn--text"
                 title="Banear (no podrá unirse)"
@@ -118,7 +119,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
               >
                 <Ban size={13} />
                 Banear
-              </button>
+              </Button>
             </div>
           </div>
         </div>

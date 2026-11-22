@@ -1,3 +1,4 @@
+import { ActionLink, Button, Field } from '../../shared/components/ui';
 import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { VideoPlayer } from '../player/VideoPlayer';
@@ -36,8 +37,8 @@ export function HostRoom({ options, onLeave }: { options: HostRoomOptions; onLea
           <h2>Abre la sala con una conexión segura</h2>
           <p>Esta dirección HTTP de la red local bloquea la conexión segura, el micrófono y la cámara del navegador.</p>
           <p>En este equipo, abre localhost. Para entrar desde otro dispositivo, usa la web publicada con HTTPS y el enlace de invitación generado allí.</p>
-          <a className="btn btn--primary" href={localUrl.href}>Abrir en este equipo</a>
-          <button type="button" className="btn btn--secondary" onClick={onLeave}>Volver al inicio</button>
+          <ActionLink variant="primary" className="btn btn--primary" href={localUrl.href}>Abrir en este equipo</ActionLink>
+          <Button variant="secondary" type="button" className="btn btn--secondary" onClick={onLeave}>Volver al inicio</Button>
         </section>
       </main>
     );
@@ -51,10 +52,10 @@ export function HostRoom({ options, onLeave }: { options: HostRoomOptions; onLea
         }}>
           <h2>Entrar a la sala del anfitrión</h2>
           <label htmlFor="host-member-name">Tu nombre</label>
-          <input id="host-member-name" className="form-group__input" value={name} maxLength={50} required onChange={(event) => setName(event.target.value)} />
+          <Field id="host-member-name" className="form-group__input" value={name} maxLength={50} required onChange={(event) => setName(event.target.value)} />
           <p>La sala y sus copias se mantienen en los navegadores conectados.</p>
-          <button type="submit" className="btn btn--primary">Entrar</button>
-          <button type="button" className="leader-exit-modal__cancel-btn" onClick={onLeave}>Volver</button>
+          <Button variant="primary" type="submit" className="btn btn--primary">Entrar</Button>
+          <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" onClick={onLeave}>Volver</Button>
         </form>
       </main>
     );
@@ -193,8 +194,8 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
       {!view.error && <Loader2 size={40} className="animate-spin room-loading__icon" />}
       <p className="room-loading__text" role="status">{view.status}</p>
       {view.error && <p role="alert">{view.error}</p>}
-      {view.error && <button type="button" className="btn btn--primary" onClick={() => setConnectionAttempt((value) => value + 1)}>Reintentar conexión</button>}
-      <button type="button" className="btn btn--primary" onClick={onLeave}>Volver al inicio</button>
+      {view.error && <Button variant="primary" type="button" className="btn btn--primary" onClick={() => setConnectionAttempt((value) => value + 1)}>Reintentar conexión</Button>}
+      <Button variant="primary" type="button" className="btn btn--primary" onClick={onLeave}>Volver al inicio</Button>
     </div>
   );
 
@@ -213,7 +214,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
           <div className="player-container"><div className="player-container__placeholder" role="status">
             <p>Recibiendo el video… {view.fileProgress}%</p>
             <progress max={100} value={view.fileProgress} aria-label="Recepción del video" />
-            <button type="button" className="btn btn--primary" onClick={() => session.retryVideo()}>Reintentar copia</button>
+            <Button variant="primary" type="button" className="btn btn--primary" onClick={() => session.retryVideo()}>Reintentar copia</Button>
           </div></div>
         ) : (
           <VideoPlayer directPlayback roomId={options.roomId} video={video} isLeader={isHost}
@@ -262,7 +263,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
     >
       {(view.error || error || media.mediaError) && <div role="alert" className="meet-error-banner">{view.error || error || media.mediaError}</div>}
       {view.status.includes('relevo') && <div className="reconnect-pill" role="status">{view.status}</div>}
-      {media.mediaConnectionFailed && <div className="meet-error-banner"><button type="button" className="btn btn--primary" onClick={media.retryMediaConnection}>Reconectar micrófonos y cámaras</button></div>}
+      {media.mediaConnectionFailed && <div className="meet-error-banner"><Button variant="primary" type="button" className="btn btn--primary" onClick={media.retryMediaConnection}>Reconectar micrófonos y cámaras</Button></div>}
       <MemberExitModal isOpen={showExit} onClose={() => setShowExit(false)} onConfirmLeave={onLeave} />
       <RoomSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} browserHosted
         youtubeProvider={state.roomSettings?.youtubeProvider}
@@ -284,14 +285,14 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         serverContent={<section className="host-server-settings">
         <div className="settings-section-heading"><h4>Servidor de la sala</h4><p>Tu navegador coordina la sesión. El relevo permite continuar con otro participante si sales.</p></div>
         <div className="settings-summary-grid"><div><small>Conexión</small><strong>{view.status}</strong></div><div><small>Participantes</small><strong>{state.members.length} de 8</strong></div></div>
-        {!isHost && <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => session.requestTakeover()}>Solicitar relevo del servidor</button>}
-        <label className="settings-toggle-row"><span><strong>Relevo automático del servidor</strong><small>Otro participante asume la coordinación cuando el anfitrión se desconecta</small></span><input type="checkbox" checked={state.automaticMigration} disabled={!isHost} onChange={(event) => session.command({ type: 'settings', automaticMigration: event.target.checked, replicateVideo: state.replicateVideo })} /></label>
-        <label className="settings-toggle-row"><span><strong>Copiar el video a los participantes</strong><small>Las copias completas permiten continuar aunque salga el equipo original</small></span><input type="checkbox" checked={state.replicateVideo} disabled={!isHost} onChange={(event) => {
+        {!isHost && <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" onClick={() => session.requestTakeover()}>Solicitar relevo del servidor</Button>}
+        <label className="settings-toggle-row"><span><strong>Relevo automático del servidor</strong><small>Otro participante asume la coordinación cuando el anfitrión se desconecta</small></span><Field type="checkbox" checked={state.automaticMigration} disabled={!isHost} onChange={(event) => session.command({ type: 'settings', automaticMigration: event.target.checked, replicateVideo: state.replicateVideo })} /></label>
+        <label className="settings-toggle-row"><span><strong>Copiar el video a los participantes</strong><small>Las copias completas permiten continuar aunque salga el equipo original</small></span><Field type="checkbox" checked={state.replicateVideo} disabled={!isHost} onChange={(event) => {
           session.command({ type: 'settings', automaticMigration: state.automaticMigration, replicateVideo: event.target.checked });
           if (event.target.checked) session.retryVideo();
         }} /></label>
         <p className="room-settings__box-desc" role="status">{selected?.source === 'file' ? `Copias confirmadas: ${view.replicas}` : 'Los enlaces se reproducen desde su proveedor; Google Drive utiliza el proxy de video.'}</p>
-        {selected?.source === 'file' && <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => session.retryVideo()}>Reintentar copias</button>}
+        {selected?.source === 'file' && <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" onClick={() => session.retryVideo()}>Reintentar copias</Button>}
         <details className="settings-details"><summary>Límites de las salas del navegador</summary><p>Hasta 8 participantes, archivos de 256 MB y los últimos 300 mensajes. Las copias usan memoria y ancho de banda de cada equipo. Mantén la pestaña abierta.</p><p>Si todos salen, la sala termina. El relevo puede tardar unos segundos y algunas redes necesitan un servidor TURN para conectar.</p></details>
       </section>} />
     </RoomLayout>

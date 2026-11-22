@@ -1,3 +1,4 @@
+import { Field, Button } from '../../shared/components/ui';
 import { useEffect, useState } from 'react';
 import { BACKEND_BASE } from '../../services/api';
 
@@ -41,7 +42,7 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
       {availability !== 'unavailable' && (
         <div className={`server-selector__card ${mode === 'external' ? 'is-selected' : ''}`}>
           <label className="server-selector__option">
-            <input type="radio" name="server-mode" value="external" checked={mode === 'external'}
+            <Field type="radio" name="server-mode" value="external" checked={mode === 'external'}
               disabled={availability !== 'available'} onChange={() => onChange('external')} />
             Servidor externo – {serverName}
           </label>
@@ -52,10 +53,10 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
       {availability === 'unavailable' && (
         <p role="status" className="room-settings__box-desc">El servidor externo no está disponible. Se usará el navegador del anfitrión.</p>
       )}
-      {availability === 'unavailable' && <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => setAttempt((value) => value + 1)}>Volver a comprobar</button>}
+      {availability === 'unavailable' && <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" onClick={() => setAttempt((value) => value + 1)}>Volver a comprobar</Button>}
       <div className={`server-selector__card ${mode === 'host' ? 'is-selected' : ''}`}>
         <label className="server-selector__option">
-          <input type="radio" name="server-mode" value="host" checked={mode === 'host'} onChange={() => onChange('host')} />
+          <Field type="radio" name="server-mode" value="host" checked={mode === 'host'} onChange={() => onChange('host')} />
           Navegador del anfitrión
         </label>
         <p className="room-settings__box-desc">Tu equipo coordina video, chat y llamadas, con relevo automático entre participantes. Mantén la pestaña abierta; depende de tu conexión.</p>

@@ -1,3 +1,4 @@
+import { Field, Button } from '../../shared/components/ui';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import type Hls from 'hls.js';
@@ -813,7 +814,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   if (!video) {
     return (
       <div ref={containerRef} className="player-container">
-        <input
+        <Field
           ref={fileInputRef}
           type="file"
           accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,.mkv,.mp4,.webm"
@@ -837,13 +838,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 </div>
               </BottomSheet>
               {!showEmptyPicker && (
-                <button
+                <Button variant="primary"
                   type="button"
                   className="btn btn--primary empty-picker-reopen"
                   onClick={() => setShowEmptyPicker(true)}
                 >
                   <span>{demo ? 'Pegar enlace de Google Drive' : 'Subir video o pegar enlace'}</span>
-                </button>
+                </Button>
               )}
             </>
           ) : (
@@ -873,7 +874,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
     >
-      <input
+      <Field
         ref={fileInputRef}
         type="file"
         accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,.mkv,.mp4,.webm"
@@ -907,7 +908,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           )}
 
           {isLeader && (<>
-            <button
+            <Button variant="unstyled"
               onClick={() => openChangePanel()}
               className="player-change-btn"
               title="Cambiar video: subir archivo o pegar enlace"
@@ -915,15 +916,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             >
               <RefreshCw size={13} className="player-change-btn__icon" />
               <span>Cambiar</span>
-            </button>
-            {onClearVideo && <button type="button" className="player-change-btn" onClick={onClearVideo} title="Quitar video"><span>Quitar</span></button>}
+            </Button>
+            {onClearVideo && <Button variant="unstyled" type="button" className="player-change-btn" onClick={onClearVideo} title="Quitar video"><span>Quitar</span></Button>}
           </>)}
         </div>
       </div>
 
       {/* Mobile-only floating button: opens the "Cambiar video" panel (top bar auto-hides on touch) */}
       {isLeader && !showChangePanel && (
-        <button
+        <Button variant="unstyled"
           onClick={() => openChangePanel()}
           className="player-change-fab"
           title="Cambiar video: subir archivo o pegar enlace"
@@ -932,7 +933,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         >
           <RefreshCw size={13} className="player-change-btn__icon" />
           <span>Cambiar</span>
-        </button>
+        </Button>
       )}
 
       {/* Playback error fallback overlay */}
@@ -955,13 +956,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             {playbackError}
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-            <button onClick={handleRetryStream} className="btn btn--primary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
+            <Button variant="primary" onClick={handleRetryStream} className="btn btn--primary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
               <span>Reintentar</span>
-            </button>
+            </Button>
             {isLeader && (
-              <button onClick={() => openChangePanel()} className="btn btn--primary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
+              <Button variant="primary" onClick={() => openChangePanel()} className="btn btn--primary" style={{ padding: '0.5rem 1rem', fontSize: '0.84rem' }}>
                 <span>Cambiar video (archivo o enlace)</span>
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -1029,14 +1030,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       {/* Badge "Atrasado −Xs · Ir al en vivo" (rol B): seek local, no emite sync */}
       {behindSecs > 3 && (
-        <button
+        <Button variant="unstyled"
           type="button"
           className="player-live-badge"
           onClick={seekToLive}
           title="Saltar al punto en vivo del grupo (solo te afecta a ti)"
         >
           Atrasado −{Math.round(behindSecs)}s · Ir al en vivo
-        </button>
+        </Button>
       )}
 
       {/* Buffering Indicator */}
@@ -1139,13 +1140,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <VideoUploadPicker {...pickerProps} />
             </div>
             <div className="room-settings__actions">
-              <button
+              <Button variant="secondary"
                 type="button"
                 className="leader-exit-modal__cancel-btn"
                 onClick={() => setShowChangePanel(false)}
               >
                 Cancelar
-              </button>
+              </Button>
             </div>
         </BottomSheet>
       )}

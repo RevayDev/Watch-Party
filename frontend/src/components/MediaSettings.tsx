@@ -1,3 +1,4 @@
+import { Button } from '../shared/components/ui';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '../shared/components/BottomSheet';
 
@@ -102,9 +103,9 @@ function DeviceTest({ kind, localStream }: { kind: 'audio' | 'video'; localStrea
     <section className="room-settings__box" aria-label={`Prueba de ${label}`}>
       <h4>{microphone ? 'Micrófono' : 'Cámara'}</h4>
       <p className="room-settings__box-desc">{microphone ? 'Comprueba el nivel de entrada antes de hablar en la sala.' : 'Revisa tu imagen sin compartirla con los participantes.'}</p>
-      <button type="button" className="btn btn--primary" onClick={() => void toggleTest()} disabled={pending}>
+      <Button variant="primary" type="button" className="btn btn--primary" onClick={() => void toggleTest()} disabled={pending}>
         {pending ? 'Esperando permiso…' : stream ? `Detener prueba de ${label}` : `Probar ${label}`}
-      </button>
+      </Button>
       {error && <p role="alert">{error}</p>}
       {stream && (microphone ? (
         <>
@@ -128,7 +129,7 @@ export function MediaSettingsSection({ localStream, onRetry }: {
       <DeviceTest kind="audio" localStream={localStream} />
       <DeviceTest kind="video" localStream={localStream} />
     </div>
-    <button type="button" className="leader-exit-modal__cancel-btn" onClick={onRetry}>Reconectar audio y cámara</button>
+    <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" onClick={onRetry}>Reconectar audio y cámara</Button>
   </>;
 }
 
@@ -138,6 +139,6 @@ export function MediaSettings({ localStream, onClose, onRetry }: {
   return <BottomSheet open onClose={onClose} label="Micrófono y cámara" className="modal-card--settings">
     <h3 className="leader-exit-modal__title">Micrófono y cámara</h3>
     <MediaSettingsSection localStream={localStream} onRetry={onRetry} />
-    <button type="button" className="btn btn--primary" onClick={onClose}>Cerrar</button>
+    <Button variant="primary" type="button" className="btn btn--primary" onClick={onClose}>Cerrar</Button>
   </BottomSheet>;
 }

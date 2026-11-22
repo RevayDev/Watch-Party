@@ -1,3 +1,4 @@
+import { Button } from '../../../shared/components/ui';
 import React from 'react';
 import { Check } from 'lucide-react';
 import { IKickedParticipant } from '../../../types/room';
@@ -43,7 +44,7 @@ export const KickedTab: React.FC<KickedTabProps> = ({
                   {k.banned ? 'Baneado' : 'Expulsado'}
                 </span>
                 <span className="part-float-actions">
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     className="part-float-btn part-float-btn--ok part-float-btn--text"
                     title="Permitir de nuevo (desbanear)"
@@ -58,7 +59,7 @@ export const KickedTab: React.FC<KickedTabProps> = ({
                   >
                     <Check size={13} />
                     Permitir
-                  </button>
+                  </Button>
                 </span>
               </div>
               <span className="part-kicked-sub">por {k.kickedBy}</span>

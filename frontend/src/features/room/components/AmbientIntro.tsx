@@ -1,3 +1,4 @@
+import { Button } from '../../../shared/components/ui';
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { AMBIENT_QUOTES, pickAmbientQuotes } from '../../player/interstellar';
@@ -218,10 +219,10 @@ export const AmbientIntro: React.FC<AmbientIntroProps> = ({ onDone, quotes: shar
       >
         {quotes[quoteIndex]}
       </p>
-      <button type="button" className="ambient-intro__skip" onClick={handleSkip}>
+      <Button variant="unstyled" type="button" className="ambient-intro__skip" onClick={handleSkip}>
         <span>Omitir</span>
         <ArrowRight size={16} aria-hidden="true" />
-      </button>
+      </Button>
     </div>
   );
 };

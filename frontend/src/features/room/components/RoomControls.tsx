@@ -1,3 +1,4 @@
+import { Button, Popover } from '../../../shared/components/ui';
 import React, { useEffect } from 'react';
 import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff, Music } from 'lucide-react';
 import { Reactions } from '../../../components/Reactions';
@@ -113,24 +114,24 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       <div className="meet-bar-group meet-bar-group--left">
       <BarItem label={isMicOn ? 'Silenciar' : 'Activar micrófono'}>
         {/* Mic toggle — green when ON, red when OFF */}
-        <button
+        <Button variant="unstyled"
           onClick={toggleMic}
           className={`meet-circle-btn ${isMicOn ? 'meet-circle-btn--mic-on' : 'meet-circle-btn--off'}`}
           title={isMicOn ? 'Silenciar micrófono' : 'Activar micrófono'}
         >
           {isMicOn ? <Mic size={18} /> : <MicOff size={18} />}
-        </button>
+        </Button>
       </BarItem>
 
       <BarItem label={isCameraOn ? 'Detener video' : 'Iniciar video'}>
         {/* Camera toggle */}
-        <button
+        <Button variant="unstyled"
           onClick={toggleCamera}
           className={`meet-circle-btn ${isCameraOn ? 'meet-circle-btn--on' : 'meet-circle-btn--off'}`}
           title={isCameraOn ? 'Apagar cámara' : 'Activar cámara'}
         >
           {isCameraOn ? <Video size={18} /> : <VideoOff size={18} />}
-        </button>
+        </Button>
       </BarItem>
 
       </div>
@@ -142,13 +143,13 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       <BarItem label="Reacciones">
         {/* Emoji Reactions trigger */}
         <div style={{ position: 'relative' }}>
-          <button
+          <Button variant="unstyled"
             onClick={() => setShowEmojiPicker((v) => !v)}
             className={`meet-circle-btn ${showEmojiPicker ? 'meet-circle-btn--active' : ''}`}
             title="Enviar reacción"
           >
             <Smile size={18} />
-          </button>
+          </Button>
 
 {emojiPresence.shown && (
           <div
@@ -163,18 +164,18 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
 
       <BarItem label="Participantes" className="meet-btn--hide-mobile">
         {/* Participants Drawer Toggle — hidden on mobile (moved to … menu) */}
-        <button
+        <Button variant="unstyled"
           onClick={() => setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
           className={`meet-circle-btn meet-btn--hide-mobile ${activeSideTab === 'participants' ? 'meet-circle-btn--active' : ''}`}
           title="Ver participantes"
         >
           <Users size={18} />
-        </button>
+        </Button>
       </BarItem>
 
       <BarItem label="Chat" className="meet-btn--hide-mobile">
         {/* Chat Drawer Toggle — hidden on mobile (moved to … menu) */}
-        <button
+        <Button variant="unstyled"
           onClick={() => { setActiveSideTab((v) => (v === 'chat' ? null : 'chat')); }}
           className={`meet-circle-btn meet-btn--hide-mobile ${activeSideTab === 'chat' ? 'meet-circle-btn--active' : ''}`}
           title="Chat"
@@ -183,18 +184,18 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
           {unreadCount > 0 && activeSideTab !== 'chat' && (
             <span className="meet-badge-dot" />
           )}
-        </button>
+        </Button>
       </BarItem>
 
       <BarItem label={isRightPanelCollapsed ? 'Mostrar' : 'Ocultar'} className="meet-btn--hide-mobile">
         {/* Toggle Collapse Cameras Strip (Accordion) — hidden on mobile */}
-        <button
+        <Button variant="unstyled"
           onClick={() => setIsRightPanelCollapsed((v) => !v)}
           className={`meet-circle-btn meet-btn--hide-mobile ${isRightPanelCollapsed ? 'meet-circle-btn--active' : ''}`}
           title={isRightPanelCollapsed ? 'Mostrar cámaras laterales' : 'Ocultar cámaras laterales'}
         >
           {isRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
-        </button>
+        </Button>
       </BarItem>
       </div>
 
@@ -202,7 +203,7 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
 
       {/* ⋯ More Menu — visible only on mobile (the only icon-only button besides Share) */}
       <div className="meet-more-wrap" ref={moreMenuRef}>
-        <button
+        <Button variant="unstyled"
           onClick={() => setShowMoreMenu((v) => !v)}
           className={`meet-circle-btn meet-btn--mobile-only ${showMoreMenu ? 'meet-circle-btn--active' : ''}`}
           title="Más opciones"
@@ -212,14 +213,14 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
           {unreadCount > 0 && activeSideTab !== 'chat' && (
             <span className="meet-badge-dot" />
           )}
-        </button>
+        </Button>
 
         {morePresence.shown && (
-          <div
+          <Popover
             className={`meet-more-dropdown ${morePresence.closing ? 'meet-more-dropdown--closing' : ''}`}
             ref={moreSheetRef}
           >
-            <button
+            <Button variant="unstyled"
               className={`meet-more-item ${activeSideTab === 'chat' ? 'meet-more-item--active' : ''}`}
               onClick={() => { setActiveSideTab((v) => v === 'chat' ? null : 'chat'); setShowMoreMenu(false); }}
             >
@@ -228,44 +229,44 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
               {unreadCount > 0 && activeSideTab !== 'chat' && (
                 <span className="meet-more-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
               )}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               className={`meet-more-item ${activeSideTab === 'participants' ? 'meet-more-item--active' : ''}`}
               onClick={() => { setActiveSideTab((v) => v === 'participants' ? null : 'participants'); setShowMoreMenu(false); }}
             >
               <Users size={16} />
               <span>Participantes</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               className="meet-more-item"
               onClick={() => { setIsRightPanelCollapsed((v) => !v); setShowMoreMenu(false); }}
             >
               {isRightPanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
               <span>{isRightPanelCollapsed ? 'Mostrar cámaras' : 'Ocultar cámaras'}</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               className={`meet-more-item ${!uiPinned ? 'meet-more-item--active' : ''}`}
               onClick={() => { toggleBarsVisibility(); setShowMoreMenu(false); }}
             >
               {uiPinned ? <EyeOff size={16} /> : <Eye size={16} />}
               <span>{uiPinned ? 'Ocultar interfaz' : 'Mostrar interfaz'}</span>
-            </button>
+            </Button>
             <div className="meet-more-separator" />
-            <button
+            <Button variant="danger"
               className="meet-more-item meet-more-item--danger"
               onClick={() => { handleLeaveClick(); setShowMoreMenu(false); }}
             >
               <PhoneOff size={16} />
               <span>Salir de la sala</span>
-            </button>
-          </div>
+            </Button>
+          </Popover>
         )}
       </div>
 
       {/* ── Derecha: música ── */}
       <div className="meet-bar-group meet-bar-group--right">
       <BarItem label="Música">
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={onToggleMusic}
           className={`meet-circle-btn meet-circle-btn--music${musicOpen ? ' meet-circle-btn--active' : ''}`}
@@ -273,7 +274,7 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
           aria-label={musicOpen ? 'Cerrar panel de música' : 'Abrir música (YouTube)'}
         >
           <Music size={18} />
-        </button>
+        </Button>
       </BarItem>
       </div>
 
@@ -283,13 +284,13 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
       <div className="meet-bar-group meet-bar-group--end">
       <BarItem label="Salir" className="meet-btn--hide-mobile">
         {/* Leave Call Button — hidden on mobile (available in ⋯ menu), visible on desktop */}
-        <button
+        <Button variant="unstyled"
           onClick={handleLeaveClick}
           className="meet-circle-btn meet-circle-btn--leave meet-btn--hide-mobile"
           title="Salir de la reunión"
         >
           <PhoneOff size={18} />
-        </button>
+        </Button>
       </BarItem>
       </div>
     </footer>

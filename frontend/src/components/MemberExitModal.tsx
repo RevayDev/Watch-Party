@@ -1,3 +1,4 @@
+import { Button } from '../shared/components/ui';
 import React from 'react';
 import { BottomSheet } from '../shared/components/BottomSheet';
 
@@ -28,7 +29,7 @@ export const MemberExitModal: React.FC<MemberExitModalProps> = ({
       </p>
 
       <div className="leader-exit-modal__actions">
-        <button
+        <Button variant="danger"
           type="button"
           onClick={onConfirmLeave}
           className="leader-exit-modal__opt-btn leader-exit-modal__opt-btn--danger"
@@ -36,16 +37,16 @@ export const MemberExitModal: React.FC<MemberExitModalProps> = ({
           <div className="leader-exit-modal__btn-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
             <strong>Sí, salir de la sala</strong>
           </div>
-        </button>
+        </Button>
       </div>
 
-      <button
+      <Button variant="secondary"
         type="button"
         onClick={onClose}
         className="leader-exit-modal__cancel-btn"
       >
         Cancelar
-      </button>
+      </Button>
     </BottomSheet>
   );
 };

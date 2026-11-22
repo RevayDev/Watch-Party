@@ -1,3 +1,4 @@
+import { Button, Surface, AccordionTrigger } from '../../shared/components/ui';
 import React, { useState, useEffect, useRef } from "react";
 import {
   Video,
@@ -276,7 +277,7 @@ export const Home: React.FC<HomeProps> = ({
           </div>
 
           <div className="home-nav__actions">
-            <button
+            <Button variant="ghost" size="sm"
               type="button"
               className="home-nav__btn home-nav__btn--ghost"
               onClick={() => {
@@ -286,8 +287,8 @@ export const Home: React.FC<HomeProps> = ({
               }}
             >
               Unirse
-            </button>
-            <button
+            </Button>
+            <Button variant="primary" size="sm"
               type="button"
               className="home-nav__btn home-nav__btn--primary"
               onClick={() => {
@@ -296,7 +297,7 @@ export const Home: React.FC<HomeProps> = ({
               }}
             >
               Crear sala
-            </button>
+            </Button>
           </div>
         </div>
       </nav>
@@ -335,7 +336,7 @@ export const Home: React.FC<HomeProps> = ({
 
           {/* Clean Action Buttons (Create Popup trigger + Join Popup trigger) */}
           <div className="home-hero-actions">
-            <button
+            <Button variant="primary" size="lg"
               type="button"
               onClick={() => {
                 setShowCreateModal(true);
@@ -344,9 +345,9 @@ export const Home: React.FC<HomeProps> = ({
               className="home-hero-btn home-hero-btn--primary"
             >
               <span>Crear una sala multimedia</span>
-            </button>
+            </Button>
 
-            <button
+            <Button variant="secondary" size="lg"
               type="button"
               onClick={() => {
                 setShowJoinModal(true);
@@ -356,7 +357,7 @@ export const Home: React.FC<HomeProps> = ({
               className="home-hero-btn home-hero-btn--secondary"
             >
               <span>Unirse a una sala</span>
-            </button>
+            </Button>
           </div>
 
           {/* Highlights Mini List */}
@@ -428,13 +429,13 @@ export const Home: React.FC<HomeProps> = ({
           {features.map((feature) => {
             const Icon = feature.icon;
             return (
-              <div className="home-feature-card" key={feature.title}>
+              <Surface className="home-feature-card" key={feature.title}>
                 <span className="home-feature-icon" aria-hidden="true">
                   <Icon size={22} strokeWidth={2} />
                 </span>
                 <h3 className="home-feature-title">{feature.title}</h3>
                 <p className="home-feature-desc">{feature.desc}</p>
-              </div>
+              </Surface>
             );
           })}
         </div>
@@ -453,32 +454,32 @@ export const Home: React.FC<HomeProps> = ({
         </div>
 
         <div className="home-steps-grid">
-          <div className="home-step-card">
+          <Surface className="home-step-card">
             <div className="home-step-number">01</div>
             <h4 className="home-step-title">Crea tu Sala</h4>
             <p className="home-step-desc">
               Haz clic en "Crear una sala multimedia", pon tu nombre y obtendrás
               un código único para tu sesión.
             </p>
-          </div>
+          </Surface>
 
-          <div className="home-step-card">
+          <Surface className="home-step-card">
             <div className="home-step-number">02</div>
             <h4 className="home-step-title">Invita a tus Amigos</h4>
             <p className="home-step-desc">
               Comparte el código de la sala o el enlace directo para que tus
               invitados se unan con un solo clic.
             </p>
-          </div>
+          </Surface>
 
-          <div className="home-step-card">
+          <Surface className="home-step-card">
             <div className="home-step-number">03</div>
             <h4 className="home-step-title">Sube y Disfruta</h4>
             <p className="home-step-desc">
               Carga tu archivo multimedia o pega un enlace, activa tu cámara o
               micrófono y dale al Play juntos.
             </p>
-          </div>
+          </Surface>
         </div>
       </section>
 
@@ -499,7 +500,7 @@ export const Home: React.FC<HomeProps> = ({
           {techStack.map((tech) => {
             const Icon = tech.icon;
             return (
-              <div className="home-tech-card" key={tech.name}>
+              <Surface className="home-tech-card" key={tech.name}>
                 <span className="home-tech-card__icon" aria-hidden="true">
                   <Icon size={19} strokeWidth={2} />
                 </span>
@@ -507,7 +508,7 @@ export const Home: React.FC<HomeProps> = ({
                   <span className="home-tech-card__name">{tech.name}</span>
                   <span className="home-tech-card__role">{tech.role}</span>
                 </div>
-              </div>
+              </Surface>
             );
           })}
         </div>
@@ -546,7 +547,7 @@ export const Home: React.FC<HomeProps> = ({
                     className={`home-timeline__dot home-timeline__dot--${event.tone}`}
                   />
                 </div>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   className={`home-timeline__body home-timeline__body--${event.tone}`}
                   onClick={() => setTimelineEvent(event)}
@@ -558,7 +559,7 @@ export const Home: React.FC<HomeProps> = ({
                     Ver detalles
                     <ArrowRight size={13} strokeWidth={2.4} />
                   </span>
-                </button>
+                </Button>
               </li>
             ))}
           </ol>
@@ -604,7 +605,7 @@ export const Home: React.FC<HomeProps> = ({
           {/* Tarjetas automáticas para móvil */}
           <div className="home-roadmap-cards">
             {roadmapItems.map((item) => (
-              <div className="home-roadmap-card" key={item.title}>
+              <Surface className="home-roadmap-card" key={item.title}>
                 <div className="home-roadmap-card__top">
                   <h4 className="home-roadmap-card__title">{item.title}</h4>
                   <span
@@ -614,7 +615,7 @@ export const Home: React.FC<HomeProps> = ({
                   </span>
                 </div>
                 <p className="home-roadmap-card__desc">{item.desc}</p>
-              </div>
+              </Surface>
             ))}
           </div>
         </div>
@@ -638,16 +639,15 @@ export const Home: React.FC<HomeProps> = ({
               <div
                 key={idx}
                 className={`home-faq-item ${isOpen ? "home-faq-item--open" : ""}`}
-                onClick={() => toggleFaq(idx)}
               >
-                <div className="home-faq-question">
+                <AccordionTrigger expanded={isOpen} controls={`home-faq-answer-${idx}`} onClick={() => toggleFaq(idx)} className="home-faq-question">
                   <span>{faq.q}</span>
                   <span className="home-faq-icon">
                     {isOpen ? <Minus size={18} /> : <Plus size={18} />}
                   </span>
-                </div>
+                </AccordionTrigger>
                 {isOpen && (
-                  <div className="home-faq-answer">
+                  <div id={`home-faq-answer-${idx}`} className="home-faq-answer">
                     <p>{renderFaqAnswer(faq.a)}</p>
                   </div>
                 )}
@@ -666,7 +666,7 @@ export const Home: React.FC<HomeProps> = ({
             registros.
           </p>
           <div className="home-cta-actions">
-            <button
+            <Button variant="primary" size="lg"
               type="button"
               onClick={() => {
                 setShowCreateModal(true);
@@ -675,8 +675,8 @@ export const Home: React.FC<HomeProps> = ({
               className="home-hero-btn home-hero-btn--primary"
             >
               <span>Crear sala ahora</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary" size="lg"
               type="button"
               onClick={() => {
                 setShowJoinModal(true);
@@ -685,7 +685,7 @@ export const Home: React.FC<HomeProps> = ({
               className="home-hero-btn home-hero-btn--secondary"
             >
               <span>Ingresar con código</span>
-            </button>
+            </Button>
           </div>
         </div>
       </section>
@@ -883,7 +883,7 @@ export const Home: React.FC<HomeProps> = ({
 
             <div className="home-footer__col home-footer__col--actions">
               <h4 className="home-footer__heading">Acceso rápido</h4>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 className="home-footer__action"
                 onClick={() => {
@@ -892,8 +892,8 @@ export const Home: React.FC<HomeProps> = ({
                 }}
               >
                 Crear una sala
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 type="button"
                 className="home-footer__action"
                 onClick={() => {
@@ -903,7 +903,7 @@ export const Home: React.FC<HomeProps> = ({
                 }}
               >
                 Unirse con código
-              </button>
+              </Button>
             </div>
           </div>
 

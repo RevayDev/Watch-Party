@@ -1,3 +1,4 @@
+import { Button } from '../shared/components/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RemotePeer } from '../hooks/useWebRTC';
 
@@ -24,13 +25,13 @@ function RemoteAudioTrack({ track, userName }: { track: MediaStreamTrack; userNa
     <>
       <audio ref={audio} autoPlay onPlaying={() => setBlocked(false)} />
       {blocked && (
-        <button
+        <Button variant="primary"
           type="button"
           className="btn btn--primary"
           onClick={() => audio.current?.play().then(() => setBlocked(false)).catch(() => {})}
         >
           Escuchar a {userName}
-        </button>
+        </Button>
       )}
     </>
   );

@@ -1,3 +1,4 @@
+import { Button, Field } from '../../shared/components/ui';
 import React, { useState, useMemo, useRef } from 'react';
 import { IParticipant } from '../../types/room';
 import { RoomTab } from './components/RoomTab';
@@ -153,31 +154,31 @@ export const Participants: React.FC<ParticipantsProps> = ({
       <div className="part-main-panel">
         {/* Top 3 Navigation Tabs */}
         <div className="part-tabs">
-          <button
+          <Button variant="unstyled"
             className={`part-tab ${activeTab === 'room' ? 'part-tab--active' : ''}`}
             onClick={() => setActiveTab('room')}
           >
             <span>Sala ({participants.length})</span>
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             className={`part-tab ${activeTab === 'requests' ? 'part-tab--active' : ''}`}
             onClick={() => setActiveTab('requests')}
           >
             <span>Solicitudes  ({joinRequests.length})</span>
            
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             className={`part-tab ${activeTab === 'kicked' ? 'part-tab--active' : ''}`}
             onClick={() => setActiveTab('kicked')}
           >
             <span>Expulsados ({kickedUsers.length})</span>
-          </button>
+          </Button>
         </div>
 
         {/* Search Input Bar */}
         {activeTab === 'room' && (
           <div className="part-search-wrap">
-            <input
+            <Field
               type="text"
               placeholder="Buscar participante..."
               value={searchQuery}
@@ -185,13 +186,13 @@ export const Participants: React.FC<ParticipantsProps> = ({
               className="part-search-input part-search-input--with-clear"
             />
             {searchQuery && (
-              <button
+              <Button variant="unstyled"
                 className="part-search-clear"
                 onClick={() => setSearchQuery('')}
                 title="Limpiar búsqueda"
               >
                 ×
-              </button>
+              </Button>
             )}
           </div>
         )}

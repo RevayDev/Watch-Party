@@ -1,3 +1,4 @@
+import { Button } from './ui';
 import React, {
   useCallback,
   useEffect,
@@ -289,7 +290,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           style={heightStyle}
         >
           {showHandle && (
-            <button
+            <Button variant="unstyled"
               type="button"
               className="sheet-handle sheet__grip"
               onClick={() => onCloseRef.current()}

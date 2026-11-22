@@ -1,3 +1,4 @@
+import { Button, Field } from '../../shared/components/ui';
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { DEMO_UPLOAD_DISABLED_MESSAGE, isDemoMode } from '../../shared/demo';
@@ -47,7 +48,7 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
   return (
     <>
       <div className="dropzone-tabs">
-        <button
+        <Button variant="unstyled"
           type="button"
           className={`dropzone-tab-btn ${activeTab === 'upload' ? 'dropzone-tab-btn--active' : ''}`}
           onClick={() => setActiveTab('upload')}
@@ -57,14 +58,14 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
           data-testid="demo-upload-tab"
         >
           <span>Subir Archivo</span>
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           type="button"
           className={`dropzone-tab-btn ${activeTab === 'url' ? 'dropzone-tab-btn--active' : ''}`}
           onClick={() => setActiveTab('url')}
         >
           <span>{demo ? 'Pegar enlace de Google Drive' : 'Enlace Web / HLS'}</span>
-        </button>
+        </Button>
       </div>
       {demo && (
         <p
@@ -87,19 +88,19 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
           <div className="dropzone-box__subtitle">
             Arrastra tu archivo aquí o haz clic (.mp4, .mkv, .webm)
           </div>
-          <button
+          <Button variant="primary"
             type="button"
             className="btn btn--primary"
             style={{ marginTop: '0.25rem', padding: '0.5rem 1.25rem', fontSize: '0.84rem' }}
           >
             Seleccionar de mi PC
-          </button>
+          </Button>
         </div>
       ) : (
         <form onSubmit={onUrlSubmit} className="dropzone-url-card">
           <div className="dropzone-input-group">
             <label>Enlace del video, karaoke o transmisión:</label>
-            <input
+            <Field
               type="url"
               required
               placeholder="https://... YouTube, Google Drive o playlist.m3u8"
@@ -110,7 +111,7 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
           </div>
           <div className="dropzone-input-group">
             <label>Título del archivo (opcional):</label>
-            <input
+            <Field
               type="text"
               placeholder="Ej: Bohemian Rhapsody (Karaoke Version)"
               className="dropzone-input"
@@ -125,7 +126,7 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
             <span>✓ Compatible con transmisiones HLS (.m3u8) y URLs directas (.mp4)</span>
           </div>
 
-          <button
+          <Button variant="primary"
             type="submit"
             disabled={isSubmittingUrl || !urlInput.trim()}
             className="btn btn--primary"
@@ -139,7 +140,7 @@ export const VideoUploadPicker: React.FC<VideoUploadPickerProps> = ({
             ) : (
               'Transmitir Enlace en la Sala'
             )}
-          </button>
+          </Button>
         </form>
       )}
     </>
