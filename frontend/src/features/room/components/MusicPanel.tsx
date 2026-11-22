@@ -254,7 +254,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             <input
               type="text"
               className="room-settings__input"
-              placeholder="Pega enlace de YouTube (ej: https://youtu.be/...)"
+              placeholder=""
               value={ytInput}
               onChange={(e) => {
                 setYtInput(e.target.value);

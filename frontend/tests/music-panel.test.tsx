@@ -126,7 +126,7 @@ describe('MusicPanel (YouTube, sin banner, audible)', () => {
   it('rechaza enlaces que no son de YouTube', async () => {
     render(<MusicPanel {...baseProps()} />);
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText(/enlace de youtube/i), {
+      fireEvent.change(screen.getAllByRole('textbox')[0], {
         target: { value: 'https://example.com/cosa' },
       });
     });
@@ -140,7 +140,7 @@ describe('MusicPanel (YouTube, sin banner, audible)', () => {
     const onAddUrl = vi.fn(async () => true);
     render(<MusicPanel {...baseProps({ onAddUrl })} />);
     await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText(/enlace de youtube/i), {
+      fireEvent.change(screen.getAllByRole('textbox')[0], {
         target: { value: 'https://youtu.be/PW6ZSzdjrlo' },
       });
     });
@@ -161,7 +161,7 @@ describe('MusicPanel (YouTube, sin banner, audible)', () => {
     expect(screen.getByRole('button', { name: /pausar/i })).toBeDefined();
   });
 
-  it.skip('muestra la tarjeta vacía sin montar un iframe cuando no hay música', () => {
+  it.skip('muestra la tarjeta vacï¿½a sin montar un iframe cuando no hay mï¿½sica', () => {
     const { container } = render(<MusicPanel {...baseProps()} />);
     expect(screen.queryByTestId('yt-miniplayer')).toBeNull();
     expect(container.querySelector('.music-panel__footer')).toBeTruthy();
