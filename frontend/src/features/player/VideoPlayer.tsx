@@ -118,6 +118,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const [showChangePanel, setShowChangePanel] = useState(false);
+  const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
 
   // Empty-state picker: on phones it opens as a bottom sheet (like the "Cambiar" modal)
   const [showEmptyPicker, setShowEmptyPicker] = useState(true);
@@ -137,6 +138,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const suppressUntilRef = useRef(0);
   const videoReadySentForRef = useRef<string | null>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // The host mode must never wait for or route media through a sleeping Render
+  // service. Normal rooms probe it once and fall back to the source URL when it
+  // is unavailable.
+  useEffect(() => {
+    const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+    if (directPlayback || !configured) { setBackendAvailable(false); return; }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 2000);
+    fetch(`${configured}/api/health`, { signal: controller.signal, cache: 'no-store' })
+      .then(response => response.ok)
+      .catch(() => false)
+      .then(available => { if (!controller.signal.aborted) setBackendAvailable(available); })
+      .finally(() => window.clearTimeout(timeout));
+    return () => { controller.abort(); window.clearTimeout(timeout); };
+  }, [directPlayback]);
 
   // Global player keyboard shortcuts (Space, F, M, Arrows) with input protection
   useEffect(() => {
@@ -346,7 +363,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const isExternal = (videoSourceType === 'url' || videoSourceType === 'hls') && !!videoDirectUrl;
     // External URLs go through the backend CORS proxy so hls.js/XHR are not blocked
     const driveDownload = videoDirectUrl ? googleDriveDownload(videoDirectUrl) : null;
-    const videoSrc = directPlayback && videoDirectUrl && !driveDownload ? videoDirectUrl : isExternal
+    const videoSrc = directPlayback || backendAvailable === false
+      ? (driveDownload ?? videoDirectUrl ?? `${backendBase}/api/rooms/${roomId}/video/stream`)
+      : isExternal
       ? `${backendBase}/api/proxy?url=${encodeURIComponent(driveDownload ?? videoDirectUrl!)}`
       : `${backendBase}/api/rooms/${roomId}/video/stream`;
 
@@ -453,7 +472,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hlsInstanceRef.current = null;
       }
     };
-  }, [directPlayback, videoSourceType, videoDirectUrl, videoFileName, roomId, retryToken]);
+  }, [directPlayback, backendAvailable, videoSourceType, videoDirectUrl, videoFileName, roomId, retryToken]);
 
   // Apply incoming remote sync actions with latency compensation and smooth tolerance.
   // Anti-bucle (Rol A): el play de consenso/autoplay SOLO dispara `play`,
@@ -685,8 +704,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleVideoElementError = () => {
     if (playbackError) return;
-    if (directPlayback && video?.directUrl && googleDriveDownload(video.directUrl)) {
-      setPlaybackError('No se pudo reproducir Google Drive. En salas host (sin backend) descarga el archivo y compartelo desde tu PC. En salas normales, comprueba que VITE_API_URL apunte al backend HTTPS y el archivo sea publico.');
+    if (backendAvailable === false && video?.directUrl && googleDriveDownload(video.directUrl)) {
+      setPlaybackError('El servidor externo no está disponible y Google Drive no permite reproducir este enlace directamente. Usa un enlace directo HTTPS o comparte el archivo desde tu PC.');
       return;
     }
     const kind = describeVideoSource();
