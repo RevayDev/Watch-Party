@@ -8,7 +8,12 @@ const startupSchema = z.object({
   ),
   MONGODB_URI: z.preprocess(
     (value) => value === '' || value === undefined ? defaultMongoUri : value,
-    z.string().refine((value) => /^mongodb(?:\+srv)?:\/\/\S+$/.test(value)),
+    // Mongo is optional: the repository intentionally falls back to memory
+    // when the database is unavailable. A malformed Render value must not
+    // turn that recoverable condition into a boot loop.
+    z.string().trim().transform((value) =>
+      /^mongodb(?:\+srv)?:\/\/\S+$/.test(value) ? value : defaultMongoUri
+    ),
   ),
 });
 
