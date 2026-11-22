@@ -92,7 +92,11 @@ describe('MusicPanel (YouTube, sin banner, audible)', () => {
       fireEvent.change(screen.getByRole('searchbox'), { target: { value: ' Queen ' } });
       fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Añadir Bohemian Rhapsody a la cola' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Ver en sala' }));
+      expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('');
+      expect(screen.queryByRole('list', { name: 'Resultados de YouTube' })).toBeNull();
+      fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Queen' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Ver en sala' }));
       expect(search).toHaveBeenCalledWith('Queen', expect.any(AbortSignal));
       expect(onAdd).toHaveBeenCalledWith(track);
       expect(onExpandToMain).toHaveBeenCalledWith(track.openUrl, track.name);

@@ -95,6 +95,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         });
       }
       setYtInput('');
+      setInputError('');
     } catch (err: any) {
       setInputError(err?.message || 'Error al agregar a la cola');
     } finally {
@@ -243,7 +244,8 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   };
 
   return (
-    <div className="drawer-chat__messages" aria-label="Música y Karaoke de YouTube" style={{ padding: '0.85rem', position: 'relative', minHeight: '400px' }}>
+    <div className="music-panel" aria-label="Música y Karaoke de YouTube">
+      <div className="music-panel__content">
       {allowAdd && <YouTubeSearch onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
       {/* Formulario para agregar canciones/karaokes de YouTube */}
       {allowAdd ? (
@@ -291,28 +293,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       )}
 
       {/* El reproductor "Sonando ahora" va debajo de la tarjeta de cola (diseño mockup). */}
-
-      {/* Cola con temas pero nada sonando: cualquiera puede arrancar */}
-      {!nowPlaying && active.length > 0 && (
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={onNext}
-          title="Empezar a reproducir la cola"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.45rem',
-            width: '100%',
-            marginBottom: '1rem',
-            padding: '0.6rem',
-          }}
-        >
-          <Play size={16} />
-          Reproducir ({active.length})
-        </button>
-      )}
 
       {/* Pendientes de aprobación (moderador) */}
       {isModerator && pending.length > 0 && (
@@ -656,42 +636,22 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         )}
       </div>
 
-      {/* Reproductor "Sonando ahora" fijo en el fondo del panel */}
-      {nowPlaying && nowVideoId ? (
-        <div style={{
-          position: 'absolute',
-          bottom: 0.5,
-          left: 0.85,
-          right: 0.85,
-          zIndex: 10,
-        }}>
-          <div
-            className="room-settings__box"
-            style={{
-              padding: '0.85rem',
-              border: '1px solid rgba(139, 92, 246, 0.22)',
-              background: 'rgba(15, 20, 35, 0.55)',
-              borderRadius: 12,
-            }}
-          >
-            <NowPlayingPlayer
-              trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
-              videoId={nowVideoId}
-              title={nowPlaying.name}
-              subtitle={`${nowPlaying.artists || 'YouTube Music'} · propuesto por ${nowPlaying.proposedBy}`}
-              thumb={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
-              onEnded={onAutoNext}
-              onNext={onNext}
-              onStop={onStop}
-              onExpand={() => {
-                const url = nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`;
-                if (url) onExpandToMain(url, nowPlaying.name);
-              }}
-              showModerator={isModerator}
-            />
-          </div>
-        </div>
-      ) : null}
+      </div>
+      <div className="room-settings__box music-panel__footer">
+        {nowPlaying && nowVideoId ? <NowPlayingPlayer
+          trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
+          videoId={nowVideoId} title={nowPlaying.name}
+          subtitle={`${nowPlaying.artists || 'YouTube Music'} · propuesto por ${nowPlaying.proposedBy}`}
+          thumb={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
+          onEnded={onAutoNext} onNext={onNext} onStop={onStop}
+          onExpand={() => onExpandToMain(nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`, nowPlaying.name)}
+          showModerator={isModerator}
+        /> : <div className="music-player-empty">
+          <div className="music-player-empty__art" aria-hidden="true"><Disc size={28} /></div>
+          <div className="music-player-empty__info"><strong>Sin reproducción</strong><span>Añade una canción para empezar</span></div>
+          <button type="button" className="music-player-empty__play" aria-label="Reproducir cola" disabled={!isModerator || active.length === 0} onClick={onNext}><Play size={20} /></button>
+        </div>}
+      </div>
     </div>
   );
 };

@@ -11,6 +11,8 @@ import { useSheetDrag } from '../hooks/useSheetDrag';
 export type SheetHeight = 'auto' | 'half' | 'full' | number;
 
 export interface BottomSheetProps {
+  /** Preserve media playback while the sheet is hidden. */
+  keepMounted?: boolean;
   /** Controls visibility. The sheet owns enter/exit animations internally. */
   open: boolean;
   /** Called for every dismissal: backdrop tap, Esc, handle tap, drag fling. */
@@ -117,6 +119,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   role = 'dialog',
   label,
   zIndex = 1000,
+  keepMounted = false,
 }) => {
   const isPhone = useIsPhone();
   const [mounted, setMounted] = useState(open);
@@ -231,7 +234,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     };
   }, [mounted, isModal]);
 
-  if (!mounted) return null;
+  if (!mounted && !keepMounted) return null;
 
   const labelledBy =
     !label && (typeof title === 'string' || typeof title === 'number')
@@ -243,6 +246,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     const firstToken = desktopClassName.split(' ').filter(Boolean)[0] ?? '';
     return (
       <div
+        hidden={!mounted}
+        style={!mounted ? { display: 'none' } : undefined}
         className={`${desktopClassName}${closing && firstToken ? ` ${firstToken}--closing` : ''}`}
       >
         {children}
@@ -264,7 +269,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const showExit = closing && !noExit;
 
   return createPortal(
-    <div className="sheet-root" style={{ zIndex }}>
+    <div className="sheet-root" hidden={!mounted} style={{ zIndex, ...(!mounted ? { display: 'none' } : {}) }}>
       <div
         ref={backdropRef}
         className={`sheet__backdrop${showExit ? ' sheet__backdrop--closing' : ''}`}

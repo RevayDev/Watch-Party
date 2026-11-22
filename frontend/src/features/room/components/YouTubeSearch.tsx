@@ -19,6 +19,15 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
 
   useEffect(() => () => request.current?.abort(), []);
 
+  function resetSearch() {
+    request.current?.abort();
+    request.current = null;
+    setQuery('');
+    setTracks(null);
+    setError('');
+    setLoading(false);
+  }
+
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const term = query.trim();
@@ -30,13 +39,14 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
     setError('');
     setLoading(true);
     try {
-      setTracks(await (provider ? ApiService.youtubeSearch(term, controller.signal, provider) : ApiService.youtubeSearch(term, controller.signal)));
+      const results = await (provider ? ApiService.youtubeSearch(term, controller.signal, provider) : ApiService.youtubeSearch(term, controller.signal));
+      if (!controller.signal.aborted && request.current === controller) setTracks(results);
     } catch (err) {
       if (!controller.signal.aborted) {
         setError(err instanceof Error ? err.message : 'No se pudo buscar en YouTube.');
       }
     } finally {
-      request.current = null;
+      if (request.current === controller) request.current = null;
       if (!controller.signal.aborted) setLoading(false);
     }
   }
@@ -51,7 +61,7 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
           placeholder="Busca una canción, video o karaoke"
           maxLength={100}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => event.target.value ? setQuery(event.target.value) : resetSearch()}
         />
         <button type="submit" className="btn btn--primary" disabled={loading || query.trim().length < 2}>
           <Search size={16} aria-hidden="true" /> Buscar
@@ -72,11 +82,11 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
                   <span>{track.artists}</span>
                 </div>
                 <div className="youtube-search__actions">
-                  <button type="button" className="btn btn--primary" onClick={() => onAdd(track)} aria-label={`Añadir ${track.name} a la cola`}>
+                  <button type="button" className="btn btn--primary" onClick={() => { onAdd(track); resetSearch(); }} aria-label={`Añadir ${track.name} a la cola`}>
                     <Plus size={15} aria-hidden="true" /> A la cola
                   </button>
                   {onPlay && url && (
-                    <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => onPlay(url, track.name)}>
+                    <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => { onPlay(url, track.name); resetSearch(); }}>
                       Ver en sala
                     </button>
                   )}

@@ -92,6 +92,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
 
   return (
     <BottomSheet
+      keepMounted
       open={!!activeSideTab}
       onClose={() => setActiveSideTab(null)}
       variant="inline"
@@ -120,7 +121,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
           </button>
         </div>
 
-        {currentTab === 'chat' && (
+        {activeSideTab === 'chat' && (
           <Chat
             isOpen={activeSideTab === 'chat'}
             messages={messages}
@@ -209,7 +210,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             }}
           />
         )}
-        {currentTab === 'music' && (
+        <div className="meet-drawer__music" style={{ display: currentTab === 'music' ? 'flex' : 'none' }}>
           <MusicPanel
             roomId={roomId}
             queue={musicQueue}
@@ -228,7 +229,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onStop={onMusicStop}
             onExpandToMain={onExpandToMain}
           />
-        )}
+        </div>
       </div>
     </BottomSheet>
   );

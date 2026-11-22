@@ -7991,3 +7991,7 @@ a.home-faq-hl--frontend {
 .music-player-empty__info span { color: #94a3b8; font-size: .75rem; line-height: 1.5; }
 .music-player-empty__play { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); color: #e2e8f0; background: rgba(255,255,255,.08); cursor: pointer; }
 .music-player-empty__play:disabled { opacity: .35; cursor: default; }
+
+.meet-drawer__body { min-height: 0; }
+.meet-drawer__music { flex: 1; min-height: 0; overflow: hidden; flex-direction: column; }
+.music-panel__footer { position: relative; z-index: 1; padding: 16px !important; background: var(--sheet-bg) !important; }
