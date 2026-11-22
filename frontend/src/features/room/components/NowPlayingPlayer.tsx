@@ -1,4 +1,4 @@
-import { Button, Range } from '../../../shared/components/ui';
+import { Button, Range, Popover } from '../../../shared/components/ui';
 import React, { useEffect, useRef, useState } from 'react';
 import { AudioLines, Maximize2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, Youtube, Square } from 'lucide-react';
 import { YouTubePlayerView } from '../../player/YouTubePlayerView';
@@ -42,6 +42,8 @@ export const NowPlayingPlayer: React.FC<{
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(80);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  const volumeAnchor = useRef<HTMLButtonElement>(null);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const onEndedRef = useRef(onEnded);
@@ -207,7 +209,7 @@ export const NowPlayingPlayer: React.FC<{
         </div>}
       </div>
       <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
-        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onReady={(player) => { playerRef.current = player; tryPlay(); }} onStateChange={(event) => {
+        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; tryPlay(); }} onStateChange={(event) => {
           if (event.data === 1) { playingRef.current = true; setPlaying(true); }
           else if (event.data === 2) { playingRef.current = false; setPlaying(false); }
           else if (event.data === 0) { setPlaying(false); onEndedRef.current(); }
@@ -221,8 +223,12 @@ export const NowPlayingPlayer: React.FC<{
           <Range className="music-player__range" type="range" min={0} max={Math.max(1, Math.floor(duration))} step={1} value={Math.min(Math.floor(current), Math.max(1, Math.floor(duration)))} onChange={(e) => seekTo(Number(e.target.value))} title="Adelantar o retroceder" aria-label="Adelantar o retroceder" disabled={duration <= 0} style={{ '--range-progress': (duration > 0 ? Math.min(100, current / duration * 100) : 0) + '%' } as React.CSSProperties} />
           <span className="music-player__time">{formatPlayerTime(current)} / {formatPlayerTime(duration)}</span>
         </div>
-        <Button variant="unstyled" type="button" className="music-player__icon" title={muted ? 'Activar sonido' : 'Silenciar'} aria-label={muted ? 'Activar sonido' : 'Silenciar'} onClick={toggleMute}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</Button>
-        <Range className="music-player__range music-player__volume" type="range" min={0} max={100} step={1} value={muted ? 0 : volume} onChange={(e) => changeVolume(Number(e.target.value))} title="Volumen" aria-label="Volumen" style={{ '--range-progress': (muted ? 0 : volume) + '%' } as React.CSSProperties} />
+        <Button ref={volumeAnchor} variant="unstyled" type="button" className="music-player__icon" title="Volumen de música" aria-label="Volumen de música" aria-expanded={volumeOpen} onClick={() => setVolumeOpen(value => !value)}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</Button>
+        {volumeOpen && <Popover placement="top" anchor={volumeAnchor.current} className="music-volume-popup" role="dialog" aria-label="Volumen de música" onDismiss={() => setVolumeOpen(false)}>
+          <span>{muted ? 0 : volume}%</span>
+          <Range className="music-volume-popup__range" min={0} max={100} value={muted ? 0 : volume} onChange={event => changeVolume(Number(event.target.value))} aria-label="Volumen" />
+          <Button variant="unstyled" className="music-player__icon" aria-label={muted ? 'Activar sonido' : 'Silenciar'} onClick={toggleMute}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />}</Button>
+        </Popover>}
       </div>
     </section>
   );

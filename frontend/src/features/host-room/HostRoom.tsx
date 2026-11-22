@@ -1,4 +1,5 @@
 import { ScreenSharingStage } from '../../components/ScreenSharingStage';
+import { MediaConnectionNotice } from '../../components/MediaConnectionNotice';
 import { ConnectionCard } from '../../shared/components/ConnectionCard';
 import { ActionLink, Button, Field } from '../../shared/components/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -277,7 +278,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
     >
       {(view.error || error || media.mediaError) && <div role="alert" className="meet-error-banner">{view.error || error || media.mediaError}</div>}
       {view.status.includes('relevo') && <div className="reconnect-pill" role="status">{view.status}</div>}
-      {media.mediaConnectionFailed && <div className="meet-error-banner"><Button variant="primary" type="button" className="btn btn--primary" onClick={media.retryMediaConnection}>Reconectar micrófonos y cámaras</Button></div>}
+      <MediaConnectionNotice failed={media.mediaConnectionFailed} onRetry={media.retryMediaConnection} />
       <LeaderExitModal browserHosted isOpen={showExit && isHost} participantCount={state.members.length} busy={leaving} error={leaveError} onClose={() => setShowExit(false)} onLeaveOnlyMe={async () => {
         if (leaving) return;
         setLeaving(true); setLeaveError('');

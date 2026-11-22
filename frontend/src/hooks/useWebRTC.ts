@@ -765,7 +765,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
                 console.warn('[WebRTC] No se pudo actualizar el relay de una conexión existente.');
               }
             }
-            if (existing?.connectionState !== 'connected') {
+            if (!existing || existing.connectionState === 'failed' || existing.connectionState === 'disconnected') {
               void sendOffer(p.socketId, p.userName, p.isLeader);
             }
           }

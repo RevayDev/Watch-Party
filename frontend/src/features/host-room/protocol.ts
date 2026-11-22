@@ -26,12 +26,14 @@ const musicEntrySchema = musicTrackSchema.omit({ id: true }).extend({
   id, trackId: id, proposedBy: name, proposedByUserId: id.optional(),
   status: z.enum(['queued', 'pending']), votes: z.array(id).max(MAX_HOST_MEMBERS), createdAt: z.string(),
 });
+const musicSearchSchema = z.object({ id, query: z.string().max(100), tracks: z.array(musicTrackSchema).max(12).nullable() });
 const musicPlayingSchema = musicTrackSchema.omit({ id: true, durationMs: true }).extend({
   playback: z.object({ currentTime: z.number().finite().nonnegative(), playing: z.boolean(), sentAt: z.number().finite() }).optional(),
   entryId: id, trackId: id, proposedBy: name.optional(), proposedByUserId: id.optional(),
   startedAt: z.string(), startedBy: name,
 });
 export const snapshotSchema = z.object({
+  musicSearch: musicSearchSchema.optional(),
   revision: z.number().int().nonnegative(), hostId: id,
   members: z.array(memberSchema).max(MAX_HOST_MEMBERS),
   readReceipts: z.record(z.string(), z.object({ readerId: id, userName: name, messageId: id })).optional(),
@@ -52,6 +54,7 @@ export const snapshotSchema = z.object({
   musicNowPlaying: musicPlayingSchema.nullable().default(null),
 });
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('music-search'), search: musicSearchSchema }),
   z.object({ type: z.literal('music-playback'), entryId: id, currentTime: z.number().finite().nonnegative(), playing: z.boolean() }),
   z.object({ type: z.literal('room-settings'), settings: roomSettingsSchema }),
   z.object({ type: z.literal('chat-delete'), id }),
@@ -116,9 +119,11 @@ export function newHostRoom(name: string): HostRoomOptions {
 
 export function applyHostCommand(state: HostSnapshot, senderId: string, command: HostCommand): HostSnapshot {
   const member = state.members.find((candidate) => candidate.id === senderId);
-  const memberAction = command.type === 'playback' || command.type === 'music-playback' || command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
+  const memberAction = command.type === 'music-search' || command.type === 'playback' || command.type === 'music-playback' || command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
   if (!member || (!memberAction && senderId !== state.hostId)) return state;
   switch (command.type) {
+    case 'music-search':
+      return { ...state, revision: state.revision + 1, musicSearch: command.search };
     case 'music-playback':
       if (state.musicNowPlaying?.entryId !== command.entryId) return state;
       return { ...state, revision: state.revision + 1, musicNowPlaying: { ...state.musicNowPlaying, playback: { currentTime: command.currentTime, playing: command.playing, sentAt: Date.now() } } };

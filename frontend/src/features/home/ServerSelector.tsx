@@ -16,11 +16,11 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
   const serverName = BACKEND_BASE.includes('onrender.com') ? 'Render' : BACKEND_BASE ? 'Servidor configurado' : 'Backend local';
   useEffect(() => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
+    const timeout = setTimeout(() => controller.abort(), import.meta.env.PROD ? 5000 : 2000);
     let active = true;
     setAvailability('checking');
     onAvailability(false);
-    fetch(`${BACKEND_BASE.replace(/\/$/, '')}/api/health`, { signal: controller.signal, cache: 'no-store' })
+    fetch(import.meta.env.PROD ? `/api/backend-status${attempt ? '?refresh=1' : ''}` : `${BACKEND_BASE.replace(/\/$/, '')}/api/health`, { signal: controller.signal, cache: 'no-store' })
       .then(async (response) => {
         const body: unknown = await response.json();
         return response.ok && typeof body === 'object' && body !== null && 'ok' in body && body.ok === true;

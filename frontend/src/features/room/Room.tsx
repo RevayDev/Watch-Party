@@ -1,4 +1,5 @@
 import { ScreenSharingStage } from '../../components/ScreenSharingStage';
+import { MediaConnectionNotice } from '../../components/MediaConnectionNotice';
 import { ConnectionCard } from '../../shared/components/ConnectionCard';
 import { Button } from '../../shared/components/ui';
 import React, { useEffect, useRef, useState } from 'react';
@@ -295,12 +296,7 @@ onVideoReady={r.handleVideoReady}
       />
 
       {r.mediaError && <div className="meet-error-banner">⚠️ {r.mediaError}</div>}
-      {r.mediaConnectionFailed && (
-        <div className="meet-error-banner" role="status">
-          No se pudo conectar el audio y video con algún participante.{' '}
-          <Button variant="primary" type="button" className="btn btn--primary" onClick={r.retryMediaConnection}>Reintentar</Button>
-        </div>
-      )}
+      <MediaConnectionNotice failed={r.mediaConnectionFailed} onRetry={r.retryMediaConnection} />
       {r.lowBandwidth && (
         <div className="meet-error-banner">📶 Señal débil: video pausado, seguís con audio</div>
       )}

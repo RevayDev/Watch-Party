@@ -37,6 +37,7 @@ export function loadYouTubeIframeApi(): Promise<void> {
 export interface YouTubePlayerViewProps {
   videoId: string;
   onReady?: (player: any) => void;
+  onDispose?: (player: any) => void;
   onStateChange?: (event: { data: number }) => void;
   className?: string;
 }
@@ -47,12 +48,15 @@ export interface YouTubePlayerViewProps {
 export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
   videoId,
   onReady,
+  onDispose,
   onStateChange,
   className = 'player-container__video',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
   const onReadyRef = useRef(onReady);
+  const onDisposeRef = useRef(onDispose);
+  onDisposeRef.current = onDispose;
   const onStateChangeRef = useRef(onStateChange);
   onReadyRef.current = onReady;
   onStateChangeRef.current = onStateChange;
@@ -96,6 +100,7 @@ export const YouTubePlayerView: React.FC<YouTubePlayerViewProps> = ({
 
     return () => {
       active = false;
+      onDisposeRef.current?.(playerRef.current);
       try {
         if (playerRef.current?.destroy) {
           playerRef.current.destroy();

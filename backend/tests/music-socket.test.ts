@@ -71,6 +71,19 @@ afterEach(async () => {
 });
 
 describe('music-queue.handler', () => {
+  it('shares searches with members and rejects updates from outside the room', async () => {
+    const registered = new Map<string, (data: unknown) => void>();
+    const socket = { id: 'search-member', on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb), emit: () => {} } as unknown as Socket;
+    const { io, emitted } = makeIo(); registerMusicQueueHandlers(io, socket);
+    const search = { id: 'search', query: 'Song', tracks: [TRACK] };
+    await registered.get('music-search')?.({ roomId, search });
+    expect(emitted).toHaveLength(0);
+    admit(socket.id, roomId, 'Ana');
+    await registered.get('music-search')?.({ roomId, search });
+    expect(emitted.at(-1)).toMatchObject({ room: roomId, event: 'music-search-state', payload: search });
+    await registered.get('music-search')?.({ roomId, search: { id: 'clear', query: '', tracks: null } });
+    expect(emitted.at(-1)?.payload).toEqual({ id: 'clear', query: '', tracks: null });
+  });
   it('broadcasts member music checkpoints, rejects stale tracks and outsiders', async () => {
     const registered = new Map<string, (data: unknown) => void>();
     const socket = { id: 'sync-member', on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb), emit: () => {} } as unknown as Socket;

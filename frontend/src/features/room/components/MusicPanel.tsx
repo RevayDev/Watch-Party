@@ -1,12 +1,14 @@
 import { Button, Field, Surface, Popover, AccordionTrigger } from '../../../shared/components/ui';
 import React, { useState, useRef } from 'react';
 import { Youtube, Plus, Trash2, ArrowUp, ArrowDown, Check, Disc, Play, Pause, SkipForward, Maximize2, ListMusic, MoreVertical, ExternalLink, Square, ChevronDown } from 'lucide-react';
-import type { IMusicNowPlaying, IMusicQueueEntry, IMusicTrack, IRoomSettings } from '../../../types/room';
+import type { IMusicNowPlaying, IMusicQueueEntry, IMusicTrack, IRoomSettings, MusicSearchState } from '../../../types/room';
 import { parseYouTubeUrl } from '../../../shared/youtube';
 import { formatPlayerTime, NowPlayingPlayer } from './NowPlayingPlayer';
 import { YouTubeSearch } from './YouTubeSearch';
 
 export interface MusicPanelProps {
+  sharedSearch?: MusicSearchState;
+  onShareSearch?: (search: MusicSearchState) => void;
   onPlayback?: (entryId: string, currentTime: number, playing: boolean) => void;
   roomId: string;
   queue: IMusicQueueEntry[];
@@ -45,6 +47,7 @@ export function resolveNowPlayingVideoId(
 }
 
 export const MusicPanel: React.FC<MusicPanelProps> = ({
+  sharedSearch, onShareSearch,
   onPlayback,
   queue,
   nowPlaying,
@@ -237,7 +240,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   return (
     <div className="music-panel" aria-label="Música y Karaoke de YouTube">
       <div className="music-panel__content">
-      {allowAdd && <YouTubeSearch onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
+      {allowAdd && <YouTubeSearch sharedSearch={sharedSearch} onShareSearch={onShareSearch} onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
       {/* Formulario para agregar canciones/karaokes de YouTube */}
       {allowAdd ? (
         <form onSubmit={handlePasteSubmit} className="room-settings__box" style={{ padding: '0.85rem', marginBottom: '1rem' }}>

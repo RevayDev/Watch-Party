@@ -1,4 +1,5 @@
 import { Server, Socket } from 'socket.io';
+import { z } from 'zod';
 import { RoomService } from '../../services/room.service.js';
 import { requireModerator } from '../../domain/auth-policy.js';
 import { activeUsers } from '../socket-state.js';
@@ -14,6 +15,11 @@ const VOTE_LIMIT = { max: 30, windowMs: 60_000 };
 const DEFAULT_LIMIT = { max: 20, windowMs: 60_000 };
 const AUTO_NEXT_LIMIT = { max: 10, windowMs: 60_000 };
 const DEDUP_WINDOW_MS = 2_000;
+const sharedSearches = new Map<string, { state: unknown; until: number }>();
+const searchStateSchema = z.object({
+  id: z.string().min(1).max(100), query: z.string().max(100),
+  tracks: z.array(z.object({ id: z.string().min(1).max(100), name: z.string().max(200), artists: z.string().max(200), albumArt: z.string().max(2048).optional(), openUrl: z.string().max(2048).optional(), uri: z.string().max(2048).optional() })).max(12).nullable(),
+});
 
 /**
  * Miembro real de la sala (ni fantasma, ni en espera). Devuelve la identidad
@@ -39,6 +45,19 @@ function cleanRoomIdOf(roomId: unknown): string | null {
 
 /** Handler de la cola musical Spotify. Eventos y payloads según contrato. */
 export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
+  socket.on('request-music-search', (data: { roomId?: string } | undefined) => {
+    const roomId = cleanRoomIdOf(data?.roomId); if (!roomId || !memberOf(socket.id, roomId)) return;
+    const cached = sharedSearches.get(roomId);
+    if (cached && cached.until > Date.now()) socket.emit('music-search-state', cached.state);
+  });
+  socket.on('music-search', (data: { roomId?: string; search?: unknown } | undefined) => {
+    const roomId = cleanRoomIdOf(data?.roomId);
+    if (!roomId || !memberOf(socket.id, roomId) || !checkSocketRateLimit(socket.id, 'music-search', 30, 60000)) return;
+    const parsed = searchStateSchema.safeParse(data?.search); if (!parsed.success) return;
+    if (sharedSearches.size >= 100) sharedSearches.delete(sharedSearches.keys().next().value!);
+    sharedSearches.set(roomId, { state: parsed.data, until: Date.now() + 900000 });
+    io.to(roomId).emit('music-search-state', parsed.data);
+  });
   socket.on('music-playback', async (data: { roomId: string; entryId: string; currentTime: number; playing: boolean } & PrivilegedPayload) => {
     if (!data || typeof data.entryId !== 'string' || data.entryId.length > 100 || !Number.isFinite(data.currentTime) || data.currentTime < 0 || typeof data.playing !== 'boolean') return;
     const roomId = cleanRoomIdOf(data.roomId);

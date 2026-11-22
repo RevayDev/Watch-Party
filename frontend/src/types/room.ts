@@ -139,6 +139,7 @@ export interface IMusicNowPlaying {
   startedAt: string;
   startedBy: string;
 }
+export interface MusicSearchState { id: string; query: string; tracks: IMusicTrack[] | null }
 
 export interface ChatMessage {
   deleted?: boolean;

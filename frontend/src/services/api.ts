@@ -98,7 +98,14 @@ export class ApiService {
    * Demo gratuita: solo conteos de salas (roomsUsed/roomsTotal/roomsAvailable).
    * No expone códigos ni listas. Si falla, el llamador oculta el contador.
    */
-  static async getDemoAvailability(): Promise<DemoAvailability> {    const response = await fetch(`${API_BASE_URL}/demo/availability`);
+  static async getDemoAvailability(): Promise<DemoAvailability> {
+    if (import.meta.env.PROD) {
+      const response = await fetch('/api/backend-status', { signal: AbortSignal.timeout(6000) });
+      const data = await response.json();
+      if (!response.ok || !data.ok || !data.availability) throw new Error('Servidor externo no disponible');
+      return data.availability;
+    }
+    const response = await fetch(`${API_BASE_URL}/demo/availability`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

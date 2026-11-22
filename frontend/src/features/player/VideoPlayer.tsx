@@ -150,9 +150,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (directPlayback || !configured) { setBackendAvailable(false); return; }
     let active = true;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2000);
-    fetch(`${configured}/api/health`, { signal: controller.signal, cache: 'no-store' })
-      .then(response => response.ok)
+    const timeout = window.setTimeout(() => controller.abort(), import.meta.env.PROD ? 5000 : 2000);
+    fetch(import.meta.env.PROD ? '/api/backend-status' : `${configured}/api/health`, { signal: controller.signal, cache: 'no-store' })
+      .then(async response => response.ok && (await response.json()).ok === true)
       .catch(() => false)
       .then(available => { if (active) setBackendAvailable(available); })
       .finally(() => window.clearTimeout(timeout));
@@ -1112,6 +1112,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               key={ytVideoId}
               videoId={ytVideoId}
               className="player-container__video"
+              onDispose={(player) => { if (ytPlayerRef.current === player) ytPlayerRef.current = null; }}
               onReady={(player) => {
                 ytPlayerRef.current = player;
                 setMediaReadyEpoch(value => value + 1);

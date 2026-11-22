@@ -28,3 +28,15 @@ it('publishes local play and seek controls to the room', () => {
  fireEvent.click(screen.getByRole('button', { name: 'Reiniciar canción' }));
  expect(onPlayback).toHaveBeenLastCalledWith(0, true);
 });
+it('opens volume separately without moving or changing the shared music position', () => {
+ const onPlayback = vi.fn();
+ render(<NowPlayingPlayer {...props} onPlayback={onPlayback} />);
+ expect(screen.queryByRole('slider', { name: 'Volumen' })).toBeNull();
+ fireEvent.click(screen.getByRole('button', { name: 'Volumen de música' }));
+ expect(screen.getByRole('dialog', { name: 'Volumen de música' })).toBeTruthy();
+ fireEvent.change(screen.getByRole('slider', { name: 'Volumen' }), { target: { value: '25' } });
+ expect(player.setVolume).toHaveBeenLastCalledWith(25);
+ expect(onPlayback).not.toHaveBeenCalled();
+ fireEvent.keyDown(document, { key: 'Escape' });
+ expect(screen.queryByRole('dialog')).toBeNull();
+});

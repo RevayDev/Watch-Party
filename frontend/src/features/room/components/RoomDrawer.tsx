@@ -5,7 +5,7 @@ import { BottomSheet } from '../../../shared/components/BottomSheet';
 import { Chat } from '../../chat/Chat';
 import { MusicPanel } from './MusicPanel';
 import { Participants } from '../../participants/Participants';
-import type { IRoomData, IMusicQueueEntry, IMusicNowPlaying, IMusicTrack, IRoomSettings, ChatMessage } from '../../../types/room';
+import type { IRoomData, IMusicQueueEntry, IMusicNowPlaying, IMusicTrack, IRoomSettings, ChatMessage, MusicSearchState } from '../../../types/room';
 import { buildSocketAuth } from '../../../shared/utils';
 
 /**
@@ -88,6 +88,17 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   onMusicStop = () => undefined,
   onExpandToMain = () => undefined,
 }) => {
+  const [musicSearch, setMusicSearch] = useState<MusicSearchState>();
+  useEffect(() => {
+    setMusicSearch(undefined);
+    const receive = (data: unknown) => {
+      const state = data as MusicSearchState | null;
+      if (state && typeof state.id === 'string' && typeof state.query === 'string' && (state.tracks === null || Array.isArray(state.tracks))) setMusicSearch(state);
+    };
+    socket.on?.('music-search-state', receive);
+    socket.emit('request-music-search', { roomId });
+    return () => { socket.off?.('music-search-state', receive); };
+  }, [socket, roomId]);
   const [readReceipts, setReadReceipts] = useState<Record<string, { readerId: string; userName: string; messageId: string }>>({});
   useEffect(() => {
     setReadReceipts({});
@@ -229,6 +240,8 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
         )}
         <div className="meet-drawer__music" style={{ display: currentTab === 'music' ? 'flex' : 'none' }}>
           <MusicPanel
+            sharedSearch={musicSearch}
+            onShareSearch={search => socket.emit('music-search', { roomId, search })}
             onPlayback={(entryId, currentTime, playing) => socket.emit('music-playback', { roomId, entryId, currentTime, playing, ...auth() })}
             roomId={roomId}
             queue={musicQueue}

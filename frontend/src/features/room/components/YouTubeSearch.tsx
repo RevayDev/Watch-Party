@@ -2,16 +2,18 @@ import { Field, Button } from '../../../shared/components/ui';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { ApiService } from '../../../services/api';
-import type { IMusicTrack } from '../../../types/room';
+import type { IMusicTrack, MusicSearchState } from '../../../types/room';
 import './YouTubeSearch.css';
 
 interface Props {
+  sharedSearch?: MusicSearchState;
+  onShareSearch?: (search: MusicSearchState) => void;
   provider?: string;
   onAdd: (track: IMusicTrack) => void;
   onPlay?: (url: string, title: string) => void;
 }
 
-export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
+export function YouTubeSearch({ sharedSearch, onShareSearch, onAdd, onPlay, provider }: Props) {
   const [query, setQuery] = useState('');
   const [tracks, setTracks] = useState<IMusicTrack[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -19,6 +21,11 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
   const request = useRef<AbortController | null>(null);
 
   useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    if (!sharedSearch) return;
+    request.current?.abort(); request.current = null;
+    setQuery(sharedSearch.query); setTracks(sharedSearch.tracks); setError(''); setLoading(false);
+  }, [sharedSearch?.id]);
 
   function resetSearch() {
     request.current?.abort();
@@ -27,6 +34,7 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
     setTracks(null);
     setError('');
     setLoading(false);
+    onShareSearch?.({ id: crypto.randomUUID(), query: '', tracks: null });
   }
 
   async function search(event: FormEvent<HTMLFormElement>) {
@@ -41,7 +49,10 @@ export function YouTubeSearch({ onAdd, onPlay, provider }: Props) {
     setLoading(true);
     try {
       const results = await (provider ? ApiService.youtubeSearch(term, controller.signal, provider) : ApiService.youtubeSearch(term, controller.signal));
-      if (!controller.signal.aborted && request.current === controller) setTracks(results);
+      if (!controller.signal.aborted && request.current === controller) {
+        setTracks(results);
+        onShareSearch?.({ id: crypto.randomUUID(), query: term, tracks: results });
+      }
     } catch (err) {
       if (!controller.signal.aborted) {
         setError(err instanceof Error ? err.message : 'No se pudo buscar en YouTube.');

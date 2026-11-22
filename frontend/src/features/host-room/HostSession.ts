@@ -54,6 +54,7 @@ export class HostSession implements WebRTCTransport {
   private offlineSince = new Map<string, number>();
   private pendingChat = new Map<string, Extract<HostCommand, { type: 'chat' }>>();
   private pendingPlayback = new Map<string, HostCommand>();
+  private pendingMusic: HostCommand[] = [];
   private fileUrl: string | null = null;
   private fileId: string | null = null;
   private fileProgress = 0;
@@ -100,6 +101,7 @@ export class HostSession implements WebRTCTransport {
   }
   private notify() {
     if (this.stopped) return;
+    if (this.state?.musicSearch) this.publish('music-search-state', this.state.musicSearch);
     this.publish('chat-read-state', this.state?.readReceipts ?? {});
     this.update({
       id: this.id, state: this.state, status: this.status, error: this.error,
@@ -405,6 +407,7 @@ export class HostSession implements WebRTCTransport {
       const host = this.connections.get(this.state.hostId);
       if (!host?.open) {
         if (parsed.data.type === 'playback' || parsed.data.type === 'music-playback') this.pendingPlayback.set(parsed.data.type, parsed.data);
+        else if (parsed.data.type.startsWith('music-') && this.pendingMusic.length < 40) this.pendingMusic.push(parsed.data);
         this.error = 'Esperando el relevo del servidor. Los mensajes pendientes se enviarán al reconectar.';
         this.notify();
         return;
@@ -416,7 +419,12 @@ export class HostSession implements WebRTCTransport {
   private flushChat() {
     if (!this.state) return;
     const host = this.connections.get(this.state.hostId);
-    if (host?.open) {
+    if (this.isHost) {
+      for (const command of [...this.pendingMusic, ...this.pendingPlayback.values()]) this.state = applyHostCommand(this.state, this.id, command);
+      this.pendingMusic = []; this.pendingPlayback.clear();
+    } else if (host?.open) {
+      for (const command of this.pendingMusic) this.send(host, { type: 'command', command });
+      this.pendingMusic = [];
       for (const command of this.pendingPlayback.values()) this.send(host, { type: 'command', command });
       this.pendingPlayback.clear();
     }
@@ -449,6 +457,12 @@ export class HostSession implements WebRTCTransport {
     const serialized: unknown = JSON.parse(JSON.stringify(data));
     if (!serialized || typeof serialized !== 'object' || Array.isArray(serialized)) return;
     const payload = serialized as Record<string, unknown>;
+    if (event === 'request-music-search') { if (this.state.musicSearch) this.publish('music-search-state', this.state.musicSearch); return; }
+    if (event === 'music-search') {
+      const parsed = commandSchema.safeParse({ ...payload, type: 'music-search' });
+      if (parsed.success) this.command(parsed.data);
+      return;
+    }
     if (event === 'music-playback') {
       const parsed = commandSchema.safeParse({ ...payload, type: 'music-playback' });
       if (parsed.success) this.command(parsed.data);
@@ -675,6 +689,7 @@ export class HostSession implements WebRTCTransport {
     this.files.clear();
     this.pendingChat.clear();
     this.pendingPlayback.clear();
+    this.pendingMusic = [];
     this.incoming.clear();
     if (this.fileUrl) URL.revokeObjectURL(this.fileUrl);
     this.listeners.clear();

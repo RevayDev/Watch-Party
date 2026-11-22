@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode, type CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, GripVertical, RefreshCw, X } from 'lucide-react';
 import { Button } from '../../shared/components/ui';
 import { nearestDockEdge, type DockEdge } from './dockPosition';
@@ -9,19 +9,36 @@ export function PlayerActionDock({ onChange, onClear, children }: { onChange?: (
  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
  const [edge, setEdge] = useState<DockEdge>('top');
  const [anchor, setAnchor] = useState<CSSProperties>({ left: '50%', top: 0, transform: 'translateX(-50%)' });
+ const attached = useRef<DockEdge | null>(null);
+ useLayoutEffect(() => {
+  const el = root.current, parent = el?.parentElement;
+  if (!el || !parent || !position || collapsed) return;
+  const clamp = () => setPosition(previous => {
+    if (!previous) return previous;
+    const left = attached.current === 'right' ? Math.max(0, parent.clientWidth - el.offsetWidth) : Math.min(previous.left, Math.max(0, parent.clientWidth - el.offsetWidth));
+    const top = attached.current === 'bottom' ? Math.max(0, parent.clientHeight - el.offsetHeight) : Math.min(previous.top, Math.max(0, parent.clientHeight - el.offsetHeight));
+    return left === previous.left && top === previous.top ? previous : { left, top };
+  });
+  clamp();
+  if (typeof ResizeObserver === 'undefined') return;
+  const observer = new ResizeObserver(clamp); observer.observe(parent); observer.observe(el);
+  return () => observer.disconnect();
+ }, [collapsed, !!position]);
  const move = (left: number, top: number) => {
   const el = root.current, parent = el?.parentElement; if (!el || !parent) return;
   const x = Math.max(0, Math.min(left, parent.clientWidth - el.offsetWidth));
   const y = Math.max(0, Math.min(top, parent.clientHeight - el.offsetHeight));
   setPosition({ left: x, top: y });
-  setEdge(nearestDockEdge(x, y, el.offsetWidth, el.offsetHeight, parent.clientWidth, parent.clientHeight));
+  const nearest = nearestDockEdge(x, y, el.offsetWidth, el.offsetHeight, parent.clientWidth, parent.clientHeight);
+  attached.current = Math.min(x, y, parent.clientWidth - x - el.offsetWidth, parent.clientHeight - y - el.offsetHeight) <= 12 ? nearest : null;
+  setEdge(nearest);
  };
  const fold = () => {
   if (collapsed) { setCollapsed(false); return; }
   const el = root.current, parent = el?.parentElement; if (!el || !parent) return;
   const rect = el.getBoundingClientRect(), box = parent.getBoundingClientRect();
   const x = rect.left - box.left, y = rect.top - box.top;
-  const closest = nearestDockEdge(x, y, el.offsetWidth, el.offsetHeight, parent.clientWidth, parent.clientHeight);
+  const closest = attached.current ?? nearestDockEdge(x, y, el.offsetWidth, el.offsetHeight, parent.clientWidth, parent.clientHeight);
   setEdge(closest);
   const centerX = Math.max(0, Math.min(x + el.offsetWidth / 2 - 18, parent.clientWidth - 36));
   const centerY = Math.max(0, Math.min(y + el.offsetHeight / 2 - 20, parent.clientHeight - 40));

@@ -9,6 +9,7 @@ esta clave solo debe estar disponible en la función del servidor. Aplica la
 variable a los entornos necesarios y realiza un nuevo despliegue.
 
 - `GET /api/youtube/status`: indica si hay una clave configurada, sin revelarla.
+- `GET /api/backend-status`: comprueba Render desde Vercel y devuelve disponibilidad sin peticiones CORS desde el navegador. Usa `ROOM_BACKEND_URL` o, si falta, `VITE_API_URL`. Un backend apagado devuelve `{ ok: false }`.
 - `GET /api/youtube/search?q=consulta`: busca y devuelve `{ tracks: [...] }`.
 - `GET /api/proxy?url=URL_DE_DESCARGA_DRIVE`: entrega rangos de hasta 4 MiB.
 
@@ -30,3 +31,7 @@ restricciones de permisos, cuota, archivos privados ni bloqueos de Google.
 Estos servicios consumen cuota de YouTube y transferencia/ejecución de Vercel;
 no garantizan uso ilimitado gratuito. Las películas no se almacenan en Vercel.
 Las reglas SPA excluyen `/api/` para evitar devolver `index.html` a estas peticiones.
+
+Para las salas externas, Render también debe permitir el origen real de la web
+en `CLIENT_URL` (por ejemplo `https://watch-party-irving.vercel.app`). El auxiliar
+de estado no reemplaza la configuración CORS del Socket.IO del servidor de salas.

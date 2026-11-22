@@ -277,3 +277,15 @@ it('relays guest video pause/seek and music checkpoints to the host', async () =
  await settleUntil(() => host.snapshot?.musicNowPlaying?.playback?.currentTime === 18);
  expect(host.snapshot?.musicNowPlaying?.playback?.playing).toBe(false);
 });
+it('keeps a music addition made before the mesh opens and shares searches', async () => {
+ const host = start('Ana', true); await vi.advanceTimersByTimeAsync(1);
+ const guest = start('Beto'); await settleUntil(() => guest.snapshot?.members.length === 2);
+ guest.command({ type: 'music-add', track: { id: 'abcdefghijk', name: 'Song', artists: 'Artist' } });
+ await settleUntil(() => host.snapshot?.musicQueue.length === 1);
+ expect(host.snapshot?.musicQueue[0].name).toBe('Song');
+ guest.emit('music-search', { search: { id: 'search-1', query: 'song', tracks: [{ id: 'abcdefghijk', name: 'Song', artists: 'Artist' }] } });
+ await settleUntil(() => host.snapshot?.musicSearch?.query === 'song');
+ host.emit('music-search', { search: { id: 'clear', query: '', tracks: null } });
+ await settleUntil(() => guest.snapshot?.musicSearch?.id === 'clear');
+ expect(guest.snapshot?.musicSearch?.tracks).toBeNull();
+});
