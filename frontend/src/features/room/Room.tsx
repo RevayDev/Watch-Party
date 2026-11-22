@@ -4,6 +4,7 @@ import { RoomHeader } from '../../components/RoomHeader';
 import { VideoPlayer } from '../player/VideoPlayer';
 import { CameraGrid } from '../../components/CameraGrid';
 import { RemoteAudio } from '../../components/RemoteAudio';
+import { MediaSettings } from '../../components/MediaSettings';
 import { LeaderExitModal } from '../../components/LeaderExitModal';
 import { MemberExitModal } from '../../components/MemberExitModal';
 import { RoomSettingsModal } from '../../components/RoomSettingsModal';
@@ -13,9 +14,7 @@ import { buildSocketAuth } from '../../shared/utils';
 import { parseYouTubeUrl } from '../../shared/youtube';
 import { notify } from '../../services/notifications';
 import { RoomControls } from './components/RoomControls';
-import { RoomLayout } from './components/RoomLayout';
 import { RoomDrawer } from './components/RoomDrawer';
-import { MusicPanel } from './components/MusicPanel';
 import { useBarPrefs } from './hooks/useBarPrefs';
 
 export interface RoomProps {
@@ -30,12 +29,12 @@ export interface RoomProps {
  * JSX movido verbatim desde pages/Room.tsx — CERO cambios visuales.
  */
 export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialIsLeader, onLeave }) => {
+  const [showMediaSettings, setShowMediaSettings] = useState(false);
   const r = useRoomSocket({ roomId, userName, initialIsLeader, onLeave });
 
-  const [musicPanelOpen, setMusicPanelOpen] = useState(true);
   // Toggle del panel de música (YouTube)
   const toggleMusicPanel = () => {
-    setMusicPanelOpen((v) => !v);
+    r.setActiveSideTab((v) => (v === 'music' ? null : 'music'));
   };
   // Agregar música de YouTube a la cola
   const handleAddMusicUrl = async (rawUrl: string): Promise<boolean> => {
@@ -56,9 +55,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
   const isModerator = r.isLeader || r.isCohost;
   // Ampliar a la pantalla de la sala: pone el tema actual como video
   // principal (solo moderador; el servidor lo valida de todos modos).
-  const handleExpandMusicToMain = (url: string, title: string, currentTime = 0) => {
+  const handleExpandMusicToMain = (url: string, title: string) => {
     if (!isModerator) return;
-    void r.handleSetVideoUrl(url, title, { startTime: currentTime, transferMusic: true });
+    void r.handleSetVideoUrl(url, title);
   };
   // Estilo personal de la barra (local, por usuario: nunca se emite a la sala).
   const barPrefs = useBarPrefs();
@@ -138,11 +137,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
   }
 
   return (
-    <RoomLayout
-      uiPinned={r.uiPinned}
-      camerasCollapsed={r.isRightPanelCollapsed}
-      header={
-        <RoomHeader
+    <div className={`meet-layout ${!r.uiPinned ? 'meet-layout--bars-hidden' : ''}`}>
+      {/* ── Top Header (Google Meet style) ── */}
+      <RoomHeader
         roomId={r.roomData.roomId}
         participantCount={r.roomData.participants.length}
         isLeader={r.isLeader}
@@ -152,21 +149,24 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
         timerEndsAt={r.roomData.settings?.timerEndsAt}
         roomStatus={r.roomData.status}
         onOpenSettings={() => r.setShowRoomSettings(true)}
-        showSettings
+        onOpenMediaSettings={() => setShowMediaSettings(true)}
         onOpenParticipants={() => r.setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
         participantsActive={r.sideTabView === 'participants'}
         onLeaveClick={r.handleLeaveClick}
         className={!r.uiPinned ? 'header--hidden' : ''}
       />
-      }
-      player={<>
-        <RemoteAudio peers={r.remotePeers} />
+
+      {/* ── Main Stage Area: Left Video + Right Vertical Cameras Strip ── */}
+      <main className={`meet-stage ${r.isRightPanelCollapsed ? 'meet-stage--cams-collapsed' : ''}`}>
+        {/* Cinematic Video Card */}
+        <section className="meet-stage__video-wrapper">
+          <RemoteAudio peers={r.remotePeers} />
           <VideoPlayer
             roomId={roomId}
             video={r.roomData.video}
             isLeader={r.isLeader || r.isCohost}
             onUploadVideo={r.handleUploadVideo}
-            onSetVideoUrl={r.handleSetVideoUrl} onClearVideo={r.handleClearVideo}
+            onSetVideoUrl={r.handleSetVideoUrl}
             uploadProgress={r.uploadProgress}
             isVideoLoading={r.isVideoLoading}
             onSyncAction={r.handleSyncAction}
@@ -194,35 +194,18 @@ onVideoReady={r.handleVideoReady}
               Visible al reconectar el socket o con calidad crítica (nivel 3:
               la media se está restableciendo). No destruye sala/chat/video:
               la película sigue reproduciéndose mientras se reintenta. */}
-          <div style={musicPanelOpen ? {} : { position: 'fixed', left: '-9999px', top: '-9999px', width: 320, height: 180, overflow: 'hidden', opacity: 0.01, pointerEvents: 'none', zIndex: -1 }}>
-            <MusicPanel
-              roomId={roomId}
-              queue={r.musicQueue ?? []}
-              nowPlaying={r.musicNowPlaying ?? null}
-              settings={r.roomData.settings ?? ({} as any)}
-              isModerator={isModerator}
-              myName={r.myName}
-              userId={r.userId}
-              onAddUrl={handleAddMusicUrl}
-              onAdd={r.musicAdd ?? (() => {})}
-              onRemove={r.musicRemove ?? (() => {})}
-              onReorder={r.musicReorder ?? (() => {})}
-              onApprove={r.musicApprove ?? (() => {})}
-              onNext={r.musicNext ?? (() => {})}
-              onAutoNext={r.musicAutoNext ?? (() => {})}
-              onStop={r.musicStop ?? (() => {})}
-              onExpandToMain={handleExpandMusicToMain}
-            />
-          </div>
           {(r.isReconnecting || r.qualityLevel >= 3) && (
             <div className="reconnect-pill" role="status" aria-live="polite">
               <span className="reconnect-pill__dot" aria-hidden="true" />
               <span>Reconectando…</span>
             </div>
           )}
-      </>}
-      cameras={
-        <CameraGrid
+        </section>
+
+        {/* Right Vertical Camera Strip (Collapsible Accordion Style) */}
+        {!r.isRightPanelCollapsed && (
+          <aside className="meet-stage__cams-strip">
+            <CameraGrid
               localStream={r.localStream}
               remotePeers={r.remotePeers}
               participants={r.roomData.participants}
@@ -234,8 +217,10 @@ onVideoReady={r.handleVideoReady}
               peerSignalStates={r.peerSignalStates}
               dataSaverMode={r.dataSaver}
             />
-      }
-      drawer={
+          </aside>
+        )}
+
+        {/* ── Slide-over Right Drawer for Chat or Participants ── */}
         <RoomDrawer
           activeSideTab={r.activeSideTab}
           sideTabView={r.sideTabView}
@@ -271,11 +256,12 @@ onVideoReady={r.handleVideoReady}
           onMusicStop={r.musicStop}
           onExpandToMain={handleExpandMusicToMain}
         />
-      }
-      controls={
-        <RoomControls
+      </main>
+
+      {/* ── Bottom Bar (text buttons) ── */}
+      <RoomControls
         roomId={roomId}
-        musicOpen={musicPanelOpen}
+        musicOpen={r.activeSideTab === 'music'}
         onToggleMusic={toggleMusicPanel}
         layout={barPrefs.layout}
         showLabels={barPrefs.showLabels}
@@ -303,8 +289,7 @@ onVideoReady={r.handleVideoReady}
         uiPinned={r.uiPinned}
         toggleBarsVisibility={r.toggleBarsVisibility}
       />
-      }
-    >
+
       {r.mediaError && <div className="meet-error-banner">⚠️ {r.mediaError}</div>}
       {r.mediaConnectionFailed && (
         <div className="meet-error-banner" role="status">
@@ -332,11 +317,13 @@ onVideoReady={r.handleVideoReady}
       />
 
       {/* ⚙ Room settings: name, info, save-mode (temporary/stored), approval and auto-close timer */}
+      {showMediaSettings && (
+        <MediaSettings localStream={r.localStream} onClose={() => setShowMediaSettings(false)} onRetry={() => {
+          r.retryMediaConnection();
+          setShowMediaSettings(false);
+        }} />
+      )}
       <RoomSettingsModal
-        youtubeProvider={r.roomData.settings?.youtubeProvider}
-        onYouTubeProviderChange={(youtubeProvider) => r.handleUpdatePerfSettings({ youtubeProvider })}
-        localStream={r.localStream}
-        onRetryMedia={r.retryMediaConnection}
         isOpen={r.showRoomSettings}
         onClose={() => r.setShowRoomSettings(false)}
         isTemporary={r.roomData.isTemporary !== false}
@@ -372,7 +359,7 @@ onVideoReady={r.handleVideoReady}
           if (patch.layout !== undefined) barPrefs.setLayout(patch.layout);
         }}
       />
-    </RoomLayout>
+    </div>
   );
 };
 
