@@ -8240,6 +8240,6 @@ a.home-faq-hl--frontend {
 
 /* Keep both music sliders on the playback button centerline. */
 .music-player__controls { position: relative; align-items: center; padding-bottom: 14px; }
-.music-player__progress { position: relative; display: flex; align-items: center; }
-.music-player__progress > .music-player__range, .music-player__volume { display: block; margin: 0; }
-.music-player__time { position: absolute; top: calc(50% + 12px); right: 0; white-space: nowrap; line-height: 1; pointer-events: none; }
+.music-player__progress { position: relative; display: flex; align-items: center; height: 32px; align-self: center; }
+.music-player__progress > .music-player__range, .music-player__volume { display: block; margin: 0; height: 4px; min-height: 4px; padding: 0; align-self: center; }
+.music-player__time { position: absolute; top: calc(50% + 16px); right: 0; white-space: nowrap; line-height: 1; pointer-events: none; }
