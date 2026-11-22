@@ -255,9 +255,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => window.clearInterval(iv);
   }, [video, roomId]);
 
-  // Salto al consenso SIN alterar a los demás: seek puramente local. Se usa
-  // el guardián `isApplyingRemote` existente para que onSeeked/onPlay no
-  // emitan sync (cada uno reproduce su copia). Agente A: revisar al cablear.
+  // El control de recuperación establece una nueva marca común. Al pulsarlo
+  // cualquier miembro (también desde móvil) adelanta a toda la sala; el
+  // guardián evita que el evento `seeked` local duplique esa señal.
   const seekToLive = useCallback(() => {
     const vid = videoRef.current;
     const live = resolveLiveEdge(liveAnchorRef.current, Date.now());
@@ -276,11 +276,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       atMs: Date.now(),
       playing: willPlay,
     };
+    onSyncAction('seek', targetTime);
     setBehindSecs(0);
     window.setTimeout(() => {
       isApplyingRemote.current = false;
     }, 300);
-  }, []);
+  }, [onSyncAction]);
 
   // Position heartbeat (2.5 s normal, 15 s en mala señal): lets the server
   // resolve the consensus time a (re)joining member should adopt. Skipped
@@ -1094,13 +1095,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Badge "Atrasado −Xs · Ir al en vivo" (rol B): seek local, no emite sync */}
-      {behindSecs > 3 && (
+      {/* Solo aparece con cuatro minutos de desfase y fija la nueva marca compartida. */}
+      {behindSecs > 0 && (
         <Button variant="unstyled"
           type="button"
           className="player-live-badge"
           onClick={seekToLive}
-          title="Saltar al punto en vivo del grupo (solo te afecta a ti)"
+          title="Saltar al punto en vivo del grupo y sincronizar a todos"
         >
           Atrasado −{Math.round(behindSecs)}s · Ir al en vivo
         </Button>

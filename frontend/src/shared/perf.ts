@@ -19,8 +19,10 @@ export function clampDuckPct(value: unknown): number {
   return rounded;
 }
 
-/** Segundos a partir de los cuales se muestra el badge "Atrasado". */
-export const BEHIND_THRESHOLD_SECS = 3;
+/** Segundos a partir de los cuales se muestra el control de recuperación.
+ * Las variaciones breves de red se corrigen solas; solo exponemos la acción
+ * cuando el desfase ya es de cuatro minutos completos. */
+export const BEHIND_THRESHOLD_SECS = 4 * 60;
 
 export interface LiveEdgeAnchor {
   /** Posición consensuada (s) en el momento del ancla. */
@@ -66,7 +68,7 @@ export function resolveLiveEdge(anchor: LiveEdgeAnchor | null, nowMs: number): n
 
 /**
  * Segundos de retraso respecto al borde en vivo. Devuelve 0 cuando no hay
- * retraso relevante (<= umbral), cuando el local está pausado o sin datos.
+ * retraso relevante (< umbral), cuando el local está pausado o sin datos.
  * Nunca negativo.
  */
 export function behindSeconds(
@@ -77,7 +79,7 @@ export function behindSeconds(
   if (liveEdgeSecs === null || !localPlaying) return 0;
   if (!Number.isFinite(localTimeSecs) || !Number.isFinite(liveEdgeSecs)) return 0;
   const behind = liveEdgeSecs - localTimeSecs;
-  if (!(behind > BEHIND_THRESHOLD_SECS)) return 0;
+  if (behind < BEHIND_THRESHOLD_SECS) return 0;
   return behind;
 }
 

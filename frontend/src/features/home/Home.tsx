@@ -317,7 +317,7 @@ export const Home: React.FC<HomeProps> = ({
               <ExternalLink size={18} strokeWidth={2.2} aria-hidden="true" />
               <p>
                 En esta demo los vídeos se comparten con un{" "}
-                <strong>enlace externo (por ejemplo, Google Drive)</strong>:
+                <strong>enlace externo (Google Drive)</strong><br></br>
                 pega el enlace en la sala para reproducirlo juntos.
               </p>
             </aside>
@@ -909,8 +909,7 @@ export const Home: React.FC<HomeProps> = ({
 
           <div className="home-footer__bottom">
             <span>
-              © {new Date().getFullYear()} Watch Party • Hecho con React,
-              TypeScript, WebRTC y Prisma.
+              © {new Date().getFullYear()} Watch Party • Hecho por RevayDev (Robeto Jimenez)
             </span>
             <span className="home-footer__legal">
               Watch Party no provee contenido: los archivos los suben y

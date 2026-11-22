@@ -223,7 +223,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
   return (
     <RoomLayout uiPinned={uiPinned} camerasCollapsed={camerasCollapsed}
       header={<RoomHeader roomId={options.roomId} participantCount={state.members.length} capacity={8}
-        inviteUrl={hostInvite(options.roomId, options.key)} isLeader={isHost} showSettings
+        inviteUrl={hostInvite(options.roomId, options.key)} linkOnlyInvite isLeader={isHost} showSettings
         createdAt={createdAt.current} roomStatus={roomData.status}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenParticipants={() => setActiveSideTab((tab) => tab === 'participants' ? null : 'participants')}
@@ -289,13 +289,13 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
     >
       {(view.error || error || media.mediaError) && <div role="alert" className="meet-error-banner">{view.error || error || media.mediaError}</div>}
       {view.status.includes('relevo') && <div className="reconnect-pill" role="status">{view.status}</div>}
-      <MediaConnectionNotice failed={media.mediaConnectionFailed} onRetry={media.retryMediaConnection} />
+      <MediaConnectionNotice failed={media.mediaConnectionFailed} hasPeers={state.members.length > 1} onRetry={media.retryMediaConnection} />
       <LeaderExitModal browserHosted isOpen={showExit && isHost} participantCount={state.members.length} busy={leaving} error={leaveError} onClose={() => setShowExit(false)} onLeaveOnlyMe={async () => {
         if (leaving) return;
         setLeaving(true); setLeaveError('');
         try { await session.leaveGracefully(); onLeave(); } catch (cause) { setLeaveError(cause instanceof Error ? cause.message : 'No se pudo completar el relevo.'); } finally { setLeaving(false); }
       }} onDeleteRoomForAll={async () => { if (leaving) return; setLeaving(true); await session.closeRoom(); onLeave(); }} />
-      <MemberExitModal isOpen={showExit && !isHost} onClose={() => setShowExit(false)} onConfirmLeave={onLeave} />
+      <MemberExitModal isOpen={showExit && !isHost} onClose={() => setShowExit(false)} onConfirmLeave={async () => { await session.leave(); onLeave(); }} />
       <RoomSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} browserHosted
         youtubeProvider={state.roomSettings?.youtubeProvider}
         onYouTubeProviderChange={(youtubeProvider) => session.command({ type: 'room-settings', settings: { youtubeProvider } })}

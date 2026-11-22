@@ -113,6 +113,21 @@ describe('sync-video con hostOnlySync bloqueado (true)', () => {
     });
   });
 
+  it('miembro normal puede adelantar con seek y fija la referencia para la sala', async () => {
+    const { roomId } = await setupRoom(true);
+    const { io } = makeIo();
+    const sock = makeSocket('s-member-seek');
+    joinActive('s-member-seek', roomId, 'Ana', 'u-ana');
+    registerSyncPlaybackHandlers(io, sock.socket);
+
+    await fire(sock.handlers, 'sync-video', { roomId, action: 'seek', currentTime: 240 });
+
+    const emitted = sock.toEmitted.filter((e) => e.event === 'sync-video');
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0].payload).toMatchObject({ action: 'seek', currentTime: 240 });
+    expect(sock.emitted.filter((e) => e.event === 'action-denied')).toHaveLength(0);
+  });
+
   it('coleader permitido', async () => {
     const { roomId } = await setupRoom(true);
     const { io } = makeIo();

@@ -1230,8 +1230,9 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
 
   const handleSyncAction = useCallback(
     (action: 'play' | 'pause' | 'seek', currentTime: number) => {
-      // Pre-chequeo local: con hostOnlySync solo leader/coleader emiten sync-video.
-      // El servidor también lo niega (action-denied); esto evita el viaje.
+      // Con hostOnlySync el líder conserva play/pausa, pero un invitado puede
+      // adelantar (seek) para fijar una nueva marca compartida desde móvil.
+      // El servidor aplica exactamente la misma excepción.
       const snapshot = roomDataRef.current;
       if (snapshot?.settings?.hostOnlySync === true) {
         const myNameVigente = myNameRef.current;
@@ -1240,7 +1241,7 @@ export function useRoomSocket({ roomId, userName, initialIsLeader, onLeave }: Us
             (p.userId ? p.userId === userId : p.name.toLowerCase() === myNameVigente.toLowerCase()) &&
             p.role === 'coleader'
         );
-        if (!isLeaderRef.current && !coleader) {
+        if (action !== 'seek' && !isLeaderRef.current && !coleader) {
           notify('warning', 'Solo el anfitrión controla la reproducción.', 'Reproducción bloqueada');
           return;
         }

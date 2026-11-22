@@ -64,6 +64,7 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('cinematic-skip'), id }),
   z.object({ type: z.literal('music-search'), search: musicSearchSchema }),
   z.object({ type: z.literal('music-playback'), entryId: id, currentTime: z.number().finite().nonnegative(), playing: z.boolean() }),
+  z.object({ type: z.literal('leave') }),
   z.object({ type: z.literal('room-settings'), settings: roomSettingsSchema }),
   z.object({ type: z.literal('chat-delete'), id }),
   z.object({ type: z.literal('chat-react'), id, emoji: z.enum(['❤️','😂','😮','👏','😢','🔥']) }),
@@ -129,9 +130,23 @@ export function newHostRoom(name: string): HostRoomOptions {
 
 export function applyHostCommand(state: HostSnapshot, senderId: string, command: HostCommand): HostSnapshot {
   const member = state.members.find((candidate) => candidate.id === senderId);
-  const memberAction = ['video-ready', 'music-ready', 'cinematic', 'cinematic-skip'].includes(command.type) || command.type === 'music-search' || command.type === 'playback' || command.type === 'music-playback' || command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
+  const memberAction = ['video-ready', 'music-ready', 'cinematic', 'cinematic-skip', 'leave'].includes(command.type) || command.type === 'music-search' || command.type === 'playback' || command.type === 'music-playback' || command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
   if (!member || (!memberAction && senderId !== state.hostId)) return state;
   switch (command.type) {
+    case 'leave': {
+      const members = state.members.filter((candidate) => candidate.id !== senderId);
+      if (members.length === state.members.length) return state;
+      return {
+        ...state,
+        revision: state.revision + 1,
+        members,
+        videoReady: state.videoReady?.filter((id) => id !== senderId),
+        musicNowPlaying: state.musicNowPlaying ? {
+          ...state.musicNowPlaying,
+          readyMembers: state.musicNowPlaying.readyMembers?.filter((id) => id !== senderId),
+        } : null,
+      };
+    }
     case 'cinematic':
       if (state.cinematic && !state.cinematic.skipped) return state;
       return { ...state, revision: state.revision + 1, cinematic: { id: command.id, quotes: command.quotes } };
@@ -139,12 +154,9 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
       if (state.cinematic?.id !== command.id) return state;
       return { ...state, revision: state.revision + 1, cinematic: { ...state.cinematic, skipped: true } };
     case 'video-ready': {
-      if (state.video?.id !== command.videoId || !state.playback?.awaitingReady) return state;
-      const ready = [...new Set([...(state.videoReady ?? []), senderId])];
-      const all = state.members.every(member => ready.includes(member.id));
-      return { ...state, revision: state.revision + 1, videoReady: ready, playback: all
-        ? { action: 'play', isPlaying: true, currentTime: state.video.startTime ?? 0, sentAt: Date.now() + 1200, timestamp: Math.max(Date.now(), state.playback.timestamp + 1) }
-        : state.playback };
+      // A member who arrives or finishes loading must catch up to the current
+      // timeline; they must never pause everybody else waiting for their media.
+      return state;
     }
     case 'music-ready': {
       const music = state.musicNowPlaying;
@@ -198,7 +210,7 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
     case 'clear-video':
       return { ...state, revision: state.revision + 1, video: null, playback: null };
     case 'video':
-      return { ...state, revision: state.revision + 1, video: command.video, videoReady: [], playback: { action: 'pause', isPlaying: false, awaitingReady: true, currentTime: command.video.startTime ?? 0, sentAt: Date.now(), timestamp: Date.now() }, ...(command.transferMusic ? { musicNowPlaying: null } : {}) };
+      return { ...state, revision: state.revision + 1, video: command.video, videoReady: [], playback: { action: 'play', isPlaying: true, currentTime: command.video.startTime ?? 0, sentAt: Date.now() + 1200, timestamp: Date.now() }, ...(command.transferMusic ? { musicNowPlaying: null } : {}) };
     case 'settings':
       return { ...state, revision: state.revision + 1, automaticMigration: command.automaticMigration, replicateVideo: command.replicateVideo };
     case 'playback':

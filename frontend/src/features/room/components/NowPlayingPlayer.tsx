@@ -53,6 +53,7 @@ export const NowPlayingPlayer: React.FC<{
   const checkpoint = useRef(playback);
   const playingRef = useRef(false);
   const startedRef = useRef(startedAt);
+  const readyTrackRef = useRef<string | null>(null);
   const readyRef = useRef(onReadyToPlay); readyRef.current = onReadyToPlay;
   startedRef.current = startedAt;
   const synchronize = (force = false) => {
@@ -72,7 +73,12 @@ export const NowPlayingPlayer: React.FC<{
   const syncRef = useRef(synchronize); syncRef.current = synchronize;
   const reportReady = () => {
     const p = playerRef.current;
-    if (p && Math.abs(p.getCurrentTime?.() ?? Infinity) < .25 && (p.getDuration?.() ?? 0) > 0) readyRef.current?.();
+    // `onReady` is the reliable signal on mobile. getDuration() can remain 0
+    // until after playback starts, which used to leave every client waiting.
+    if (p && readyTrackRef.current !== trackKey) {
+      readyTrackRef.current = trackKey;
+      readyRef.current?.();
+    }
   };
   const reportReadyRef = useRef(reportReady); reportReadyRef.current = reportReady;
   useEffect(() => {
@@ -96,26 +102,18 @@ export const NowPlayingPlayer: React.FC<{
     onPlayback?.(seconds, active);
   };
 
-  const tryPlay = () => {
-    try {
-      const p = playerRef.current;
-      if (!p) return;
-      if (typeof p.unMute === 'function') p.unMute();
-      if (typeof p.setVolume === 'function') p.setVolume(volume);
-      synchronize(true);
-      setMuted(false);
-    } catch {
-      /* Autoplay may require a manual click. */
-    }
-  };
-
   const togglePlay = () => {
     if (playback?.awaitingReady) { reportReady(); return; }
     try {
       const p = playerRef.current;
       if (!p) return;
-      publish(p.getCurrentTime?.() ?? current, !playing);
-      if (playing) {
+      // React state can lag behind a remote seek/play after a phone resumes.
+      const active = p.getPlayerState?.() === 1 || playingRef.current;
+      const next = !active;
+      publish(p.getCurrentTime?.() ?? current, next);
+      playingRef.current = next;
+      setPlaying(next);
+      if (!next) {
         if (typeof p.pauseVideo === 'function') p.pauseVideo();
       } else {
         // A user gesture lets the browser resume playback with sound.
@@ -187,6 +185,8 @@ export const NowPlayingPlayer: React.FC<{
 
   useEffect(() => {
     setPlaying(false);
+    playingRef.current = false;
+    readyTrackRef.current = null;
     setCurrent(0);
     setDuration(0);
   }, [trackKey]);
@@ -227,7 +227,7 @@ export const NowPlayingPlayer: React.FC<{
         </div>}
       </div>
       <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
-        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; tryPlay(); reportReady(); }} onStateChange={(event) => {
+        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; synchronize(true); reportReady(); }} onStateChange={(event) => {
           if (checkpoint.current?.awaitingReady) { playerRef.current?.pauseVideo?.(); reportReady(); }
           if (event.data === 1) { playingRef.current = true; setPlaying(true); }
           else if (event.data === 2) { playingRef.current = false; setPlaying(false); }

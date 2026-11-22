@@ -53,9 +53,10 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       const member = activeUsers.get(socket.id);
       if (!member || member.roomId !== cleanRoomId || member.pending) return;
 
-      // `hostOnlySync` (default OFF): bloqueado → solo moderadores
-      // (leader o coleader) pueden sincronizar; el resto recibe `action-denied`.
-      if (room.settings?.hostOnlySync === true) {
+      // `hostOnlySync` (default OFF) mantiene play/pausa para moderadores.
+      // Cualquier miembro sí puede adelantar (seek): en teléfono ese salto
+      // se vuelve la nueva referencia compartida para todos.
+      if (room.settings?.hostOnlySync === true && action !== 'seek') {
         if (!requireModerator(room, resolveSocketClaim(socket, data))) {
           denySocket(socket, 'sync-video', 'Solo el anfitrión controla la reproducción.');
           return;

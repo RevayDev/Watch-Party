@@ -7558,11 +7558,11 @@ a.home-faq-hl--frontend {
   white-space: nowrap;
 }
 
-/* 3. Badge "Atrasado −Xs · Ir al en vivo": abajo-izquierda, seek solo local. */
+/* 3. Control de recuperación: pegado al borde inferior izquierdo. */
 .player-live-badge {
   position: absolute;
-  left: 0.9rem;
-  bottom: max(3rem, 7vmin);
+  left: 0.75rem;
+  bottom: 0.75rem;
   z-index: 2147483645;
   display: inline-flex;
   align-items: center;

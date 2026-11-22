@@ -18,6 +18,8 @@ interface RoomHeaderProps {
   roomStatus?: 'waiting' | 'active' | 'closed';
   onOpenSettings?: () => void;
   inviteUrl?: string;
+  /** Browser-hosted rooms require the private key in their invitation URL. */
+  linkOnlyInvite?: boolean;
   capacity?: number;
   showSettings?: boolean;
   onLeaveClick?: () => void;
@@ -38,6 +40,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   roomStatus,
   onOpenSettings,
   inviteUrl,
+  linkOnlyInvite = false,
   capacity,
   showSettings = false,
   onOpenParticipants,
@@ -202,7 +205,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
             onClick={() => setShowShareMenu((v) => !v)}
             className="header__room-pill header__share-btn"
             aria-label="Compartir sala"
-            title="Compartir sala (código y link)"
+            title={linkOnlyInvite ? 'Compartir enlace de invitación' : 'Compartir sala (código y link)'}
             type="button"
           >
             <Share2 size={13} color="#818cf8" />
@@ -215,8 +218,8 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
               anchor={shareRef.current}
               ref={shareSheetRef}
             >
-              {/* Room code */}
-              <div className="header-share-menu__row">
+              {/* Browser-hosted rooms need the secret URL fragment; their ID alone cannot join safely. */}
+              {!linkOnlyInvite && <div className="header-share-menu__row">
                 <div className="header-share-menu__info">
                   <span className="header-share-menu__label">
                     <Hash size={12} /> Código de la sala
@@ -231,7 +234,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                 >
                   {copiedCode ? 'Copiado' : 'Copiar'}
                 </Button>
-              </div>
+              </div>}
 
               {/* Invite link */}
               <div className="header-share-menu__row">

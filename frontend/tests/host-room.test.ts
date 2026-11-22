@@ -161,7 +161,7 @@ it('reports a connection timeout instead of leaving an absent room loading forev
   }));
 });
 
-it('allows members to chat while restricting video and server settings to the current host', () => {
+it('allows members to chat and set playback while restricting video and server settings to the current host', () => {
   const state: HostSnapshot = {
     revision: 0, hostId: 'host', members: [{ id: 'host', name: 'Ana', joinedAt: 1 }, { id: 'guest', name: 'Beto', joinedAt: 2 }],
     messages: [], video: null, playback: null, automaticMigration: true, replicateVideo: true,
@@ -177,6 +177,8 @@ it('allows members to chat while restricting video and server settings to the cu
   expect(edited.messages[0]).toMatchObject({ edited: true, text: 'Hola de nuevo' });
   const replied = applyHostCommand(edited, 'host', { type: 'chat', id: 'reply', text: 'Bienvenido', replyTo: 'x' });
   expect(replied.messages[1].replyTo).toEqual({ id: 'x', user: 'Beto', text: 'Hola de nuevo' });
+  expect(applyHostCommand(replied, 'guest', { type: 'playback', action: 'seek', currentTime: 240 }).playback)
+    .toMatchObject({ action: 'seek', currentTime: 240 });
 });
 
 it('replicates music queue changes and restricts playback to the current host', () => {
@@ -280,6 +282,16 @@ it('relays guest video pause/seek and music checkpoints to the host', async () =
  await settleUntil(() => host.snapshot?.musicNowPlaying?.playback?.currentTime === 18);
  expect(host.snapshot?.musicNowPlaying?.playback?.playing).toBe(false);
 });
+
+it('removes an intentional leaver from the browser-hosted room snapshot', () => {
+ const state = {
+  revision: 0, hostId: 'host', members: [{ id: 'host', name: 'Ana', joinedAt: 1 }, { id: 'guest', name: 'Beto', joinedAt: 2 }],
+  messages: [], video: null, playback: null, automaticMigration: true, replicateVideo: true, musicQueue: [], musicNowPlaying: null,
+ } satisfies HostSnapshot;
+ const next = applyHostCommand(state, 'guest', { type: 'leave' });
+ expect(next.members.map(member => member.name)).toEqual(['Ana']);
+});
+
 it('keeps a music addition made before the mesh opens and shares searches', async () => {
  const host = start('Ana', true); await vi.advanceTimersByTimeAsync(1);
  const guest = start('Beto'); await settleUntil(() => guest.snapshot?.members.length === 2);
@@ -293,18 +305,16 @@ it('keeps a music addition made before the mesh opens and shares searches', asyn
  expect(guest.snapshot?.musicSearch?.tracks).toBeNull();
 });
 
-it('holds a new video at zero until every member is ready, then schedules one shared start', async () => {
+it('starts a new video on one shared mark without waiting for a joining member', async () => {
  const host = start('Ana', true); await vi.advanceTimersByTimeAsync(1);
  const guest = start('Beto'); await settleUntil(() => guest.snapshot?.members.length === 2);
  host.command({ type: 'video', video: { id: 'video-ready-test', name: 'Film', source: 'url', url: 'https://example.com/film.mp4', size: 0, mime: 'video/mp4' } });
- host.command({ type: 'video-ready', videoId: 'video-ready-test' });
- await vi.advanceTimersByTimeAsync(20000);
- expect(host.snapshot?.playback).toMatchObject({ action: 'pause', currentTime: 0, awaitingReady: true });
+ expect(host.snapshot?.playback).toMatchObject({ action: 'play', currentTime: 0, isPlaying: true });
+ const startAt = host.snapshot!.playback!.sentAt;
  guest.command({ type: 'video-ready', videoId: 'video-ready-test' });
- await settleUntil(() => host.snapshot?.playback?.action === 'play');
- expect(host.snapshot?.playback?.sentAt).toBeGreaterThan(Date.now());
  await settleUntil(() => guest.snapshot?.playback?.action === 'play');
- expect(guest.snapshot?.playback?.sentAt).toBe(host.snapshot?.playback?.sentAt);
+ expect(host.snapshot?.playback?.sentAt).toBe(startAt);
+ expect(guest.snapshot?.playback?.sentAt).toBe(startAt);
 });
 
 it('shares one cinematic and its dismissal across host and guest', async () => {

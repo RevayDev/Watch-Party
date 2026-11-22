@@ -44,12 +44,11 @@ describe('perf helpers (rol B)', () => {
     expect(resolveLiveEdge({ timeSecs: 100, atMs: 1000, playing: false }, 11000)).toBe(100);
   });
 
-  it('behindSeconds respeta el umbral de 3 s y el estado local', () => {
-    expect(BEHIND_THRESHOLD_SECS).toBe(3);
-    expect(behindSeconds(110, 100, true)).toBeCloseTo(10);
-    expect(behindSeconds(102, 100, true)).toBe(0);
-    expect(behindSeconds(103, 100, true)).toBe(0);
-    expect(behindSeconds(110, 100, false)).toBe(0);
+  it('behindSeconds solo actúa desde cuatro minutos y respeta el estado local', () => {
+    expect(BEHIND_THRESHOLD_SECS).toBe(240);
+    expect(behindSeconds(340, 100, true)).toBeCloseTo(240);
+    expect(behindSeconds(339.9, 100, true)).toBe(0);
+    expect(behindSeconds(340, 100, false)).toBe(0);
     expect(behindSeconds(null, 100, true)).toBe(0);
     expect(behindSeconds(90, 100, true)).toBe(0);
   });

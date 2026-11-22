@@ -297,7 +297,7 @@ onVideoReady={r.handleVideoReady}
       />
 
       {r.mediaError && <div className="meet-error-banner">⚠️ {r.mediaError}</div>}
-      <MediaConnectionNotice failed={r.mediaConnectionFailed} onRetry={r.retryMediaConnection} />
+      <MediaConnectionNotice failed={r.mediaConnectionFailed} hasPeers={r.roomData.participants.length > 1} onRetry={r.retryMediaConnection} />
       {r.lowBandwidth && (
         <div className="meet-error-banner">📶 Señal débil: video pausado, seguís con audio</div>
       )}

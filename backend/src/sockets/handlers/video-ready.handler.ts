@@ -140,7 +140,20 @@ export function registerVideoReadyHandlers(io: Server, socket: Socket): void {
     if (!room) return;
     const expectedKey = room.video?.fileName || room.video?.directUrl || '';
     if (!expectedKey || fileName !== expectedKey) return;
-    if (startedByRoom.get(cleanRoomId) === expectedKey) return;
+    if (startedByRoom.get(cleanRoomId) === expectedKey) {
+      // Late joiners load the same source after the room is already playing.
+      // Send the current mark only to them; never pause or rewind the room.
+      const playback = roomPlayback.get(cleanRoomId);
+      if (playback) {
+        const elapsed = playback.isPlaying ? Math.max(0, (Date.now() - playback.updatedAt) / 1000) : 0;
+        socket.emit('sync-video', {
+          action: playback.isPlaying ? 'play' : 'pause',
+          currentTime: playback.currentTime + elapsed,
+          sentAt: Date.now(),
+        });
+      }
+      return;
+    }
 
     let state = readyByRoom.get(cleanRoomId);
     if (!state || state.videoKey !== expectedKey) {

@@ -280,10 +280,15 @@ export class HostSession implements WebRTCTransport {
         this.offlineSince.delete(message.member.id);
         if (!this.announced.has(message.member.id)) {
           this.announced.add(message.member.id);
-          this.publish('room-state', { peers: [{
+          const peer = {
             socketId: message.member.id, userName: message.member.name,
             isLeader: message.member.id === this.state?.hostId,
-          }] });
+          };
+          // Match the server flow: the newcomer initiates the offer. Sending
+          // a room-state to the host made both sides offer simultaneously,
+          // which commonly broke camera/mic negotiation on phones.
+          if (this.isHost) this.publish('user-joined', peer);
+          else this.publish('room-state', { peers: [peer] });
         }
         if (this.isHost) this.commit();
         if (message.member.id === this.state?.hostId) this.flushChat();
@@ -421,6 +426,15 @@ export class HostSession implements WebRTCTransport {
     }
   }
 
+  /** Announces an intentional guest exit before closing the mesh connection. */
+  async leave() {
+    if (!this.state || this.isHost) return;
+    this.command({ type: 'leave' });
+    // DataConnection.send is queued behind its authenticated hello exchange.
+    // Keep this session alive briefly so navigating home does not cancel it.
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 80));
+  }
+
   private flushChat() {
     if (!this.state) return;
     const host = this.connections.get(this.state.hostId);
@@ -521,9 +535,6 @@ export class HostSession implements WebRTCTransport {
           ...this.state, revision: this.state.revision + 1,
           members: this.state.members.filter((member) => !removed.some((entry) => entry.id === member.id)),
         };
-      }
-      if (this.state.video && this.state.playback?.awaitingReady && this.state.members.every(member => this.state!.videoReady?.includes(member.id))) {
-        this.state = applyHostCommand(this.state, this.id, { type: 'video-ready', videoId: this.state.video.id });
       }
       if (this.state.musicNowPlaying?.playback?.awaitingReady && this.state.members.every(member => this.state!.musicNowPlaying?.readyMembers?.includes(member.id))) {
         this.state = applyHostCommand(this.state, this.id, { type: 'music-ready', entryId: this.state.musicNowPlaying.entryId });
