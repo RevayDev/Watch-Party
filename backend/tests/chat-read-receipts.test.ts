@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import type { Server, Socket } from 'socket.io';
+import { registerChatReactionsHandlers } from '../src/sockets/handlers/chat-reactions.handler.js';
+import { activeUsers, trackRoomMessage, roomReadReceipts, clearRoomMessageAuthors } from '../src/sockets/socket-state.js';
+import { __resetSocketLimitsForTests } from '../src/sockets/socket-limits.js';
+afterEach(() => { activeUsers.clear(); clearRoomMessageAuthors('READ'); __resetSocketLimitsForTests(); });
+it('authenticates the reader, prevents backward progress and clears receipts with room history', () => {
+ const handlers = new Map<string, (data: unknown) => void>(); const emit = vi.fn();
+ const socket = { id: 'reader', on: (event: string, handler: (data: unknown) => void) => handlers.set(event, handler), emit } as unknown as Socket;
+ const broadcast = vi.fn(); const io = { to: () => ({ emit: broadcast }) } as unknown as Server;
+ registerChatReactionsHandlers(io, socket);
+ trackRoomMessage('READ', 'first', 'Ana'); trackRoomMessage('READ', 'last', 'Ana');
+ handlers.get('chat-read')!({ roomId: 'READ', messageId: 'last' }); expect(broadcast).not.toHaveBeenCalled();
+ activeUsers.set('reader', { socketId: 'reader', roomId: 'READ', userName: 'Beto', userId: 'beto', isLeader: false });
+ handlers.get('chat-read')!({ roomId: 'READ', messageId: 'last', userName: 'Fake', readerId: 'fake' });
+ expect(broadcast).toHaveBeenCalledWith('chat-read', { readerId: 'beto', userName: 'Beto', messageId: 'last' });
+ handlers.get('chat-read')!({ roomId: 'READ', messageId: 'first' }); expect(broadcast).toHaveBeenCalledTimes(1);
+ handlers.get('request-chat-reads')!({ roomId: 'READ' }); expect(emit).toHaveBeenCalledWith('chat-read-state', roomReadReceipts.get('READ'));
+ clearRoomMessageAuthors('READ'); expect(roomReadReceipts.has('READ')).toBe(false);
+});

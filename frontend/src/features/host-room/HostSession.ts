@@ -97,6 +97,7 @@ export class HostSession implements WebRTCTransport {
   }
   private notify() {
     if (this.stopped) return;
+    this.publish('chat-read-state', this.state?.readReceipts ?? {});
     this.update({
       id: this.id, state: this.state, status: this.status, error: this.error,
       fileUrl: this.fileUrl, fileProgress: this.fileProgress,
@@ -432,6 +433,8 @@ export class HostSession implements WebRTCTransport {
     const serialized: unknown = JSON.parse(JSON.stringify(data));
     if (!serialized || typeof serialized !== 'object' || Array.isArray(serialized)) return;
     const payload = serialized as Record<string, unknown>;
+    if (event === 'request-chat-reads') { this.publish('chat-read-state', this.state.readReceipts ?? {}); return; }
+    if (event === 'chat-read' && typeof payload.messageId === 'string') { this.command({ type: 'chat-read', messageId: payload.messageId }); return; }
     if (event === 'reaction' && typeof payload.emoji === 'string' && payload.emoji.length <= 32) {
       const reaction = { id: crypto.randomUUID(), emoji: payload.emoji, userName: this.self.name };
       this.broadcast({ type: 'signal', event, payload: reaction });

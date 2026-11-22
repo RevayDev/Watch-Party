@@ -2,6 +2,8 @@ import { Server, Socket } from 'socket.io';
 import { checkSocketRateLimit } from '../socket-limits.js';
 import {
   activeUsers,
+  roomReadReceipts,
+  roomMessageAuthors,
   lastCinematicTrigger,
   roomMessageAuthor,
   trackRoomMessage,
@@ -35,6 +37,28 @@ function memberNameOf(socketId: string, cleanRoomId: string): string | null {
 
 /** Handler de chat y reacciones. Nombres de eventos y payloads idénticos al original. */
 export function registerChatReactionsHandlers(io: Server, socket: Socket): void {
+  socket.on('request-chat-reads', (data: { roomId?: unknown } | undefined) => {
+    if (typeof data?.roomId !== 'string') return;
+    const roomId = data.roomId.toUpperCase().trim();
+    if (!memberNameOf(socket.id, roomId) || !checkSocketRateLimit(socket.id, 'chat-read', 100, 10000)) return;
+    socket.emit('chat-read-state', roomReadReceipts.get(roomId) ?? {});
+  });
+  socket.on('chat-read', (data: { roomId?: unknown; messageId?: unknown } | undefined) => {
+    if (typeof data?.roomId !== 'string' || typeof data.messageId !== 'string' || data.messageId.length > 100) return;
+    const roomId = data.roomId.toUpperCase().trim();
+    const userName = memberNameOf(socket.id, roomId);
+    if (!userName || !roomMessageAuthor(roomId, data.messageId) || !checkSocketRateLimit(socket.id, 'chat-read', 100, 10000)) return;
+    const readerId = activeUsers.get(socket.id)?.userId || socket.id;
+    const receipts = roomReadReceipts.get(roomId) ?? {};
+    const ids = [...(roomMessageAuthors.get(roomId)?.keys() ?? [])];
+    if (ids.indexOf(data.messageId) <= ids.indexOf(receipts[readerId]?.messageId)) return;
+    const receipt = { readerId, userName, messageId: data.messageId };
+    receipts[readerId] = receipt;
+    // Keep this ephemeral directory bounded even as visitors change.
+    const keys = Object.keys(receipts); if (keys.length > 100) delete receipts[keys[0]];
+    roomReadReceipts.set(roomId, receipts);
+    io.to(roomId).emit('chat-read', receipt);
+  });
   // 7. Chat Message
   socket.on('send-message', (data: { roomId: string; text: string; userName?: string } | undefined) => {
     if (!data) return;
@@ -68,7 +92,7 @@ export function registerChatReactionsHandlers(io: Server, socket: Socket): void 
       id: Math.random().toString(36).substring(2, 9),
       user: serverName,
       text: cleanText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: new Date().toISOString(),
       replyTo,
     };
     trackRoomMessage(cleanRoomId, messagePayload.id, serverName);

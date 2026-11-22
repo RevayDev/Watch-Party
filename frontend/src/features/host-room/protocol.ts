@@ -33,6 +33,7 @@ const musicPlayingSchema = musicTrackSchema.omit({ id: true, durationMs: true })
 export const snapshotSchema = z.object({
   revision: z.number().int().nonnegative(), hostId: id,
   members: z.array(memberSchema).max(MAX_HOST_MEMBERS),
+  readReceipts: z.record(z.string(), z.object({ readerId: id, userName: name, messageId: id })).optional(),
   messages: z.array(z.object({
     id, authorId: id, user: name, text: z.string().max(2000), timestamp: z.string().max(30), edited: z.boolean().optional(),
     replyTo: z.object({ id, user: name, text: z.string().max(200) }).optional(),
@@ -49,6 +50,7 @@ export const snapshotSchema = z.object({
 });
 export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('room-settings'), settings: roomSettingsSchema }),
+  z.object({ type: z.literal('chat-read'), messageId: id }),
   z.object({ type: z.literal('chat'), text: z.string().trim().min(1).max(2000), id, replyTo: id.optional() }),
   z.object({ type: z.literal('edit-chat'), text: z.string().trim().min(1).max(2000), id }),
   z.object({ type: z.literal('video'), video: videoSchema, transferMusic: z.boolean().optional() }),
@@ -108,17 +110,25 @@ export function newHostRoom(name: string): HostRoomOptions {
 
 export function applyHostCommand(state: HostSnapshot, senderId: string, command: HostCommand): HostSnapshot {
   const member = state.members.find((candidate) => candidate.id === senderId);
-  const memberAction = command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
+  const memberAction = command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
   if (!member || (!memberAction && senderId !== state.hostId)) return state;
   switch (command.type) {
     case 'room-settings':
       return { ...state, revision: state.revision + 1, roomSettings: { ...state.roomSettings, ...command.settings } };
+    case 'chat-read': {
+      const index = state.messages.findIndex(message => message.id === command.messageId);
+      const previous = state.messages.findIndex(message => message.id === state.readReceipts?.[senderId]?.messageId);
+      if (index < 0 || index <= previous) return state;
+      const readReceipts = { ...state.readReceipts, [senderId]: { readerId: senderId, userName: member.name, messageId: command.messageId } };
+      const readers = Object.keys(readReceipts); if (readers.length > 100) delete readReceipts[readers[0]];
+      return { ...state, revision: state.revision + 1, readReceipts };
+    }
     case 'chat': {
       if (state.messages.some((message) => message.id === command.id)) return state;
       const reply = state.messages.find((message) => message.id === command.replyTo);
       return { ...state, revision: state.revision + 1, messages: [...state.messages, {
         id: command.id, authorId: member.id, user: member.name, text: command.text,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date().toISOString(),
         ...(reply ? { replyTo: { id: reply.id, user: reply.user, text: reply.text.slice(0, 200) } } : {}),
       }].slice(-300) };
     }

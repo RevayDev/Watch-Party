@@ -209,6 +209,8 @@ it('confirms voluntary server and ownership handoff before the current owner lea
  await settleUntil(() => third.snapshot?.members.length === 3 && guest.snapshot?.members.length === 3);
  host.command({ type: 'chat', id: 'preserved', text: 'Seguimos aquí' });
  await settleUntil(() => guest.snapshot?.messages.length === 1);
+ guest.command({ type: 'chat-read', messageId: 'preserved' });
+ await settleUntil(() => host.snapshot?.readReceipts?.[guest.id]?.messageId === 'preserved');
  let finished = false;
  const leaving = host.leaveGracefully().then(() => { finished = true; });
  expect(finished).toBe(false);
@@ -216,6 +218,7 @@ it('confirms voluntary server and ownership handoff before the current owner lea
  await leaving;
  expect(host.snapshot?.hostId).toBe(guest.id);
  expect(guest.snapshot?.messages[0].text).toBe('Seguimos aquí');
+ expect(guest.snapshot?.readReceipts?.[guest.id]?.messageId).toBe('preserved');
  host.stop();
  let nextFinished = false;
  const next = guest.leaveGracefully().then(() => { nextFinished = true; });

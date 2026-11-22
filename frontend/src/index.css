@@ -8097,3 +8097,20 @@ a.home-faq-hl--frontend {
 .meet-device-menu .room-settings__box > .ui-action { width: 100%; }
 .meet-device-menu > .ui-action { margin-top: 8px; font-size: 12px; }
 @media (max-width: 600px) { .meet-device-control { padding: 2px; border-radius: 12px; } .meet-device-control .meet-circle-btn { width: 32px; height: 36px; } .meet-device-control .meet-device-arrow { width: 18px; height: 36px; } }
+
+/* Chat composer and reaction popover share square controls and dark surfaces. */
+.drawer-chat__input-bar { padding: 12px; gap: 8px; align-items: center; }
+.drawer-chat__input { min-width: 0; width: 0; min-height: 44px; border-radius: 10px; padding: 10px 12px; }
+.drawer-chat__input.ui-field:focus-visible { outline: none; border-color: var(--color-primary-light); box-shadow: 0 0 0 2px rgba(99,102,241,.18); }
+.drawer-chat__send { width: 44px; height: 44px; border-radius: 10px; }
+.drawer-chat__actions { position: static; margin-top: 8px; opacity: 1; pointer-events: auto; justify-content: flex-end; }
+.drawer-chat__action { width: 28px; height: 28px; border-radius: 8px; }
+.drawer-chat__time { display: block; margin-top: 6px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.drawer-chat__seen { display: flex; flex-wrap: wrap; gap: 4px; align-self: flex-start; margin-top: -4px; padding: 0 4px; }
+.drawer-chat__seen--mine { align-self: flex-end; }
+.drawer-chat__seen-avatar { width: 22px; height: 22px; display: inline-grid; place-items: center; border: 2px solid var(--color-bg-input); border-radius: 50%; color: white; font-size: 9px; font-weight: 600; }
+.meet-emoji-popup { margin-bottom: 24px; padding: 12px; border-radius: 14px; background: var(--color-bg-main); border-color: var(--color-border); max-width: calc(100vw - 32px); box-sizing: border-box; }
+.reactions-bar__row { gap: 4px; }
+.reactions-bar__btn { width: 36px; height: 36px; padding: 0; border-radius: 8px; display: inline-grid; place-items: center; flex-shrink: 0; }
+.reactions-bar__btn:hover { background: var(--color-bg-hover); }
+@media (max-width: 600px) { .meet-emoji-popup { position: fixed; left: 16px; right: 16px; bottom: 104px; margin: 0; transform: none !important; animation: none; justify-content: center; } .reactions-bar__row { display: grid; grid-template-columns: repeat(5, 36px); } }

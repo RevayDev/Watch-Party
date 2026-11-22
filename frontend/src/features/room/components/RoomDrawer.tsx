@@ -1,5 +1,5 @@
 import { Button } from '../../../shared/components/ui';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { BottomSheet } from '../../../shared/components/BottomSheet';
 import { Chat } from '../../chat/Chat';
@@ -35,7 +35,7 @@ interface RoomDrawerProps {
   isCameraOn: boolean;
   toggleMic: () => void;
   toggleCamera: () => void;
-  socket: { emit: (event: string, data: unknown) => unknown };
+  socket: { emit: (event: string, data: unknown) => unknown; on?: (event: string, listener: (data: unknown) => void) => unknown; off?: (event: string, listener: (data: unknown) => void) => unknown };
   roomId: string;
   musicQueue?: IMusicQueueEntry[];
   musicNowPlaying?: IMusicNowPlaying | null;
@@ -88,6 +88,16 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   onMusicStop = () => undefined,
   onExpandToMain = () => undefined,
 }) => {
+  const [readReceipts, setReadReceipts] = useState<Record<string, { readerId: string; userName: string; messageId: string }>>({});
+  useEffect(() => {
+    setReadReceipts({});
+    const isReceipt = (data: unknown): data is { readerId: string; userName: string; messageId: string } => !!data && typeof data === 'object' && ['readerId', 'userName', 'messageId'].every(key => typeof (data as Record<string, unknown>)[key] === 'string');
+    const receive = (data: unknown) => { if (isReceipt(data)) setReadReceipts(previous => ({ ...previous, [data.readerId]: data })); };
+    const snapshot = (data: unknown) => { if (data && typeof data === 'object') setReadReceipts(Object.fromEntries(Object.values(data).filter(isReceipt).map(receipt => [receipt.readerId, receipt]))); };
+    socket.on?.('chat-read', receive); socket.on?.('chat-read-state', snapshot);
+    socket.emit('request-chat-reads', { roomId });
+    return () => { socket.off?.('chat-read', receive); socket.off?.('chat-read-state', snapshot); };
+  }, [socket, roomId]);
   const auth = () => buildSocketAuth(roomId, myName);
   const currentTab = activeSideTab ?? sideTabView;
 
@@ -126,6 +136,9 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
           <Chat
             isOpen={activeSideTab === 'chat'}
             messages={messages}
+            readReceipts={Object.values(readReceipts)}
+            currentUserId={userId}
+            onReadMessage={(messageId) => socket.emit('chat-read', { roomId, messageId })}
             onSendMessage={handleSendMessage}
             onEditMessage={handleEditMessage}
             currentUserName={myName}
