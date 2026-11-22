@@ -19,7 +19,9 @@ beforeEach(() => {
   ioMock.mockImplementation(() => fakeSocketInstance());
 });
 
-afterEach(() => {
+afterEach(async () => {
+  const { disconnectSocket } = await import('../src/services/socket');
+  disconnectSocket();
   vi.unstubAllGlobals();
 });
 
@@ -57,4 +59,16 @@ describe('services/socket: singleton', () => {
     const { disconnectSocket } = await import('../src/services/socket');
     expect(() => disconnectSocket()).not.toThrow();
   });
+});
+it('reconnects after foregrounding but not after an explicit leave', async () => {
+ const { getSocket, disconnectSocket } = await import('../src/services/socket');
+ const socket = getSocket() as unknown as { connected: boolean; connect: ReturnType<typeof vi.fn> };
+ socket.connected = false; socket.connect = vi.fn();
+ window.dispatchEvent(new Event('pageshow'));
+ expect(socket.connect).toHaveBeenCalledTimes(1);
+ socket.connected = true;
+ window.dispatchEvent(new Event('online'));
+ expect(socket.connect).toHaveBeenCalledTimes(1);
+ disconnectSocket(); window.dispatchEvent(new Event('pageshow'));
+ expect(socket.connect).toHaveBeenCalledTimes(1);
 });

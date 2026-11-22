@@ -250,3 +250,14 @@ it('authenticates delete/reaction commands and preserves deleted reply previews'
  const reply=applyHostCommand(deleted,'b',{type:'chat',id:'r',text:'De acuerdo',replyTo:'m'});
  expect(reply.messages[1].replyTo?.text).toBe('Mensaje eliminado');
 });
+it('retains the host after returning from a throttled background tab', async () => {
+ const host = start('Ana', true); await vi.advanceTimersByTimeAsync(1);
+ const guest = start('Beto'); await settleUntil(() => guest.snapshot?.members.length === 2);
+ const hostId = guest.snapshot!.hostId;
+ vi.setSystemTime(Date.now() + 60_000);
+ window.dispatchEvent(new Event('pageshow'));
+ await vi.advanceTimersByTimeAsync(10);
+ expect(host.snapshot?.hostId).toBe(hostId);
+ expect(guest.snapshot?.hostId).toBe(hostId);
+ expect(guest.connected).toBe(true);
+});

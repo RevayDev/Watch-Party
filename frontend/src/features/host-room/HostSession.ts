@@ -1,3 +1,4 @@
+import { onPageResume } from '../../shared/pageResume';
 import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
 import type { WebRTCTransport } from '../../hooks/useWebRTC';
 import {
@@ -40,6 +41,7 @@ export class HostSession implements WebRTCTransport {
   private stopped = false;
   private handoffTarget: string | null = null;
   private lastHostSeen = Date.now();
+  private stopResume: (() => void) | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastJoin = 0;
   private startedAt = Date.now();
@@ -129,6 +131,13 @@ export class HostSession implements WebRTCTransport {
         this.error = 'No se pudo establecer una conexión entre navegadores. Revisa la red y la señalización.';
         this.notify();
       }
+    });
+    this.stopResume = onPageResume(() => {
+      if (this.stopped) return;
+      // Give the open data channel time to answer after our own timers were frozen.
+      if (this.state && this.connections.get(this.state.hostId)?.open) this.lastHostSeen = Date.now();
+      if (this.directory?.disconnected && !this.directory.destroyed) this.directory.reconnect();
+      this.tick();
     });
     this.timer = setInterval(() => this.tick(), 2000);
     return this;
@@ -641,6 +650,7 @@ export class HostSession implements WebRTCTransport {
   }
 
   stop() {
+    this.stopResume?.(); this.stopResume = null;
     this.stopped = true;
     this.connected = false;
     if (this.timer) clearInterval(this.timer);

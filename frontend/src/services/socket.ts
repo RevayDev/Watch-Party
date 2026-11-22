@@ -1,6 +1,8 @@
+import { onPageResume } from '../shared/pageResume';
 import { io, Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
+let stopResume: (() => void) | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
@@ -32,10 +34,12 @@ export function getSocket(): Socket {
       autoConnect: true,
     });
   }
+  stopResume ??= onPageResume(() => { if (socket && !socket.connected) socket.connect(); });
   return socket;
 }
 
 export function disconnectSocket(): void {
+  stopResume?.(); stopResume = null;
   if (socket) {
     socket.disconnect();
     socket = null;

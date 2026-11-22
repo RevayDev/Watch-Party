@@ -1,3 +1,4 @@
+import { onPageResume } from '../../shared/pageResume';
 import { useEffect, useState, type RefObject } from 'react';
 import { ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
 import { Button } from '../../shared/components/ui';
@@ -60,13 +61,18 @@ export function VideoAudioBoost({ videoRef }: { videoRef: RefObject<HTMLVideoEle
    }
   }
   const listener = () => { void apply(); };
+  const stopResume = onPageResume(listener);
+  const unlock = () => { const context = videoRef.current && graphs.get(videoRef.current)?.context; if (context && context.state !== 'running') listener(); };
+  document.addEventListener('pointerdown', unlock);
+  document.addEventListener('keydown', unlock);
   window.addEventListener('watch-party-sound', listener);
   const video = videoRef.current;
   video?.addEventListener('play', listener);
   video?.addEventListener('playing', listener);
   listener();
   return () => {
-   disposed = true;
+   disposed = true; stopResume();
+   document.removeEventListener('pointerdown', unlock); document.removeEventListener('keydown', unlock);
    window.removeEventListener('watch-party-sound', listener);
    video?.removeEventListener('play', listener); video?.removeEventListener('playing', listener);
    // Closing here permanently silences the captured element on StrictMode/remount.

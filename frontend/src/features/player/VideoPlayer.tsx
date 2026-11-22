@@ -1,3 +1,4 @@
+import { onPageResume } from '../../shared/pageResume';
 import { VideoAudioBoost } from './VideoAudioBoost';
 import { PlayerActionDock } from './PlayerActionDock';
 import { Field, Button } from '../../shared/components/ui';
@@ -286,7 +287,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
     report();
     const iv = window.setInterval(report, heartbeatIntervalMs);
-    return () => window.clearInterval(iv);
+    const stopResume = onPageResume(report);
+    return () => { window.clearInterval(iv); stopResume(); };
   }, [heartbeatVideoKey, heartbeatSourceType, playbackError, hasHeartbeat, roomId, heartbeatIntervalMs]);
 
   // Auto-hide overlay top bar (filename + "Cambiar") after mouse idle — always, not just fullscreen
