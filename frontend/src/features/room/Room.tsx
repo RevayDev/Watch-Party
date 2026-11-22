@@ -15,6 +15,7 @@ import { notify } from '../../services/notifications';
 import { RoomControls } from './components/RoomControls';
 import { RoomLayout } from './components/RoomLayout';
 import { RoomDrawer } from './components/RoomDrawer';
+import { MusicPanel } from './components/MusicPanel';
 import { useBarPrefs } from './hooks/useBarPrefs';
 
 export interface RoomProps {
@@ -31,9 +32,10 @@ export interface RoomProps {
 export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialIsLeader, onLeave }) => {
   const r = useRoomSocket({ roomId, userName, initialIsLeader, onLeave });
 
+  const [musicPanelOpen, setMusicPanelOpen] = useState(true);
   // Toggle del panel de música (YouTube)
   const toggleMusicPanel = () => {
-    r.setActiveSideTab((v) => (v === 'music' ? null : 'music'));
+    setMusicPanelOpen((v) => !v);
   };
   // Agregar música de YouTube a la cola
   const handleAddMusicUrl = async (rawUrl: string): Promise<boolean> => {
@@ -192,6 +194,26 @@ onVideoReady={r.handleVideoReady}
               Visible al reconectar el socket o con calidad crítica (nivel 3:
               la media se está restableciendo). No destruye sala/chat/video:
               la película sigue reproduciéndose mientras se reintenta. */}
+          <div style={musicPanelOpen ? {} : { position: 'fixed', left: '-9999px', top: '-9999px', width: 320, height: 180, overflow: 'hidden', opacity: 0.01, pointerEvents: 'none', zIndex: -1 }}>
+            <MusicPanel
+              roomId={roomId}
+              queue={r.musicQueue ?? []}
+              nowPlaying={r.musicNowPlaying ?? null}
+              settings={r.roomData.settings ?? ({} as any)}
+              isModerator={isModerator}
+              myName={r.myName}
+              userId={r.userId}
+              onAddUrl={handleAddMusicUrl}
+              onAdd={r.musicAdd ?? (() => {})}
+              onRemove={r.musicRemove ?? (() => {})}
+              onReorder={r.musicReorder ?? (() => {})}
+              onApprove={r.musicApprove ?? (() => {})}
+              onNext={r.musicNext ?? (() => {})}
+              onAutoNext={r.musicAutoNext ?? (() => {})}
+              onStop={r.musicStop ?? (() => {})}
+              onExpandToMain={handleExpandMusicToMain}
+            />
+          </div>
           {(r.isReconnecting || r.qualityLevel >= 3) && (
             <div className="reconnect-pill" role="status" aria-live="polite">
               <span className="reconnect-pill__dot" aria-hidden="true" />
@@ -253,7 +275,7 @@ onVideoReady={r.handleVideoReady}
       controls={
         <RoomControls
         roomId={roomId}
-        musicOpen={r.activeSideTab === 'music'}
+        musicOpen={musicPanelOpen}
         onToggleMusic={toggleMusicPanel}
         layout={barPrefs.layout}
         showLabels={barPrefs.showLabels}

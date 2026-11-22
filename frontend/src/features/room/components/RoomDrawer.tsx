@@ -3,7 +3,6 @@ import { X } from 'lucide-react';
 import { BottomSheet } from '../../../shared/components/BottomSheet';
 import { Chat } from '../../chat/Chat';
 import { Participants } from '../../participants/Participants';
-import { MusicPanel } from './MusicPanel';
 import type { IRoomData, IMusicQueueEntry, IMusicNowPlaying, IMusicTrack, IRoomSettings, ChatMessage } from '../../../types/room';
 import { buildSocketAuth } from '../../../shared/utils';
 
@@ -73,19 +72,6 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
   toggleCamera,
   socket,
   roomId,
-  musicQueue = [],
-  musicNowPlaying = null,
-  musicSettings,
-  musicIsModerator = false,
-  onAddMusicUrl,
-  onMusicAdd = () => undefined,
-  onMusicRemove = () => undefined,
-  onMusicReorder = () => undefined,
-  onMusicApprove = () => undefined,
-  onMusicNext = () => undefined,
-  onMusicAutoNext = () => undefined,
-  onMusicStop = () => undefined,
-  onExpandToMain = () => undefined,
 }) => {
   const auth = () => buildSocketAuth(roomId, myName);
   const currentTab = activeSideTab ?? sideTabView;
@@ -108,9 +94,6 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
               : currentTab === 'music'
                 ? 'Música'
                 : 'Chat'}
-            {currentTab === 'music' && musicQueue.length > 0 && (
-              <span className="meet-drawer__tab-badge">{musicQueue.length}</span>
-            )}
           </span>
           <button
             type="button"
@@ -210,26 +193,6 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
             onUpdateSettings={(settings) => {
               socket.emit('update-room-settings', { roomId, settings, ...auth() });
             }}
-          />
-        )}
-        {currentTab === 'music' && (
-          <MusicPanel
-            roomId={roomId}
-            queue={musicQueue}
-            nowPlaying={musicNowPlaying}
-            settings={musicSettings ?? roomData.settings ?? ({} as IRoomSettings)}
-            isModerator={musicIsModerator}
-            myName={myName}
-            userId={userId}
-            onAddUrl={onAddMusicUrl}
-            onAdd={onMusicAdd}
-            onRemove={onMusicRemove}
-            onReorder={onMusicReorder}
-            onApprove={onMusicApprove}
-            onNext={onMusicNext}
-            onAutoNext={onMusicAutoNext}
-            onStop={onMusicStop}
-            onExpandToMain={onExpandToMain}
           />
         )}
       </div>

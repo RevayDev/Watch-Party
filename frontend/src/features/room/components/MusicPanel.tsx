@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { Youtube, Plus, Trash2, ArrowUp, ArrowDown, Check, Disc, Play, Pause, SkipForward, Maximize2, ListMusic, MoreVertical, ExternalLink, Square } from 'lucide-react';
 import type { IMusicNowPlaying, IMusicQueueEntry, IMusicTrack, IRoomSettings } from '../../../types/room';
 import { parseYouTubeUrl } from '../../../shared/youtube';
-import { formatPlayerTime, NowPlayingPlayer } from './NowPlayingPlayer';
+import { formatPlayerTime } from './NowPlayingPlayer';
 import { YouTubeSearch } from './YouTubeSearch';
-
 export interface MusicPanelProps {
   roomId: string;
   queue: IMusicQueueEntry[];
@@ -24,7 +23,6 @@ export interface MusicPanelProps {
   /** Muestra el tema actual en la pantalla principal de la sala (moderador). */
   onExpandToMain?: (url: string, title: string, currentTime?: number) => void;
 }
-
 /**
  * ID de video para lo que suena: prueba trackId/uri/openUrl (URL completa o
  * ID suelto de 11 caracteres, que es como lo guarda la cola).
@@ -41,7 +39,6 @@ export function resolveNowPlayingVideoId(
   }
   return '';
 }
-
 export const MusicPanel: React.FC<MusicPanelProps> = ({
   queue,
   nowPlaying,
@@ -54,7 +51,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   onReorder,
   onApprove,
   onNext,
-  onAutoNext,
   onStop,
   onExpandToMain = () => undefined,
 }) => {
@@ -62,22 +58,18 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
   const [addingYt, setAddingYt] = useState(false);
   const [inputError, setInputError] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
   const musicEnabled = settings.musicEnabled !== false;
   const allowAdd = isModerator || settings.musicCanAdd !== 'moderator';
-
   const handlePasteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setInputError('');
     const raw = ytInput.trim();
     if (!raw) return;
-
     const ytRef = parseYouTubeUrl(raw);
     if (!ytRef) {
       setInputError('El enlace no es de YouTube válido (ej: https://youtu.be/... o youtube.com/watch?v=...)');
       return;
     }
-
     setAddingYt(true);
     try {
       if (onAddUrl) {
@@ -100,7 +92,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       setAddingYt(false);
     }
   };
-
   if (!musicEnabled) {
     return (
       <div className="drawer-chat__empty">
@@ -110,13 +101,11 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       </div>
     );
   }
-
   const canRemove = (entry: IMusicQueueEntry): boolean => {
     if (isModerator) return true;
     if (settings.musicCanRemove === 'moderator') return false;
     return entry.proposedBy === myName;
   };
-
   const moveEntry = (index: number, delta: -1 | 1) => {
     const next = [...queue];
     const j = index + delta;
@@ -125,7 +114,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
     next.splice(j, 0, item);
     onReorder(next.map((e) => e.id));
   };
-
   const pending = queue.filter((e) => e.status === 'pending');
   const active = queue.filter((e) => e.status !== 'pending');
   const nowVideoId = resolveNowPlayingVideoId(nowPlaying);
@@ -144,7 +132,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
     cursor: 'pointer',
     textAlign: 'left',
   };
-
   /** Menú ⋮ de las filas de la cola (diseño mockup). */
   const PlayingMenu: React.FC<{
     rowId: string;
@@ -236,7 +223,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       </div>
     );
   };
-
   return (
     <div className="music-panel" aria-label="Música y Karaoke de YouTube"><div className="music-panel__content">
       {allowAdd && <YouTubeSearch provider={settings.youtubeProvider} onAdd={onAdd} onPlay={isModerator ? onExpandToMain : undefined} />}
@@ -282,7 +268,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
               </button>
             </div>
           </div>
-
           {inputError && (
             <p style={{ color: '#f87171', fontSize: '0.76rem', marginTop: '0.45rem', marginBottom: 0 }}>
               ⚠️ {inputError}
@@ -294,9 +279,7 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
           🔒 Solo los moderadores pueden proponer canciones a la cola.
         </p>
       )}
-
       {/* El reproductor "Sonando ahora" va debajo de la tarjeta de cola (diseño mockup). */}
-
       {/* Pendientes de aprobación (moderador) */}
       {isModerator && pending.length > 0 && (
         <div style={{ marginBottom: '1rem' }}>
@@ -364,7 +347,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
           </div>
         </div>
       )}
-
       {/* Tarjeta de la cola musical (diseño mockup) */}
       <details className="room-settings__box music-panel__queue" style={{ padding: '0.85rem', marginBottom: '1rem' }}>
         <summary style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', cursor: 'pointer' }}>
@@ -376,7 +358,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             <ListMusic size={14} />
           </span>
         </summary>
-
         {active.length === 0 ? (
           <div className="drawer-chat__empty" style={{ padding: '1.5rem 1rem' }}>
             <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.84rem' }}>
@@ -393,7 +374,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
               const rowDuration = typeof e.durationMs === 'number' && e.durationMs > 0
                 ? formatPlayerTime(e.durationMs / 1000)
                 : null;
-
               return (
                 <div
                   key={e.id}
@@ -456,7 +436,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                       <Youtube size={18} />
                     </div>
                   )}
-
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {e.name}
@@ -465,13 +444,11 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                       {e.artists || 'YouTube Music'} · propuesto por {e.proposedBy}
                     </p>
                   </div>
-
                   {rowDuration && (
                     <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                       {rowDuration}
                     </span>
                   )}
-
                   {!isPlayingNow && canRemove(e) && (
                     <button
                       type="button"
@@ -516,7 +493,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
                       isCurrentlyPlaying={isPlayingNow}
                     />
                   )}
-
                   {!isPlayingNow && isModerator && settings.musicAllowReorder === true && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <button
@@ -560,7 +536,6 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
         )}
       </details>
       </div>
-
       {/* Reproductor "Sonando ahora" debajo de la tarjeta (diseño mockup) */}
         <div
           className="room-settings__box music-panel__footer"
@@ -571,29 +546,16 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
             background: 'rgba(15, 20, 35, 0.55)',
           }}
         >
-          {nowPlaying && nowVideoId ? <NowPlayingPlayer
-            trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
-            videoId={nowVideoId}
-            title={nowPlaying.name}
-            subtitle={`${nowPlaying.artists || 'YouTube Music'} · propuesto por ${nowPlaying.proposedBy}`}
-            thumb={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
-            onEnded={onAutoNext}
-            onNext={onNext}
-            onStop={onStop}
-            onExpand={(currentTime) => {
-              const url = nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`;
-              if (url) onExpandToMain(url, nowPlaying.name, currentTime);
-            }}
-            showModerator={isModerator}
-          /> : <div className="music-player-empty">
+          {nowPlaying && nowVideoId ? <div className="music-player-empty">
+            <div className="music-player-empty__art" aria-hidden="true"><Disc size={28} /></div>
+            <div className="music-player-empty__info"><strong>Reproduciendo en la sala</strong><span>Usa el reproductor de arriba para controlar la m�sica</span></div>
+          </div> : <div className="music-player-empty">
             <div className="music-player-empty__art" aria-hidden="true"><Disc size={28} /></div>
             <div className="music-player-empty__info"><strong>Sin reproducción</strong><span>{active.length ? 'Elige un tema de la cola o inicia la reproducción' : 'Añade una canción para empezar'}</span></div>
             <button type="button" className="music-player-empty__play" aria-label="Reproducir cola" title="Reproducir cola" disabled={!isModerator || active.length === 0} onClick={onNext}><Play size={20} /></button>
           </div>}
         </div>
-
     </div>
   );
 };
-
 export default MusicPanel;
