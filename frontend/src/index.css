@@ -8221,3 +8221,12 @@ a.home-faq-hl--frontend {
 .video-audio-boost label { display: grid; gap: 10px; }
 .video-audio-boost input { width: 100%; accent-color: var(--color-primary); }
 .video-audio-boost p { color: var(--color-muted-light); margin: 10px 0; }
+.video-audio-boost { left: auto; right: 12px; top: 60px; display: flex; align-items: flex-start; gap: 4px; }
+.video-audio-boost--collapsed { right: 0; }
+.video-audio-boost summary { display: flex; align-items: center; gap: 6px; list-style: none; }
+.video-audio-boost__fold { display: grid; place-items: center; width: 28px; height: 34px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text-main); background: var(--color-bg-input); }
+.video-audio-boost__panel { max-height: min(440px, 60dvh); overflow-y: auto; }
+.video-audio-boost__panel .room-settings__box { padding: 0; margin: 0; border: 0; background: transparent; }
+.sound-settings__fields { display: grid; gap: 20px; margin: 20px 0; }
+.sound-settings__fields label { display: grid; gap: 10px; font-size: 13px; color: var(--color-text-main); }
+.sound-settings__fields input { width: 100%; }

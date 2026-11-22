@@ -1,3 +1,4 @@
+import { SoundSettingsSection } from './SoundSettingsSection';
 import { Button, Field, TextArea, Surface, Range } from '../shared/components/ui';
 import React, { useEffect, useState } from "react";
 import { YouTubeSettingsSection } from './YouTubeSettingsSection';
@@ -88,7 +89,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
   const [choice, setChoice] = useState<number | null>(timerMinutes);
   // Organización por pestañas: General, Barra (local) y Rendimiento.
   // Mismo contenido y handlers, solo agrupado.
-  const [tab, setTab] = useState<'general' | 'barra' | 'rendimiento' | 'media' | 'server' | 'youtube'>('general');
+  const [tab, setTab] = useState<'general' | 'barra' | 'rendimiento' | 'media' | 'server' | 'youtube' | 'sound'>('general');
 
   // Demo: la persistencia y el cierre automático configurable quedan
   // deshabilitados solo visualmente (el timer lo pone el servidor).
@@ -151,6 +152,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
               ['barra', 'Apariencia'],
               ['rendimiento', 'Rendimiento'],
               ['media', 'Micrófono y cámara'],
+              ['sound', 'Sonido'],
               ['server', 'Servidor'],
               ['youtube', 'YouTube'],
             ] as const
@@ -168,7 +170,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
           ))}
         </div>
 
-        <section className="room-settings__page" role="tabpanel" aria-label={tab === 'barra' ? 'Apariencia' : tab === 'media' ? 'Micrófono y cámara' : tab === 'youtube' ? 'YouTube' : tab === 'server' ? 'Servidor' : tab === 'general' ? 'General' : 'Rendimiento'}>
+        <section className="room-settings__page" role="tabpanel" aria-label={tab === 'sound' ? 'Sonido' : tab === 'barra' ? 'Apariencia' : tab === 'media' ? 'Micrófono y cámara' : tab === 'youtube' ? 'YouTube' : tab === 'server' ? 'Servidor' : tab === 'general' ? 'General' : 'Rendimiento'}>
+        {tab === 'sound' && <SoundSettingsSection />}
         {tab === 'youtube' && <YouTubeSettingsSection provider={youtubeProvider} onChange={onYouTubeProviderChange} canEdit={canEdit} />}
         {tab === 'media' && onRetryMedia && <MediaSettingsSection localStream={localStream} onRetry={onRetryMedia} />}
         {tab === 'server' && (serverContent ?? <section className="room-settings__box">
