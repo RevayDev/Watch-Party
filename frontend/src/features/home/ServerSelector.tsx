@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react';
 import { Field, Button } from '../../shared/components/ui';
 import { useEffect, useState } from 'react';
 import { BACKEND_BASE } from '../../services/api';
@@ -39,21 +40,16 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
     <fieldset className="server-selector">
       <legend>¿Dónde quieres alojar la sala?</legend>
       <p className="server-selector__intro">La misma experiencia, dos formas de conectar.</p>
-      {availability !== 'unavailable' && (
-        <div className={`server-selector__card ${mode === 'external' ? 'is-selected' : ''}`}>
+        <div className={`server-selector__card server-selector__card--external ${mode === 'external' ? 'is-selected' : ''}`}>
+          <Button variant="unstyled" type="button" className="server-selector__retry" aria-label="Reintentar conexión del servidor" title="Reintentar conexión" disabled={availability === 'checking'} onClick={() => setAttempt(value => value + 1)}><RefreshCw size={16} /></Button>
           <label className="server-selector__option">
             <Field type="radio" name="server-mode" value="external" checked={mode === 'external'}
               disabled={availability !== 'available'} onChange={() => onChange('external')} />
             Servidor externo – {serverName}
           </label>
           <p className="room-settings__box-desc">El servidor gestiona la sala, los archivos y el proxy de video. Consume recursos del servidor externo.</p>
-          <p role="status">{availability === 'checking' ? 'Comprobando conexión…' : 'Servidor disponible.'}</p>
+          <p role="status">{availability === 'checking' ? 'Comprobando conexión…' : availability === 'available' ? 'Servidor disponible.' : 'Servidor no disponible. Se usará el navegador del anfitrión.'}</p>
         </div>
-      )}
-      {availability === 'unavailable' && (
-        <p role="status" className="room-settings__box-desc">El servidor externo no está disponible. Se usará el navegador del anfitrión.</p>
-      )}
-      {availability === 'unavailable' && <Button variant="secondary" type="button" className="leader-exit-modal__cancel-btn" onClick={() => setAttempt((value) => value + 1)}>Volver a comprobar</Button>}
       <div className={`server-selector__card ${mode === 'host' ? 'is-selected' : ''}`}>
         <label className="server-selector__option">
           <Field type="radio" name="server-mode" value="host" checked={mode === 'host'} onChange={() => onChange('host')} />
