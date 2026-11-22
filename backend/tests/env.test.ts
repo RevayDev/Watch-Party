@@ -10,7 +10,11 @@ it('applies the existing local defaults and accepts an explicit port and MongoDB
   expect(readStartupEnv({ PORT: '10000', MONGODB_URI: mongoUri })).toEqual({ port: 10000, mongoUri });
 });
 
-it('rejects invalid configuration without including values in the error', () => {
+it('rejects invalid ports but safely falls back when MongoDB URI is malformed', () => {
   expect(() => readStartupEnv({ PORT: '10000bad', MONGODB_URI: 'https://private:secret@example.net' }))
-    .toThrow(/^Invalid startup configuration: PORT, MONGODB_URI$/);
+    .toThrow(/^Invalid startup configuration: PORT$/);
+  expect(readStartupEnv({ MONGODB_URI: 'https://private:secret@example.net' })).toEqual({
+    port: 4000,
+    mongoUri: 'mongodb://127.0.0.1:27017/watch_party',
+  });
 });
