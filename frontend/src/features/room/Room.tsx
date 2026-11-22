@@ -149,7 +149,6 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
         timerEndsAt={r.roomData.settings?.timerEndsAt}
         roomStatus={r.roomData.status}
         onOpenSettings={() => r.setShowRoomSettings(true)}
-        onOpenMediaSettings={() => setShowMediaSettings(true)}
         onOpenParticipants={() => r.setActiveSideTab((v) => (v === 'participants' ? null : 'participants'))}
         participantsActive={r.sideTabView === 'participants'}
         onLeaveClick={r.handleLeaveClick}

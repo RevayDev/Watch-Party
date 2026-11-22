@@ -14,7 +14,7 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
   const serverName = BACKEND_BASE.includes('onrender.com') ? 'Render' : BACKEND_BASE ? 'Servidor configurado' : 'Backend local';
   useEffect(() => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 2000);
     let active = true;
     setAvailability('checking');
     onAvailability(false);
@@ -38,24 +38,28 @@ export function ServerSelector({ mode, onChange, onAvailability }: {
     <fieldset className="server-selector">
       <legend>¿Dónde quieres alojar la sala?</legend>
       <p className="server-selector__intro">La misma experiencia, dos formas de conectar.</p>
-      <div className={`server-selector__card ${mode === 'external' ? 'is-selected' : ''}`}>
-      <label className="server-selector__option">
-        <input type="radio" name="server-mode" value="external" checked={mode === 'external'}
-          disabled={availability !== 'available'} onChange={() => onChange('external')} />
-        Servidor externo · {serverName}
-      </label>
-      <p className="room-settings__box-desc">El servidor gestiona la sala, los archivos y el proxy de video. Consume recursos del servidor externo.</p>
-      <p role="status">{availability === 'checking' ? 'Comprobando conexión…' : availability === 'available'
-        ? 'Servidor disponible.' : 'Sin respuesta. Puede estar suspendido o sin conexión.'}</p>
+      {availability !== 'unavailable' && (
+        <div className={`server-selector__card ${mode === 'external' ? 'is-selected' : ''}`}>
+          <label className="server-selector__option">
+            <input type="radio" name="server-mode" value="external" checked={mode === 'external'}
+              disabled={availability !== 'available'} onChange={() => onChange('external')} />
+            Servidor externo – {serverName}
+          </label>
+          <p className="room-settings__box-desc">El servidor gestiona la sala, los archivos y el proxy de video. Consume recursos del servidor externo.</p>
+          <p role="status">{availability === 'checking' ? 'Comprobando conexión…' : 'Servidor disponible.'}</p>
+        </div>
+      )}
+      {availability === 'unavailable' && (
+        <p role="status" className="room-settings__box-desc">El servidor externo no está disponible. Se usará el navegador del anfitrión.</p>
+      )}
       {availability === 'unavailable' && <button type="button" className="leader-exit-modal__cancel-btn" onClick={() => setAttempt((value) => value + 1)}>Volver a comprobar</button>}
-      </div>
       <div className={`server-selector__card ${mode === 'host' ? 'is-selected' : ''}`}>
-      <label className="server-selector__option">
-        <input type="radio" name="server-mode" value="host" checked={mode === 'host'} onChange={() => onChange('host')} />
-        Navegador del anfitrión
-      </label>
-      <p className="room-settings__box-desc">Tu equipo coordina video, chat y llamadas, con relevo automático entre participantes. Mantén la pestaña abierta; depende de tu conexión.</p>
-      <span className="server-selector__limits">Hasta 8 personas · Archivos de hasta 256 MB</span>
+        <label className="server-selector__option">
+          <input type="radio" name="server-mode" value="host" checked={mode === 'host'} onChange={() => onChange('host')} />
+          Navegador del anfitrión
+        </label>
+        <p className="room-settings__box-desc">Tu equipo coordina video, chat y llamadas, con relevo automático entre participantes. Mantén la pestaña abierta; depende de tu conexión.</p>
+        <span className="server-selector__limits">Hasta 8 personas · Archivos de hasta 256 MB</span>
       </div>
     </fieldset>
   );

@@ -12,7 +12,7 @@ it('disables Render and selects browser hosting when the health endpoint fails',
   const available = vi.fn();
   render(<ServerSelector mode="external" onChange={onChange} onAvailability={available} />);
   await waitFor(() => expect(onChange).toHaveBeenCalledWith('host'));
-  expect(screen.getByRole('radio', { name: /Servidor externo/ })).toBeDisabled();
+  expect(screen.queryByRole('radio', { name: /Servidor externo/ })).toBeNull();
   expect(screen.getByRole('radio', { name: /Navegador del anfitrión/ })).toBeEnabled();
   expect(available).toHaveBeenLastCalledWith(false);
 });
@@ -26,3 +26,4 @@ it('enables Render only after validating its health response', async () => {
   expect(screen.getByRole('radio', { name: /Servidor externo/ })).toBeEnabled();
   expect(onChange).not.toHaveBeenCalled();
 });
+
