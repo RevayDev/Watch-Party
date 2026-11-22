@@ -59,9 +59,9 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
   const isModerator = r.isLeader || r.isCohost;
   // Ampliar a la pantalla de la sala: pone el tema actual como video
   // principal (solo moderador; el servidor lo valida de todos modos).
-  const handleExpandMusicToMain = (url: string, title: string) => {
+  const handleExpandMusicToMain = (url: string, title: string, currentTime?: number) => {
     if (!isModerator) return;
-    void r.handleSetVideoUrl(url, title);
+    void r.handleSetVideoUrl(url, title, { startTime: currentTime ?? 0, transferMusic: true });
   };
   // Estilo personal de la barra (local, por usuario: nunca se emite a la sala).
   const barPrefs = useBarPrefs();
@@ -171,6 +171,7 @@ export const Room: React.FC<RoomProps> = ({ roomId, userName, isLeader: initialI
             isLeader={r.isLeader || r.isCohost}
             onUploadVideo={r.handleUploadVideo}
             onSetVideoUrl={r.handleSetVideoUrl}
+            onClearVideo={r.handleClearVideo}
             uploadProgress={r.uploadProgress}
             isVideoLoading={r.isVideoLoading}
             onSyncAction={r.handleSyncAction}

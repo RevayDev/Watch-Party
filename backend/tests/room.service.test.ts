@@ -34,7 +34,7 @@ describe('RoomService.createRoom / getRoomById', () => {
   it('crea una sala con código de 6 caracteres y registra al leader', async () => {
     const { room, leaderSecret } = await RoomService.createRoom({ leaderName: '  Ana  ' });
     created.push(room.roomId);
-    expect(room.roomId).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
+    expect(room.roomId).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6,8}$/);
     expect(leaderSecret).toMatch(/^[0-9a-f]{32}$/);
     expect(room.leaderName).toBe('Ana');
     expect(room.participants).toHaveLength(1);

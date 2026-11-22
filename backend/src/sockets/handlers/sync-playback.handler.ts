@@ -129,9 +129,14 @@ export function registerSyncPlaybackHandlers(io: Server, socket: Socket): void {
       return;
     }
 
+    const startMark =
+      typeof video.startTime === 'number' && Number.isFinite(video.startTime) && video.startTime > 0
+        ? video.startTime
+        : 0;
+
     // Reset playback state for the new video
     roomPlayback.set(cleanRoomId, {
-      currentTime: 0,
+      currentTime: startMark,
       isPlaying: false,
       updatedAt: Date.now(),
     });

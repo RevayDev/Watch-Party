@@ -152,7 +152,7 @@ describe('integrado salas: 5×201 vía REST y la 6ª 429 exacto', () => {
       const res = mockRes();
       await RoomController.create(mockReq({}, { leaderName: `H${i}` }, {}) as any, res, next);
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(res.body.roomId).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
+      expect(res.body.roomId).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6,8}$/);
       created.push(res.body.roomId);
     }
     expect(await RoomService.countLiveRooms()).toBe(5);

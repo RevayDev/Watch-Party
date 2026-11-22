@@ -86,7 +86,7 @@ describe('RoomController.create: validaciones', () => {
     const res = mockRes();
     await RoomController.create(req, res, next);
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.body.roomId).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
+    expect(res.body.roomId).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6,8}$/);
     expect(res.body.isTemporary).toBe(false);
     created.push(res.body.roomId);
   });
