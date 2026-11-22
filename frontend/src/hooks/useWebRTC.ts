@@ -458,6 +458,16 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
     async (audioRequested: boolean, videoRequested: boolean): Promise<MediaStream | null> => {
       try {
         setMediaError(null);
+        // JSDOM and a few legacy webviews omit the property; only reject when
+        // the browser explicitly reports an insecure context.
+        if ('isSecureContext' in window && window.isSecureContext === false) {
+          setMediaError('La cámara y el micrófono requieren abrir la sala con HTTPS. No uses una vista previa ni una dirección http.');
+          return null;
+        }
+        if (!navigator.mediaDevices?.getUserMedia) {
+          setMediaError('Este navegador no permite usar cámara o micrófono. Abre la sala directamente en Chrome, Brave o Safari actualizado.');
+          return null;
+        }
 
         // 1. Handle Microphone
         if (audioRequested !== isMicOnRef.current) {
@@ -501,7 +511,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
       } catch (err: any) {
         console.warn('⚠️ Media access error:', err.name, err.message);
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          setMediaError('Permiso denegado. Permite el acceso a la cámara y micrófono en tu navegador.');
+          setMediaError('Permiso bloqueado por el navegador. En Brave toca el candado junto a la dirección, permite Cámara y Micrófono para esta web y recarga la sala.');
         } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
           setMediaError('No se detectó cámara o micrófono disponible.');
         } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
