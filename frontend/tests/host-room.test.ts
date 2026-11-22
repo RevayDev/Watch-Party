@@ -261,3 +261,19 @@ it('retains the host after returning from a throttled background tab', async () 
  expect(guest.snapshot?.hostId).toBe(hostId);
  expect(guest.connected).toBe(true);
 });
+
+it('relays guest video pause/seek and music checkpoints to the host', async () => {
+ const host = start('Ana', true); await vi.advanceTimersByTimeAsync(1);
+ const guest = start('Beto'); await settleUntil(() => guest.snapshot?.members.length === 2);
+ guest.command({ type: 'playback', action: 'pause', currentTime: 42 });
+ await settleUntil(() => host.snapshot?.playback?.currentTime === 42);
+ expect(host.snapshot?.playback?.action).toBe('pause');
+ guest.command({ type: 'playback', action: 'seek', currentTime: 90 });
+ await settleUntil(() => host.snapshot?.playback?.currentTime === 90);
+ host.command({ type: 'music-add', track: { id: 'abcdefghijk', name: 'Song', artists: 'Artist' } });
+ host.command({ type: 'music-next' });
+ await settleUntil(() => !!guest.snapshot?.musicNowPlaying);
+ guest.emit('music-playback', { entryId: guest.snapshot!.musicNowPlaying!.entryId, currentTime: 18, playing: false });
+ await settleUntil(() => host.snapshot?.musicNowPlaying?.playback?.currentTime === 18);
+ expect(host.snapshot?.musicNowPlaying?.playback?.playing).toBe(false);
+});

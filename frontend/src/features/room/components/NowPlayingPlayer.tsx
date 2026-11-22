@@ -2,6 +2,7 @@ import { Button, Range } from '../../../shared/components/ui';
 import React, { useEffect, useRef, useState } from 'react';
 import { AudioLines, Maximize2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, Youtube, Square } from 'lucide-react';
 import { YouTubePlayerView } from '../../player/YouTubePlayerView';
+import { onPageResume } from '../../../shared/pageResume';
 
 interface QueueYouTubePlayer {
   playVideo?: () => void;
@@ -12,6 +13,7 @@ interface QueueYouTubePlayer {
   setVolume?: (volume: number) => void;
   getCurrentTime?: () => number;
   getDuration?: () => number;
+  getPlayerState?: () => number;
 }
 
 export function formatPlayerTime(totalSeconds: number): string {
@@ -22,6 +24,9 @@ export function formatPlayerTime(totalSeconds: number): string {
 
 /** The mini-player uses the existing iframe and advances the room queue when playback ends. */
 export const NowPlayingPlayer: React.FC<{
+  playback?: { currentTime: number; playing: boolean; sentAt: number };
+  startedAt?: string;
+  onPlayback?: (currentTime: number, playing: boolean) => void;
   trackKey: string;
   videoId: string;
   title: string;
@@ -32,7 +37,7 @@ export const NowPlayingPlayer: React.FC<{
   onStop: () => void;
   onExpand: (currentTime: number) => void;
   showModerator: boolean;
-}> = ({ trackKey, videoId, title, subtitle, thumb, onEnded, onNext, onStop, onExpand, showModerator }) => {
+}> = ({ playback, startedAt, onPlayback, trackKey, videoId, title, subtitle, thumb, onEnded, onNext, onStop, onExpand, showModerator }) => {
   const playerRef = useRef<QueueYouTubePlayer | null>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -41,6 +46,38 @@ export const NowPlayingPlayer: React.FC<{
   const [duration, setDuration] = useState(0);
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
+  const checkpoint = useRef(playback);
+  const playingRef = useRef(false);
+  const startedRef = useRef(startedAt);
+  startedRef.current = startedAt;
+  const synchronize = (force = false) => {
+    const p = playerRef.current; if (!p) return;
+    const point = checkpoint.current;
+    const shouldPlay = point?.playing ?? true;
+    const sentAt = point?.sentAt ?? Date.parse(startedRef.current || new Date().toISOString());
+    const target = (point?.currentTime ?? 0) + (shouldPlay ? Math.max(0, (Date.now() - sentAt) / 1000) : 0);
+    try {
+      if (force || Math.abs((p.getCurrentTime?.() ?? 0) - target) > 1.2) p.seekTo?.(target, true);
+      const active = p.getPlayerState ? p.getPlayerState() === 1 : playingRef.current;
+      if (shouldPlay && !active) p.playVideo?.();
+      if (!shouldPlay && active) p.pauseVideo?.();
+      setCurrent(target);
+    } catch { /* The next ready/foreground event retries the checkpoint. */ }
+  };
+  const syncRef = useRef(synchronize); syncRef.current = synchronize;
+  useEffect(() => {
+    checkpoint.current = playback;
+    syncRef.current(true);
+  }, [playback?.sentAt, playback?.currentTime, playback?.playing, startedAt, trackKey]);
+  useEffect(() => {
+    const timer = window.setInterval(() => syncRef.current(), 1500);
+    const stop = onPageResume(() => syncRef.current(true));
+    return () => { window.clearInterval(timer); stop(); };
+  }, [trackKey]);
+  const publish = (seconds: number, active: boolean) => {
+    checkpoint.current = { currentTime: seconds, playing: active, sentAt: Date.now() };
+    onPlayback?.(seconds, active);
+  };
 
   const tryPlay = () => {
     try {
@@ -48,7 +85,7 @@ export const NowPlayingPlayer: React.FC<{
       if (!p) return;
       if (typeof p.unMute === 'function') p.unMute();
       if (typeof p.setVolume === 'function') p.setVolume(volume);
-      if (typeof p.playVideo === 'function') p.playVideo();
+      synchronize(true);
       setMuted(false);
     } catch {
       /* Autoplay may require a manual click. */
@@ -59,6 +96,7 @@ export const NowPlayingPlayer: React.FC<{
     try {
       const p = playerRef.current;
       if (!p) return;
+      publish(p.getCurrentTime?.() ?? current, !playing);
       if (playing) {
         if (typeof p.pauseVideo === 'function') p.pauseVideo();
       } else {
@@ -74,7 +112,9 @@ export const NowPlayingPlayer: React.FC<{
   };
 
   const restart = () => {
-    seekTo(0);
+    publish(0, true);
+    playerRef.current?.seekTo?.(0, true);
+    setCurrent(0);
     try {
       playerRef.current?.playVideo?.();
     } catch {
@@ -83,6 +123,7 @@ export const NowPlayingPlayer: React.FC<{
   };
 
   const seekTo = (seconds: number) => {
+    publish(seconds, playing);
     try {
       const p = playerRef.current;
       if (p && typeof p.seekTo === 'function') p.seekTo(seconds, true);
@@ -167,8 +208,8 @@ export const NowPlayingPlayer: React.FC<{
       </div>
       <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
         <YouTubePlayerView key={trackKey} videoId={videoId} className="" onReady={(player) => { playerRef.current = player; tryPlay(); }} onStateChange={(event) => {
-          if (event.data === 1) setPlaying(true);
-          else if (event.data === 2) setPlaying(false);
+          if (event.data === 1) { playingRef.current = true; setPlaying(true); }
+          else if (event.data === 2) { playingRef.current = false; setPlaying(false); }
           else if (event.data === 0) { setPlaying(false); onEndedRef.current(); }
         }} />
       </div>

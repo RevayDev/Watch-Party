@@ -126,6 +126,7 @@ export interface IMusicQueueEntry {
 
 /** Tema sonando ahora en la sala (YouTube). */
 export interface IMusicNowPlaying {
+  playback?: { currentTime: number; playing: boolean; sentAt: number };
   entryId: string;
   trackId: string;
   name: string;

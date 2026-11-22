@@ -229,6 +229,7 @@ export const RoomDrawer: React.FC<RoomDrawerProps> = ({
         )}
         <div className="meet-drawer__music" style={{ display: currentTab === 'music' ? 'flex' : 'none' }}>
           <MusicPanel
+            onPlayback={(entryId, currentTime, playing) => socket.emit('music-playback', { roomId, entryId, currentTime, playing, ...auth() })}
             roomId={roomId}
             queue={musicQueue}
             nowPlaying={musicNowPlaying}

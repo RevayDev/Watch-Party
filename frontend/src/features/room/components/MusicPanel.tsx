@@ -7,6 +7,7 @@ import { formatPlayerTime, NowPlayingPlayer } from './NowPlayingPlayer';
 import { YouTubeSearch } from './YouTubeSearch';
 
 export interface MusicPanelProps {
+  onPlayback?: (entryId: string, currentTime: number, playing: boolean) => void;
   roomId: string;
   queue: IMusicQueueEntry[];
   nowPlaying: IMusicNowPlaying | null;
@@ -23,7 +24,7 @@ export interface MusicPanelProps {
   onAutoNext: () => void;
   onStop: () => void;
   /** Muestra el tema actual en la pantalla principal de la sala (moderador). */
-  onExpandToMain?: (url: string, title: string) => void;
+  onExpandToMain?: (url: string, title: string, currentTime?: number) => void;
 }
 
 /**
@@ -44,6 +45,7 @@ export function resolveNowPlayingVideoId(
 }
 
 export const MusicPanel: React.FC<MusicPanelProps> = ({
+  onPlayback,
   queue,
   nowPlaying,
   settings,
@@ -608,12 +610,14 @@ export const MusicPanel: React.FC<MusicPanelProps> = ({
       </div>
       <Surface className="room-settings__box music-panel__footer">
         {nowPlaying && nowVideoId ? <NowPlayingPlayer
+          playback={nowPlaying.playback} startedAt={nowPlaying.startedAt}
+          onPlayback={(currentTime, playing) => onPlayback?.(nowPlaying.entryId, currentTime, playing)}
           trackKey={`${nowPlaying.entryId || nowVideoId}-${nowVideoId}`}
           videoId={nowVideoId} title={nowPlaying.name}
           subtitle={`${nowPlaying.artists || 'YouTube Music'} · propuesto por ${nowPlaying.proposedBy}`}
           thumb={nowPlaying.albumArt || `https://img.youtube.com/vi/${nowVideoId}/hqdefault.jpg`}
           onEnded={onAutoNext} onNext={onNext} onStop={onStop}
-          onExpand={() => onExpandToMain(nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`, nowPlaying.name)}
+          onExpand={(currentTime) => onExpandToMain(nowPlaying.openUrl || nowPlaying.uri || `https://www.youtube.com/watch?v=${nowVideoId}`, nowPlaying.name, currentTime)}
           showModerator={isModerator}
         /> : <div className="music-player-empty">
           <div className="music-player-empty__art" aria-hidden="true"><Disc size={28} /></div>

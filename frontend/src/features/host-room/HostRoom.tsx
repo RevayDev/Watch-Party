@@ -241,7 +241,7 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
             onSyncAction={(action, currentTime) => session.command({ type: 'playback', action, currentTime })}
             onPlaybackHeartbeat={isHost ? (currentTime, playing) => session.command({
               type: 'playback', action: playing ? 'play' : 'pause', currentTime,
-            }) : undefined} remoteAction={isHost ? null : state.playback} />
+            }) : undefined} remoteAction={state.playback} />
         )}
       </>}
       cameras={<CameraGrid localStream={media.localStream} remotePeers={media.remotePeers}

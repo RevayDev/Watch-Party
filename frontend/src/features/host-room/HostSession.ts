@@ -53,6 +53,7 @@ export class HostSession implements WebRTCTransport {
   private announced = new Set<string>();
   private offlineSince = new Map<string, number>();
   private pendingChat = new Map<string, Extract<HostCommand, { type: 'chat' }>>();
+  private pendingPlayback = new Map<string, HostCommand>();
   private fileUrl: string | null = null;
   private fileId: string | null = null;
   private fileProgress = 0;
@@ -403,6 +404,7 @@ export class HostSession implements WebRTCTransport {
       }
       const host = this.connections.get(this.state.hostId);
       if (!host?.open) {
+        if (parsed.data.type === 'playback' || parsed.data.type === 'music-playback') this.pendingPlayback.set(parsed.data.type, parsed.data);
         this.error = 'Esperando el relevo del servidor. Los mensajes pendientes se enviarán al reconectar.';
         this.notify();
         return;
@@ -413,6 +415,11 @@ export class HostSession implements WebRTCTransport {
 
   private flushChat() {
     if (!this.state) return;
+    const host = this.connections.get(this.state.hostId);
+    if (host?.open) {
+      for (const command of this.pendingPlayback.values()) this.send(host, { type: 'command', command });
+      this.pendingPlayback.clear();
+    }
     for (const [id, command] of this.pendingChat) {
       if (this.state.messages.some((message) => message.id === id)) {
         this.pendingChat.delete(id);
@@ -442,6 +449,11 @@ export class HostSession implements WebRTCTransport {
     const serialized: unknown = JSON.parse(JSON.stringify(data));
     if (!serialized || typeof serialized !== 'object' || Array.isArray(serialized)) return;
     const payload = serialized as Record<string, unknown>;
+    if (event === 'music-playback') {
+      const parsed = commandSchema.safeParse({ ...payload, type: 'music-playback' });
+      if (parsed.success) this.command(parsed.data);
+      return;
+    }
     if (event === 'delete-message' && typeof payload.id === 'string') { this.command({ type: 'chat-delete', id: payload.id }); return; }
     if (event === 'react-message' && typeof payload.id === 'string' && typeof payload.emoji === 'string') { const parsed = commandSchema.safeParse({ type: 'chat-react', id: payload.id, emoji: payload.emoji }); if (parsed.success) this.command(parsed.data); return; }
     if (event === 'request-chat-reads') { this.publish('chat-read-state', this.state.readReceipts ?? {}); return; }
@@ -662,6 +674,7 @@ export class HostSession implements WebRTCTransport {
     this.hellos.clear();
     this.files.clear();
     this.pendingChat.clear();
+    this.pendingPlayback.clear();
     this.incoming.clear();
     if (this.fileUrl) URL.revokeObjectURL(this.fileUrl);
     this.listeners.clear();

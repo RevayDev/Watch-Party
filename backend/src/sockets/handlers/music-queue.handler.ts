@@ -39,6 +39,16 @@ function cleanRoomIdOf(roomId: unknown): string | null {
 
 /** Handler de la cola musical Spotify. Eventos y payloads según contrato. */
 export function registerMusicQueueHandlers(io: Server, socket: Socket): void {
+  socket.on('music-playback', async (data: { roomId: string; entryId: string; currentTime: number; playing: boolean } & PrivilegedPayload) => {
+    if (!data || typeof data.entryId !== 'string' || data.entryId.length > 100 || !Number.isFinite(data.currentTime) || data.currentTime < 0 || typeof data.playing !== 'boolean') return;
+    const roomId = cleanRoomIdOf(data.roomId);
+    if (!roomId || !memberOf(socket.id, roomId) || !checkSocketRateLimit(socket.id, 'music-playback', 60, 60000)) return;
+    const room = await RoomService.getRoomById(roomId);
+    if (!room || room.settings?.musicEnabled === false) return;
+    if (room.settings?.hostOnlySync && !requireModerator(room, resolveSocketClaim(socket, data))) return;
+    const updated = await RoomService.syncMusic(roomId, data.entryId, data.currentTime, data.playing);
+    if (updated) emitQueue(io, roomId, updated);
+  });
   // Añadir un tema a la cola.
   socket.on(
     'music-add',

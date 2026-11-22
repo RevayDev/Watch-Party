@@ -546,7 +546,7 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
   const toggleScreenShare = useCallback(async () => {
     if (screenBusy.current) return;
     if (screenTrackRef.current) { await stopScreenShare(); return; }
-    if (!navigator.mediaDevices?.getDisplayMedia) { setMediaError('Compartir pantalla requiere HTTPS y un navegador compatible.'); return; }
+    if (!navigator.mediaDevices?.getDisplayMedia) { setMediaError('Este navegador no permite compartir la pantalla de este dispositivo. Puedes ver las pantallas de otros participantes o compartir desde un equipo compatible.'); return; }
     screenBusy.current = true;
     try {
       // The browser owns the choice of screen, window or tab. Never capture automatically.
@@ -561,6 +561,9 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
       await enableMedia(isMicOnRef.current, isCameraOnRef.current);
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'NotAllowedError') return;
+      if (cause instanceof DOMException && cause.name === 'NotSupportedError') {
+        setMediaError('Este navegador no permite capturar la pantalla del teléfono. La cámara y el micrófono siguen disponibles.'); return;
+      }
       setMediaError('No se pudo compartir la pantalla. Inténtalo de nuevo.');
     } finally { screenBusy.current = false; }
   }, [enableMedia, stopScreenShare]);

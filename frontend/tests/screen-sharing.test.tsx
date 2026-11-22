@@ -13,6 +13,15 @@ class TestStream {
 }
 function track(kind: string) { return Object.assign(new EventTarget(), { kind, readyState: 'live', enabled: true, stop: vi.fn(), applyConstraints: vi.fn(async () => {}), getSettings: () => ({}), onended: null }) as unknown as MediaStreamTrack; }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+it('explains unsupported phone screen capture without using the camera as a substitute', async () => {
+ const camera = vi.fn();
+ vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: camera } });
+ const view = renderHook(() => useWebRTC(null, 'room', 'Ana', true));
+ await act(async () => { await view.result.current.toggleScreenShare(); });
+ expect(view.result.current.mediaError).toContain('no permite compartir la pantalla');
+ expect(view.result.current.isScreenSharing).toBe(false);
+ expect(camera).not.toHaveBeenCalled();
+});
 it('shares the selected display, keeps the microphone and restores the previous camera on stop', async () => {
  const camera = track('video'), microphone = track('audio'), display = track('video');
  const capture = vi.fn(async () => new TestStream([display]));

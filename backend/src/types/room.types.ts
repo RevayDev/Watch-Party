@@ -113,6 +113,7 @@ export type IMusicNowPlaying = {
   proposedBy: string;
   proposedByUserId?: string;
   startedAt: Date;
+  playback?: { currentTime: number; playing: boolean; sentAt: number };
   startedBy: string;
 } | null;
 

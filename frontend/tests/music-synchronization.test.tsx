@@ -1,0 +1,30 @@
+// @vitest-environment jsdom
+import React from 'react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { NowPlayingPlayer } from '../src/features/room/components/NowPlayingPlayer';
+const player = vi.hoisted(() => ({ seekTo: vi.fn(), playVideo: vi.fn(), pauseVideo: vi.fn(), unMute: vi.fn(), setVolume: vi.fn(), getCurrentTime: vi.fn(() => 0), getPlayerState: vi.fn(() => 1), getDuration: () => 300 }));
+vi.mock('../src/features/player/YouTubePlayerView', () => ({ YouTubePlayerView: ({ onReady }: { onReady: (p: typeof player) => void }) => {
+ const ready = React.useRef(onReady); React.useEffect(() => ready.current(player), []); return null;
+} }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
+const props = { trackKey: 'entry', videoId: 'abcdefghijk', title: 'Song', subtitle: '', onEnded: vi.fn(), onNext: vi.fn(), onStop: vi.fn(), onExpand: vi.fn(), showModerator: true };
+it('joins at the shared elapsed position, applies pause and seek without echoing', () => {
+ vi.useFakeTimers(); vi.setSystemTime(new Date('2026-01-01T00:01:00Z'));
+ const onPlayback = vi.fn();
+ const view = render(<NowPlayingPlayer {...props} startedAt="2026-01-01T00:00:00Z" onPlayback={onPlayback} />);
+ expect(player.seekTo).toHaveBeenCalledWith(60, true);
+ view.rerender(<NowPlayingPlayer {...props} playback={{ currentTime: 25, playing: false, sentAt: Date.now() }} onPlayback={onPlayback} />);
+ expect(player.pauseVideo).toHaveBeenCalled(); expect(player.seekTo).toHaveBeenLastCalledWith(25, true);
+ act(() => { vi.advanceTimersByTime(3000); });
+ expect(player.seekTo).toHaveBeenLastCalledWith(25, true);
+ expect(onPlayback).not.toHaveBeenCalled();
+});
+it('publishes local play and seek controls to the room', () => {
+ const onPlayback = vi.fn();
+ render(<NowPlayingPlayer {...props} onPlayback={onPlayback} />);
+ fireEvent.click(screen.getByRole('button', { name: 'Reproducir' }));
+ expect(onPlayback).toHaveBeenCalledWith(0, true);
+ fireEvent.click(screen.getByRole('button', { name: 'Reiniciar canción' }));
+ expect(onPlayback).toHaveBeenLastCalledWith(0, true);
+});

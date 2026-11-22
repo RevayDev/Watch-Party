@@ -71,6 +71,25 @@ afterEach(async () => {
 });
 
 describe('music-queue.handler', () => {
+  it('broadcasts member music checkpoints, rejects stale tracks and outsiders', async () => {
+    const registered = new Map<string, (data: unknown) => void>();
+    const socket = { id: 'sync-member', on: (event: string, cb: (data: unknown) => void) => registered.set(event, cb), emit: () => {} } as unknown as Socket;
+    const { io, emitted } = makeIo();
+    registerMusicQueueHandlers(io, socket);
+    admit(socket.id, roomId, 'Ana', 'u-sync');
+    await registered.get('music-add')?.({ roomId, track: TRACK });
+    const room = await RoomService.getRoomById(roomId);
+    const entryId = room!.musicNowPlaying!.entryId;
+    emitted.length = 0;
+    await registered.get('music-playback')?.({ roomId, entryId, currentTime: 42, playing: false });
+    expect(emitted.at(-1)?.payload).toMatchObject({ nowPlaying: { playback: { currentTime: 42, playing: false } } });
+    emitted.length = 0;
+    await registered.get('music-playback')?.({ roomId, entryId: 'stale', currentTime: 0, playing: true });
+    expect(emitted).toHaveLength(0);
+    activeUsers.delete(socket.id);
+    await registered.get('music-playback')?.({ roomId, entryId, currentTime: 0, playing: true });
+    expect(emitted).toHaveLength(0);
+  });
   it('un no-miembro es ignorado en silencio', async () => {
     // Socket admitido en OTRA sala (no en roomId): el handler lo ignora.
     const registered = new Map<string, (data: unknown) => void>();

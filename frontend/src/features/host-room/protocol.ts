@@ -27,6 +27,7 @@ const musicEntrySchema = musicTrackSchema.omit({ id: true }).extend({
   status: z.enum(['queued', 'pending']), votes: z.array(id).max(MAX_HOST_MEMBERS), createdAt: z.string(),
 });
 const musicPlayingSchema = musicTrackSchema.omit({ id: true, durationMs: true }).extend({
+  playback: z.object({ currentTime: z.number().finite().nonnegative(), playing: z.boolean(), sentAt: z.number().finite() }).optional(),
   entryId: id, trackId: id, proposedBy: name.optional(), proposedByUserId: id.optional(),
   startedAt: z.string(), startedBy: name,
 });
@@ -41,6 +42,7 @@ export const snapshotSchema = z.object({
   })).max(300),
   video: videoSchema.nullable(),
   playback: z.object({
+    isPlaying: z.boolean().optional(),
     action: z.enum(['play', 'pause', 'seek']), currentTime: z.number().finite().nonnegative(),
     sentAt: z.number().finite(), timestamp: z.number().finite(),
   }).nullable(),
@@ -50,6 +52,7 @@ export const snapshotSchema = z.object({
   musicNowPlaying: musicPlayingSchema.nullable().default(null),
 });
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('music-playback'), entryId: id, currentTime: z.number().finite().nonnegative(), playing: z.boolean() }),
   z.object({ type: z.literal('room-settings'), settings: roomSettingsSchema }),
   z.object({ type: z.literal('chat-delete'), id }),
   z.object({ type: z.literal('chat-react'), id, emoji: z.enum(['❤️','😂','😮','👏','😢','🔥']) }),
@@ -113,9 +116,12 @@ export function newHostRoom(name: string): HostRoomOptions {
 
 export function applyHostCommand(state: HostSnapshot, senderId: string, command: HostCommand): HostSnapshot {
   const member = state.members.find((candidate) => candidate.id === senderId);
-  const memberAction = command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
+  const memberAction = command.type === 'playback' || command.type === 'music-playback' || command.type === 'chat-delete' || command.type === 'chat-react' || command.type === 'chat-read' || command.type === 'chat' || command.type === 'edit-chat' || command.type === 'music-add' || command.type === 'music-remove';
   if (!member || (!memberAction && senderId !== state.hostId)) return state;
   switch (command.type) {
+    case 'music-playback':
+      if (state.musicNowPlaying?.entryId !== command.entryId) return state;
+      return { ...state, revision: state.revision + 1, musicNowPlaying: { ...state.musicNowPlaying, playback: { currentTime: command.currentTime, playing: command.playing, sentAt: Date.now() } } };
     case 'room-settings':
       return { ...state, revision: state.revision + 1, roomSettings: { ...state.roomSettings, ...command.settings } };
     case 'chat-read': {
@@ -158,7 +164,7 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
     case 'settings':
       return { ...state, revision: state.revision + 1, automaticMigration: command.automaticMigration, replicateVideo: command.replicateVideo };
     case 'playback':
-      return { ...state, revision: state.revision + 1, playback: { action: command.action, currentTime: command.currentTime, sentAt: Date.now(), timestamp: Date.now() } };
+      return { ...state, revision: state.revision + 1, playback: { action: command.action, isPlaying: command.action === 'seek' ? (state.playback?.isPlaying ?? state.playback?.action === 'play') : command.action === 'play', currentTime: command.currentTime, sentAt: Date.now(), timestamp: Math.max(Date.now(), (state.playback?.timestamp ?? 0) + 1) } };
     case 'music-add': {
       if (state.musicQueue.length >= 40 || state.musicQueue.some((entry) => entry.trackId === command.track.id)) return state;
       const entry = {

@@ -1048,6 +1048,18 @@ export class RoomService {
   }
 
   /** Detiene la música: limpia nowPlaying. Nunca toca `room.video`. */
+  public static async syncMusic(roomId: string, entryId: string, currentTime: number, playing: boolean): Promise<IRoom | null> {
+    const cleanId = cleanIdOf(roomId);
+    return withRoomLock(cleanId, async () => {
+      const room = await roomRepository.findById(cleanId);
+      if (!room || room.musicNowPlaying?.entryId !== entryId) return null;
+      room.musicNowPlaying = { ...room.musicNowPlaying, playback: { currentTime, playing, sentAt: Date.now() } };
+      room.updatedAt = new Date();
+      await roomRepository.save(room);
+      return room;
+    });
+  }
+
   public static async stopMusic(roomId: string): Promise<IRoom | null> {
     const cleanId = cleanIdOf(roomId);
     return withRoomLock(cleanId, async () => {

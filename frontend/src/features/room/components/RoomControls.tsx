@@ -1,6 +1,6 @@
 import { DeviceTest } from '../../../components/MediaSettings';
 import { Button, Popover } from '../../../shared/components/ui';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MessageSquare, Users, PhoneOff, PanelRightClose, PanelRightOpen, MoreVertical, Mic, MicOff, Video, VideoOff, Smile, Eye, EyeOff, Music, ScreenShare, ScreenShareOff, ChevronDown } from 'lucide-react';
 import { Reactions } from '../../../components/Reactions';
 
@@ -98,6 +98,8 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   showLabels = true,
 }) => {
   const [deviceMenu, setDeviceMenu] = useState<'audio' | 'video' | null>(null);
+  const [screenNotice, setScreenNotice] = useState(false);
+  const screenAnchor = useRef<HTMLButtonElement>(null);
   // Picker persistente: solo se cierra con el botón Smile (toggle), Esc o
   // swipe-down (emojiSheetRef). Reaccionar NO lo cierra.
   useEffect(() => {
@@ -304,9 +306,19 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
         </Button>
       </BarItem>
       {onToggleScreenShare && <BarItem label={isScreenSharing ? 'Dejar de compartir' : 'Compartir pantalla'}>
-        <Button variant="unstyled" type="button" onClick={onToggleScreenShare} className={`meet-circle-btn ${isScreenSharing ? 'meet-circle-btn--active' : ''}`} title={isScreenSharing ? 'Dejar de compartir pantalla' : 'Compartir pantalla o ventana'} aria-pressed={isScreenSharing}>
+        <div style={{ position: 'relative' }}>
+        <Button ref={screenAnchor} variant="unstyled" type="button" onClick={() => {
+          if (!isScreenSharing && !navigator.mediaDevices?.getDisplayMedia) { setScreenNotice(value => !value); return; }
+          onToggleScreenShare();
+        }} className={`meet-circle-btn ${isScreenSharing ? 'meet-circle-btn--active' : ''}`} title={isScreenSharing ? 'Dejar de compartir pantalla' : 'Compartir pantalla o ventana'} aria-pressed={isScreenSharing}>
           {isScreenSharing ? <ScreenShareOff size={18} /> : <ScreenShare size={18} />}
         </Button>
+        {screenNotice && <Popover anchor={screenAnchor.current} className="meet-device-menu" role="dialog" aria-label="Compartir pantalla" onDismiss={() => setScreenNotice(false)}>
+          <h4>Compartir pantalla</h4>
+          <p>Este navegador no permite transmitir la pantalla de tu dispositivo. Puedes ver las pantallas de otros participantes o compartir desde un equipo compatible.</p>
+          <Button variant="secondary" onClick={() => setScreenNotice(false)}>Entendido</Button>
+        </Popover>}
+        </div>
       </BarItem>}
       </div>
 
