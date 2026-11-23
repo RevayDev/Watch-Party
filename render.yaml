@@ -19,3 +19,9 @@ services:
         value: "*.vercel.app"
       - key: MONGODB_URI
         sync: false
+      # Render conserva señalización, salas y chat. El relay TURN debe estar en
+      # un host con puertos UDP/TCP públicos; usa el mismo secreto en coturn.
+      - key: TURN_URLS
+        sync: false
+      - key: TURN_SHARED_SECRET
+        sync: false

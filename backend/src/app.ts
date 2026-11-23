@@ -13,6 +13,7 @@ import docsRoutes from './routes/docs.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { globalLimiter } from './middleware/rate-limit.middleware.js';
 import { metricsMiddleware } from './services/metrics.service.js';
+import { isTurnConfigured } from './config/turn.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,7 +39,12 @@ export function createApp(): Express {
 
   // Liveness mínimo (sin PII, sin rate-limit para no bloquear probes).
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, uptimeSec: Math.floor(process.uptime()) });
+    res.json({
+      ok: true,
+      uptimeSec: Math.floor(process.uptime()),
+      // Estado seguro para soporte: no se filtran URL, usuario ni secreto TURN.
+      turnConfigured: isTurnConfigured(),
+    });
   });
 
   // ── CORS Proxy for external video streaming (ver services/proxy.service.ts + routes/proxy.routes.ts) ──

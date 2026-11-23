@@ -211,6 +211,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
       const synced = ResolveSyncTimeUseCase.execute(cleanRoomId, room?.participants || []);
 
       // Send initial room state + peer list for WebRTC + playback position + media states
+      const turnServer = createTurnCredentials(socket.id);
       socket.emit('room-state', {
         roomId: cleanRoomId,
         leaderName: room?.leaderName,
@@ -228,7 +229,7 @@ export function registerJoinApprovalHandlers(io: Server, socket: Socket): void {
         musicQueue: room?.musicQueue || [],
         musicNowPlaying: room?.musicNowPlaying || null,
         peers: existingPeers,
-        turnServer: createTurnCredentials(socket.id),
+        turnServer,
         mediaStates: existingMediaStates,
         playback: synced !== null
           ? { currentTime: synced.currentTime, isPlaying: synced.isPlaying }

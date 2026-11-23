@@ -60,7 +60,14 @@ export const openapiSpec = {
               'application/json': {
                 schema: {
                   type: 'object',
-                  properties: { ok: { type: 'boolean' }, uptimeSec: { type: 'number' } },
+                  properties: {
+                    ok: { type: 'boolean' },
+                    uptimeSec: { type: 'number' },
+                    turnConfigured: {
+                      type: 'boolean',
+                      description: 'Indica si el backend puede emitir credenciales TURN temporales. No revela secretos.',
+                    },
+                  },
                 },
               },
             },

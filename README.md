@@ -206,3 +206,38 @@ npm run build      # build de producción
 - **Room-state:** foto completa de la sala que el servidor envía al entrar (video, gente, ajustes, posición).
 - **`hostOnlySync`:** ajuste que deja la reproducción solo en manos de host/cohost (apagado = todos controlan).
 - **Transferir sala:** el host puede pasarle la corona a otro (baja a cohost, el secreto rota).
+
+---
+
+## Cámara y micrófono confiables (TURN)
+
+Render ejecuta el backend de salas, chat y señalización WebRTC, pero su servicio web solo publica un puerto HTTP. Un relay TURN necesita puertos UDP/TCP públicos, por lo que **no se puede ejecutar el relay dentro del Web Service de Render**. Usa un VPS o un proveedor TURN para el relay y deja el backend en Render.
+
+El backend ya genera para cada participante una credencial TURN de 24 horas; no se expone una contraseña fija al navegador. Configura el mismo secreto en ambos lados:
+
+1. En un servidor público con IP fija instala `coturn` y configura, como mínimo:
+
+   ```ini
+   use-auth-secret
+   static-auth-secret=REEMPLAZA_POR_UN_SECRETO_LARGO_ALEATORIO
+   realm=turn.tu-dominio.com
+   fingerprint
+   no-multicast-peers
+   no-loopback-peers
+   min-port=49160
+   max-port=49200
+   ```
+
+   Abre `3478` UDP y TCP, el rango UDP `49160-49200`, y si habilitas TLS también `5349` TCP. Para `turns:` instala un certificado válido en el relay.
+
+2. En el servicio `watch-party-backend` de Render agrega estas variables de entorno (no en el frontend):
+
+   ```text
+   TURN_URLS=turn:turn.tu-dominio.com:3478?transport=udp,turn:turn.tu-dominio.com:3478?transport=tcp,turns:turn.tu-dominio.com:5349?transport=tcp
+   TURN_SHARED_SECRET=REEMPLAZA_POR_EL_MISMO_SECRETO
+   ```
+
+3. Redeploya el backend. Verifica `https://TU-BACKEND.onrender.com/api/health`: debe responder `"turnConfigured": true`. Ese endpoint nunca devuelve el secreto ni las URLs.
+
+Las variables `TURN_URLS` y `TURN_SHARED_SECRET` ya están declaradas como secretos manuales en `render.yaml`. El frontend recibe una credencial temporal por Socket.IO cuando la persona entra a una sala.
+
