@@ -71,7 +71,7 @@ afterEach(async () => {
 });
 
 describe('music-queue.handler', () => {
-  it('keeps music paused at zero until all present players report ready', async () => {
+  it('starts music immediately without waiting for every participant device', async () => {
     const { io, emitted } = makeIo();
     const first = new Map<string, (data: unknown) => void>(), second = new Map<string, (data: unknown) => void>();
     registerMusicQueueHandlers(io, { id: 'ready-one', on: (event: string, cb: (data: unknown) => void) => first.set(event, cb), emit: () => {} } as unknown as Socket);
@@ -79,11 +79,9 @@ describe('music-queue.handler', () => {
     admit('ready-one', roomId, 'Ana'); admit('ready-two', roomId, 'Beto');
     await first.get('music-add')?.({ roomId, track: TRACK });
     const entryId = (await RoomService.getRoomById(roomId))!.musicNowPlaying!.entryId;
-    await first.get('music-ready')?.({ roomId, entryId });
-    expect((await RoomService.getRoomById(roomId))?.musicNowPlaying?.playback).toMatchObject({ currentTime: 0, playing: false, awaitingReady: true });
-    await second.get('music-ready')?.({ roomId, entryId });
     const playback = (await RoomService.getRoomById(roomId))?.musicNowPlaying?.playback;
-    expect(playback?.playing).toBe(true); expect(playback?.sentAt).toBeGreaterThan(Date.now());
+    expect(playback).toMatchObject({ currentTime: 0, playing: true });
+    expect(playback?.awaitingReady).toBeUndefined();
     expect(emitted.at(-1)?.payload).toMatchObject({ nowPlaying: { playback: { currentTime: 0, playing: true } } });
   });
   it('shares searches with members and rejects updates from outside the room', async () => {

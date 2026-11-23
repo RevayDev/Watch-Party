@@ -3,7 +3,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AudioLines, Maximize2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, Youtube, Square } from 'lucide-react';
 import { YouTubePlayerView } from '../../player/YouTubePlayerView';
 import { onPageResume } from '../../../shared/pageResume';
-import { roomNow } from '../../../shared/roomClock';
 
 interface QueueYouTubePlayer {
   playVideo?: () => void;
@@ -22,10 +21,6 @@ export function formatPlayerTime(totalSeconds: number): string {
   const t = Math.floor(totalSeconds);
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
-
-// Like the main video, music should remain smooth through ordinary network
-// jitter. A shared checkpoint only corrects a genuinely lost position.
-export const MUSIC_SYNC_TOLERANCE_SECONDS = 20;
 
 /** The mini-player uses the existing iframe and advances the room queue when playback ends. */
 export const NowPlayingPlayer: React.FC<{
@@ -57,24 +52,19 @@ export const NowPlayingPlayer: React.FC<{
   onEndedRef.current = onEnded;
   const checkpoint = useRef(playback);
   const playingRef = useRef(false);
-  const startedRef = useRef(startedAt);
   const readyTrackRef = useRef<string | null>(null);
   const readyRef = useRef(onReadyToPlay); readyRef.current = onReadyToPlay;
-  startedRef.current = startedAt;
-  const synchronize = (force = false) => {
+  const synchronize = () => {
     const p = playerRef.current; if (!p) return;
     const point = checkpoint.current;
-    const shouldPlay = (point?.playing ?? true) && (point?.sentAt ?? 0) <= roomNow();
-    const sentAt = point?.sentAt ?? Date.parse(startedRef.current || new Date().toISOString());
-    const target = (point?.currentTime ?? 0) + (shouldPlay ? Math.max(0, (roomNow() - sentAt) / 1000) : 0);
+    const shouldPlay = point?.playing ?? true;
     try {
-      if (Math.abs((p.getCurrentTime?.() ?? 0) - target) >= MUSIC_SYNC_TOLERANCE_SECONDS) {
-        p.seekTo?.(target, true);
-      }
+      // A diferencia del video, la música no corrige segundos entre clientes.
+      // Así un móvil que cargue tarde nunca salta, pausa ni arrastra a otro.
       const active = p.getPlayerState ? p.getPlayerState() === 1 : playingRef.current;
       if (shouldPlay && !active) p.playVideo?.();
       if (!shouldPlay) p.pauseVideo?.();
-      setCurrent(target);
+      setCurrent(p.getCurrentTime?.() ?? 0);
     } catch { /* The next ready/foreground event retries the checkpoint. */ }
   };
   const syncRef = useRef(synchronize); syncRef.current = synchronize;
@@ -90,23 +80,17 @@ export const NowPlayingPlayer: React.FC<{
   const reportReadyRef = useRef(reportReady); reportReadyRef.current = reportReady;
   useEffect(() => {
     checkpoint.current = playback;
-    syncRef.current(true);
-    if (playback?.playing && playback.sentAt > roomNow()) {
-      const timer = window.setTimeout(() => syncRef.current(true), playback.sentAt - roomNow());
-      return () => window.clearTimeout(timer);
-    }
+    syncRef.current();
   }, [playback?.sentAt, playback?.currentTime, playback?.playing, startedAt, trackKey]);
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      syncRef.current();
-      if (checkpoint.current?.awaitingReady) reportReadyRef.current();
-    }, 1000);
-    const stop = onPageResume(() => syncRef.current(true));
-    return () => { window.clearInterval(timer); stop(); };
+    const stop = onPageResume(() => syncRef.current());
+    return stop;
   }, [trackKey]);
   const publish = (seconds: number, active: boolean) => {
     checkpoint.current = { currentTime: seconds, playing: active, sentAt: Date.now() };
-    onPlayback?.(seconds, active);
+    // Los invitados controlan su propio audio. Solo un moderador puede enviar
+    // play/pausa al estado común y no se replica la posición entre clientes.
+    if (showModerator) onPlayback?.(seconds, active);
   };
 
   // Android browsers can reject a programmatic iframe play. This function is
@@ -114,16 +98,11 @@ export const NowPlayingPlayer: React.FC<{
   const activateLocalPlayback = () => {
     const p = playerRef.current;
     if (!p) return;
-    const point = checkpoint.current;
-    const shouldPlay = point?.playing ?? true;
-    const sentAt = point?.sentAt ?? Date.parse(startedRef.current || new Date().toISOString());
-    const target = (point?.currentTime ?? 0) + (shouldPlay ? Math.max(0, (roomNow() - sentAt) / 1000) : 0);
     try {
-      p.seekTo?.(target, true);
       p.unMute?.();
       p.setVolume?.(volume);
       p.playVideo?.();
-      setCurrent(target);
+      setCurrent(p.getCurrentTime?.() ?? 0);
       setMuted(false);
       setNeedsActivation(false);
     } catch {
@@ -132,7 +111,6 @@ export const NowPlayingPlayer: React.FC<{
   };
 
   const togglePlay = () => {
-    if (playback?.awaitingReady) { reportReady(); return; }
     try {
       const p = playerRef.current;
       if (!p) return;
@@ -158,7 +136,6 @@ export const NowPlayingPlayer: React.FC<{
   };
 
   const restart = () => {
-    if (playback?.awaitingReady) { reportReady(); return; }
     publish(0, true);
     playerRef.current?.seekTo?.(0, true);
     setCurrent(0);
@@ -170,7 +147,6 @@ export const NowPlayingPlayer: React.FC<{
   };
 
   const seekTo = (seconds: number) => {
-    if (playback?.awaitingReady) return;
     publish(seconds, playing);
     try {
       const p = playerRef.current;
@@ -260,15 +236,13 @@ export const NowPlayingPlayer: React.FC<{
       {/* Keep the iframe painted. Mobile WebKit refuses audio from a fully
           invisible frame even after the user presses this player's button. */}
       <div aria-hidden="true" style={{ position: 'absolute', width: 2, height: 2, overflow: 'hidden', opacity: 0.01, pointerEvents: 'none' }}>
-        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; synchronize(true); reportReady(); }} onAutoplayBlocked={() => setNeedsActivation(true)} onStateChange={(event) => {
-          if (checkpoint.current?.awaitingReady) { playerRef.current?.pauseVideo?.(); reportReady(); }
+        <YouTubePlayerView key={trackKey} videoId={videoId} className="" onDispose={(player) => { if (playerRef.current === player) playerRef.current = null; }} onReady={(player) => { playerRef.current = player; synchronize(); reportReady(); }} onAutoplayBlocked={() => setNeedsActivation(true)} onStateChange={(event) => {
           if (event.data === 1) { playingRef.current = true; setPlaying(true); setNeedsActivation(false); }
           else if (event.data === 2) { playingRef.current = false; setPlaying(false); }
           else if (event.data === 0) { setPlaying(false); onEndedRef.current(); }
         }} />
       </div>
       <div className="yt-miniplayer-controls music-player__controls">
-        {playback?.awaitingReady && <span role="status">Esperando a que todos estén listos…</span>}
         {needsActivation && <Button variant="unstyled" type="button" className="music-player__activate" onClick={activateLocalPlayback}>Activar audio en este teléfono</Button>}
         <Button variant="unstyled" type="button" className="music-player__icon" title="Reiniciar canción" aria-label="Reiniciar canción" onClick={restart}><SkipBack size={18} /></Button>
         <Button variant="unstyled" type="button" className="music-player__icon music-player__play" title={playing ? 'Pausar' : 'Reproducir'} aria-label={playing ? 'Pausar' : 'Reproducir'} onClick={togglePlay}>{playing ? <Pause size={20} /> : <Play size={20} />}</Button>

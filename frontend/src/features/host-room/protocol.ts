@@ -238,7 +238,9 @@ export function applyHostCommand(state: HostSnapshot, senderId: string, command:
       const [next, ...queue] = state.musicQueue;
       return { ...state, revision: state.revision + 1, musicQueue: queue, musicNowPlaying: next ? {
         ...next, entryId: next.id, startedAt: new Date().toISOString(), startedBy: member.name,
-        playback: { currentTime: 0, playing: false, sentAt: Date.now(), awaitingReady: true }, readyMembers: [],
+        // La música no usa una barrera de participantes: quien tenga el
+        // iframe listo empieza, y los teléfonos lentos se incorporan después.
+        playback: { currentTime: 0, playing: true, sentAt: Date.now() },
       } : null };
     }
     case 'music-stop':

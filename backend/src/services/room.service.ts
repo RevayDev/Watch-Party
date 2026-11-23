@@ -881,7 +881,9 @@ export class RoomService {
           proposedByUserId: entry.proposedByUserId,
           startedAt: now,
           startedBy: 'sala',
-          playback: { currentTime: 0, playing: false, sentAt: Date.now(), awaitingReady: true },
+          // La música es deliberadamente tolerante al retraso: un teléfono
+          // lento no puede dejar esperando ni detener a los demás.
+          playback: { currentTime: 0, playing: true, sentAt: Date.now() },
         };
       }
       room.updatedAt = new Date();
@@ -1042,7 +1044,9 @@ export class RoomService {
         proposedByUserId: next.proposedByUserId,
         startedAt: new Date(),
         startedBy: 'sala',
-        playback: { currentTime: 0, playing: false, sentAt: Date.now(), awaitingReady: true },
+        // No hacemos barrera de "todos listos" para música. Android puede
+        // necesitar un toque local y se incorpora sin afectar la sala.
+        playback: { currentTime: 0, playing: true, sentAt: Date.now() },
       };
       room.updatedAt = new Date();
       await roomRepository.save(room);
