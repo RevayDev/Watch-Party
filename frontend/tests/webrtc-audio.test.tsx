@@ -5,7 +5,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import type { Socket } from 'socket.io-client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { RemoteAudio } from '../src/components/RemoteAudio';
-import { browserHostedIceConfiguration, useWebRTC } from '../src/hooks/useWebRTC';
+import { p2pIceConfiguration, useWebRTC } from '../src/hooks/useWebRTC';
 
 const microphone = Object.assign(new EventTarget(), {
   kind: 'audio', id: 'mic', readyState: 'live', stop: vi.fn(),
@@ -22,16 +22,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('adds configured TURN credentials for browser-hosted phone connections', () => {
-  const config = browserHostedIceConfiguration({
-    VITE_TURN_URLS: 'turn:relay.example.com:3478?transport=udp,turns:relay.example.com:5349?transport=tcp',
-    VITE_TURN_USERNAME: 'temporary-user',
-    VITE_TURN_CREDENTIAL: 'temporary-secret',
-  });
-  expect(config.iceServers).toContainEqual({
-    urls: ['turn:relay.example.com:3478?transport=udp', 'turns:relay.example.com:5349?transport=tcp'],
-    username: 'temporary-user', credential: 'temporary-secret',
-  });
+it('uses the original direct P2P STUN-only configuration', () => {
+  const config = p2pIceConfiguration();
+  expect(config.iceServers).toContainEqual({ urls: 'stun:stun.l.google.com:19302' });
+  expect(config.iceServers).not.toContainEqual(expect.objectContaining({ username: expect.anything() }));
 });
 
 it('reutiliza el sender negociado al encender, apagar y volver a encender el micrófono', async () => {

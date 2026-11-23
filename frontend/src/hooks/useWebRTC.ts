@@ -36,32 +36,20 @@ export interface PeerMediaState {
 }
 
 const STUN_SERVERS: RTCIceServer[] = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
+  { urls: 'stun:global.stun.twilio.com:3478' },
 ];
 
-/**
- * Browser-hosted rooms have no backend to mint temporary TURN credentials.
- * These public build variables therefore accept short-lived credentials from
- * the deployed TURN provider. Render rooms still append their server-issued
- * credentials after joining.
- */
-export function browserHostedIceConfiguration(env: Record<string, string | undefined> = import.meta.env): RTCConfiguration {
-  const urls = (env.VITE_TURN_URLS ?? env.VITE_HOST_TURN_URLS ?? '')
-    .split(',').map((url) => url.trim()).filter((url) => /^turns?:[^\s]+$/i.test(url));
-  const username = (env.VITE_TURN_USERNAME ?? env.VITE_HOST_TURN_USERNAME ?? '').trim();
-  const credential = (env.VITE_TURN_CREDENTIAL ?? env.VITE_HOST_TURN_CREDENTIAL ?? '').trim();
-  const turn: RTCIceServer[] = urls.length > 0 && username && credential
-    ? [{ urls, username, credential }]
-    : [];
-  return { iceServers: [...STUN_SERVERS, ...turn] };
+/** The original direct WebRTC transport: P2P discovery through public STUN only. */
+export function p2pIceConfiguration(): RTCConfiguration {
+  return { iceServers: [...STUN_SERVERS] };
 }
 
-const ICE_SERVERS = browserHostedIceConfiguration();
+const ICE_SERVERS = p2pIceConfiguration();
 
 export interface WebRTCTransport {
   id?: string;
@@ -775,24 +763,16 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
     const onRoomState = (s: {
       peers?: Array<{ socketId: string; userName: string; isLeader: boolean }>;
       mediaStates?: Record<string, { isCameraOn: boolean; isMicOn: boolean; userName?: string }>;
-      turnServer?: RTCIceServer;
     }) => {
-      iceConfiguration.current = s.turnServer
-        ? { iceServers: [...(ICE_SERVERS.iceServers ?? []), s.turnServer] }
-        : ICE_SERVERS;
+      // Keep the original direct P2P negotiation model. Room state never
+      // injects relay credentials or mutates an already created connection.
+      iceConfiguration.current = ICE_SERVERS;
       if (s.peers && s.peers.length > 0) {
         console.log(`[WebRTC] Room state received: connecting to ${s.peers.length} peers`);
         for (const p of s.peers) {
           if (p.socketId && p.socketId !== socket.id) {
             const existing = peerConnections.current.get(p.socketId);
-            if (existing && s.turnServer) {
-              try {
-                existing.setConfiguration(iceConfiguration.current);
-              } catch {
-                console.warn('[WebRTC] No se pudo actualizar el relay de una conexión existente.');
-              }
-            }
-            if (!existing || existing.connectionState === 'failed' || existing.connectionState === 'disconnected') {
+            if (existing?.connectionState !== 'connected') {
               void sendOffer(p.socketId, p.userName, p.isLeader);
             }
           }
