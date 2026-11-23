@@ -278,7 +278,6 @@ function ConnectedHostRoom({ options, onLeave }: { options: HostRoomOptions; onL
         onExpandToMain={(link, title, currentTime = 0) => { void setVideoUrl(link, title, currentTime); }} />}
       controls={<RoomControls localStream={media.localStream} onRetryMedia={media.retryMediaConnection} isScreenSharing={media.isScreenSharing} onToggleScreenShare={media.toggleScreenShare} roomId={options.roomId} layout={barPrefs.layout} shape={barPrefs.shape} showLabels={barPrefs.showLabels}
         isMicOn={media.isMicOn} isCameraOn={media.isCameraOn} toggleMic={media.toggleMic} toggleCamera={media.toggleCamera}
-        mediaUnavailableMessage="Las salas alojadas en navegador no activan cámara ni micrófono hasta que se configure el relay TURN seguro. Puedes seguir viendo el video, chatear y usar música."
         showEmojiPicker={showEmojiPicker} setShowEmojiPicker={setShowEmojiPicker} emojiPresence={emojiPresence}
         emojiSheetRef={emojiSheetRef} handleReaction={(emoji) => session.emit('reaction', { emoji })}
         activeSideTab={activeSideTab} setActiveSideTab={setActiveSideTab} unreadCount={0}
