@@ -832,6 +832,12 @@ export function useWebRTC(socket: WebRTCTransport | null, roomId: string, userNa
           return;
         }
 
+        // A simultaneous ICE retry leaves a local offer pending. Explicitly
+        // roll it back before answering the other peer (also on mobile).
+        if (offerCollision && pc.signalingState === 'have-local-offer') {
+          await pc.setLocalDescription({ type: 'rollback' });
+        }
+
         await pc.setRemoteDescription(new RTCSessionDescription(d.offer));
         await drainPendingCandidates(d.senderSocketId, pc);
 
